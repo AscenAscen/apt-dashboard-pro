@@ -45,6 +45,13 @@ const Search = (() => {
     $('selSgg').onchange = fillDong;
     $('selDong').onchange = fillApt;
     $('btnSearch').onclick = run;
+    // [단지 그래프 조회] — 누를 때마다 최신 파일을 다시 받아 그 단지의 그래프를 엶
+    $('btnGraph').onclick = async () => {
+      if (!$('selApt').value) return U.toast('먼저 "단지" 칸에서 단지를 고르세요.');
+      Data.refresh($('selSgg').value);
+      await run();
+      if (current) $('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
     $('listFilter').oninput = renderList;
     $('btnExcelList').onclick = excelList;
     $('btnAddTrackSel').onclick = () => {
@@ -56,12 +63,12 @@ const Search = (() => {
     $('btnDetailTrack').onclick = () => current && Tracking.add([current]);
     // 상세 그래프 옵션 (평형·기간·점/선) — 선택값은 브라우저에 기억
     const opt = Store.get('apt.chartOpt', { range: '0', mode: 'point' });
-    $('detRange').value = opt.range; $('detMode').value = opt.mode;
+    $('detRange').value = ['0', '1', '3', '5', '10', '20'].includes(opt.range) ? opt.range : '0'; $('detMode').value = opt.mode;
     $('detArea').onchange = () => { const r = rows.find(x => x.id === $('detArea').value); if (r) openDetail(r, false); };
-    $('detRange').onchange = $('detMode').onchange = () => {
-      Store.set('apt.chartOpt', { range: $('detRange').value, mode: $('detMode').value });
-      if (current) drawChart(current);
-    };
+    const saveOpt = () => Store.set('apt.chartOpt', { range: $('detRange').value, mode: $('detMode').value });
+    $('detRange').onchange = () => { saveOpt(); if ($('detRange').value !== 'c') { applyPreset(); if (current) drawChart(current); } };
+    $('detFrom').onchange = $('detTo').onchange = () => { $('detRange').value = 'c'; if (current) drawChart(current); };
+    $('detMode').onchange = () => { saveOpt(); if (current) drawChart(current); };
     $('btnExcelDetail').onclick = downloadDetail;
   }
 
@@ -233,6 +240,7 @@ const Search = (() => {
     ].join('');
 
     const p = periodTrades(r);
+    if ($('detRange').value !== 'c' || !$('detFrom').value) applyPreset();
     drawChart(r);
     const all = [...p.sale.map(t => ({ ...t, kind: '매매' })), ...p.rent.map(t => ({ ...t, kind: '전세' }))].sort((a, b) => b.d - a.d);
     $('detailTable').innerHTML = '<thead><tr><th class="c">구분</th><th class="c">계약일</th><th>금액</th><th>전용㎡</th><th>층</th><th class="l">비고</th></tr></thead><tbody>' +
@@ -242,19 +250,33 @@ const Search = (() => {
     if (scroll) $('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function drawChart(r) {
-    // 그래프 기간: 0 = 조회기간 그대로, 그 외 = 최근 N년 (불러온 자료 범위 안에서)
-    const years = +$('detRange').value;
-    let from = fromDate;
-    if (years) {
-      const t = new Date(); t.setMonth(t.getMonth() - Math.round(years * 12));
-      from = t.getFullYear() * 10000 + (t.getMonth() + 1) * 100 + t.getDate();
-    }
-    const p = { sale: r.sale.filter(t => t.d >= from), rent: r.rent.filter(t => t.d >= from), noDirect: $('chkNoDirect').checked };
+  /** 빠른 기간 선택값을 시작 월·끝 월 칸에 채움 */
+  function applyPreset() {
+    const now = new Date(), years = +$('detRange').value;
+    const ymText = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const from = years ? new Date(now.getFullYear() - years, now.getMonth(), 1) : new Date(Math.floor(fromDate / 10000), Math.floor(fromDate / 100) % 100 - 1, 1);
+    $('detFrom').value = ymText(from); $('detTo').value = ymText(now);
+    $('detFrom').min = $('detTo').min = ymText(new Date(now.getFullYear() - 20, now.getMonth(), 1));
+    $('detFrom').max = $('detTo').max = ymText(now);
+  }
+
+  let drawSeq = 0;
+  async function drawChart(r) {
+    // 그래프 기간: 시작 월 ~ 끝 월 (필요한 연도 파일은 그때그때 더 읽음)
+    let a = +($('detFrom').value || '').replace('-', ''), b = +($('detTo').value || '').replace('-', '');
+    if (!a || !b) return;
+    if (a > b) [a, b] = [b, a];
+    const seq = ++drawSeq;
+    const tr = await Data.complexTrades(r.code, r.key, r.g, Math.floor(a / 100), Math.floor(b / 100));
+    if (seq !== drawSeq) return;
+    const inRange = (t) => { const ym = Math.floor(t.d / 100); return ym >= a && ym <= b; };
+    const p = { sale: $('chkSale').checked ? tr.sale.filter(inRange) : [], rent: $('chkRent').checked ? tr.rent.filter(inRange) : [], noDirect: $('chkNoDirect').checked };
+    const quotes = Tracking.quotesOf(r.id).filter(q => q.ym >= a && q.ym <= b);   // 시세트래킹에 적어 둔 가격
     const mode = $('detMode').value;                      // point | line | both
     const line = mode !== 'point', dots = mode !== 'line';
     const toX = (d) => new Date(Math.floor(d / 10000), Math.floor(d / 100) % 100 - 1, d % 100).getTime();
     const pts = (arr) => arr.map(t => ({ x: toX(t.d), y: t.price / 10000, t }));
+    const qpts = (f) => quotes.filter(q => q[f] != null).map(q => ({ x: toX(q.ym * 100 + 15), y: q[f] / 10000, t: { price: q[f], d: q.ym * 100 + 15, floor: '-' } }));
     const allX = [...p.sale, ...p.rent].map(t => toX(t.d));
     const shortSpan = allX.length && Math.max(...allX) - Math.min(...allX) < 400 * 864e5;   // 약 1년 이하면 날짜까지 표시
     const css = getComputedStyle(document.documentElement);
@@ -267,6 +289,8 @@ const Search = (() => {
           { label: '매매', data: pts(p.sale.filter(t => !t.direct)), backgroundColor: col('--accent'), borderColor: col('--accent'), pointRadius: dots ? 3 : 0, pointHitRadius: 8, showLine: line, borderWidth: 2 },
           { label: '매매(직거래)', data: pts(p.sale.filter(t => t.direct)), backgroundColor: 'transparent', borderColor: col('--accent'), pointRadius: 3, pointStyle: 'triangle', hidden: p.noDirect },
           { label: '전세', data: pts(p.rent), backgroundColor: col('--rent'), borderColor: col('--rent'), pointRadius: dots ? 2.5 : 0, pointHitRadius: 8, pointStyle: 'rect', showLine: line, borderWidth: 2 },
+          { label: '내가 적은 매매가', data: qpts('s'), backgroundColor: '#fff', borderColor: col('--accent'), borderWidth: 2, pointRadius: 5, pointStyle: 'rectRot' },
+          { label: '내가 적은 전세가', data: qpts('r'), backgroundColor: '#fff', borderColor: col('--rent'), borderWidth: 2, pointRadius: 5, pointStyle: 'rectRot' },
         ].filter(d => d.data.length),
       },
       options: {
@@ -332,9 +356,17 @@ const Search = (() => {
         if (list.length) sheets.push({ name: `${kind} 내역`, rows: [['단지명', '전용㎡', '평형', '계약일', '금액(만원)', '층', '비고']]
           .concat(list.map(t => [r.name, t.area, CONFIG.toPyeong(t.g), U.date(t.d), t.price, t.floor, t.direct ? '직거래' : ''])) });
       }
-      U.xlsx(`실거래_${r.name}_${a}-${b}_${U.stamp()}.xlsx`, sheets);
+      const name = `실거래_${r.name}_${a}-${b}_${U.stamp()}`;
+      if ($('dlFormat').value === 'csv') {   // CSV 는 내역만 한 파일로
+        const rowsCsv = [['구분', '단지명', '전용㎡', '평형', '계약일', '금액(만원)', '층', '비고']];
+        for (const [kind, list] of sets) for (const t of list) rowsCsv.push([kind, r.name, t.area, CONFIG.toPyeong(t.g), U.date(t.d), t.price, t.floor, t.direct ? '직거래' : '']);
+        U.csv(name + '.csv', rowsCsv);
+      } else U.download(name, sheets, 'xlsx');
+      U.toast(`${sets.reduce((n, x) => n + x[1].length, 0).toLocaleString()}건을 내려받았습니다.`);
+    } catch (e) {
+      console.error(e); U.toast('내려받기 중 오류가 났습니다: ' + (e.message || e));
     } finally {
-      btn.disabled = false; btn.textContent = '엑셀 다운로드';
+      btn.disabled = false; btn.textContent = '다운로드';
     }
   }
 
@@ -364,8 +396,17 @@ const Search = (() => {
     };
     if ($('chkSale').checked) detail('sale', '매매 내역');
     if ($('chkRent').checked) detail('rent', '전세 내역');
-    U.xlsx(`실거래_${label}_${U.stamp()}.xlsx`, sheets);
+    U.download(`실거래_${label}_${U.stamp()}`, sheets, 'xlsx');
   }
 
-  return { init };
+  /** 다른 탭에서 지역을 넘겨받아 바로 조회 */
+  async function openRegion(code) {
+    const reg = regions.find(r => r[0] === code);
+    if (!reg) return;
+    $('selSido').value = reg[1]; fillSgg(code);
+    await fillDong();
+    run();
+  }
+
+  return { init, openRegion };
 })();

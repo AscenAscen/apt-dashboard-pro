@@ -376,6 +376,45 @@ def backfill_tasks(regions, state, cur):
                         yield (kind, r["code"], ym)
 
 
+# ───────────────────────── 첫 화면용 요약 ─────────────────────────
+def build_summary(regions, today):
+    """지역별 최근 30일 / 그 직전 30일 거래 요약 → data/summary.json (대시보드 첫 탭)"""
+    def ymd(d):
+        return d.year * 10000 + d.month * 100 + d.day
+    hi, mid, lo = ymd(today), ymd(today - dt.timedelta(days=30)), ymd(today - dt.timedelta(days=60))
+    years = sorted({today.year, (today - dt.timedelta(days=60)).year})
+    out = {}
+    for r in regions:
+        cur = {"s": 0, "sp": 0, "r": 0, "rp": 0}
+        total, n, top = 0, 0, None
+        for kind in ("sale", "rent"):
+            for y in years:
+                ydata = read_json(year_path(kind, r["code"], y), {})
+                for key, areas in ydata.items():
+                    for akey, flat in areas.items():
+                        for i in range(0, len(flat), 3):
+                            d = y * 10000 + flat[i]
+                            if d <= lo or d > hi:
+                                continue
+                            recent = d > mid
+                            if kind == "rent":
+                                cur["r" if recent else "rp"] += 1
+                                continue
+                            cur["s" if recent else "sp"] += 1
+                            if recent and not akey.endswith("d"):
+                                price = flat[i + 2]
+                                total += price
+                                n += 1
+                                if top is None or price > top[3]:
+                                    parts = key.split("|")
+                                    top = [parts[0], "|".join(parts[2:]), int(float(akey)), price, d]
+        if cur["s"] or cur["sp"] or cur["r"] or cur["rp"]:
+            cur["avg"] = round(total / n) if n else None
+            cur["top"] = top
+            out[r["code"]] = cur
+    write_json(os.path.join(DATA, "summary.json"), {"asOf": today.isoformat(), "days": 30, "regions": out}, by_line=False)
+
+
 # ───────────────────────── 실행 ─────────────────────────
 def run():
     now = dt.datetime.now(KST)
@@ -487,6 +526,7 @@ def run():
                     "stop": log["stop"], "closed": api.closed, "warnings": log["warnings"][:50]},
         "emptyRegions": empty,  # 1년치 이상 받았는데 단지가 0개 → 지역코드 변경 의심
     })
+    build_summary(regions, today)
     print("[완료] 저장 %d달, 실패 %d건, 호출 매매 %d / 전세 %d" % (log["saved"], log["failed"], api.calls["sale"], api.calls["rent"]))
     for k, v in api.closed.items():
         print("  -", k, ":", v)

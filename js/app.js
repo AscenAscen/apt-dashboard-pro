@@ -80,10 +80,12 @@ const App = (() => {
     document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
     $('mapClose').onclick = closeMap;
     $('mapModal').onclick = (e) => { if (e.target.id === 'mapModal') closeMap(); };
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMap(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); $('realModal').hidden = true; } });
     Tracking.init();
     Grouping.init();
     Trends.init();
+    Compare.init();
+    Home.init();
     await Search.init();
     showStatus();
   }

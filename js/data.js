@@ -90,7 +90,25 @@ const Data = (() => {
     };
   }
 
-  return { regions, status, index, loadYears, parseKey, eachTrade, stats };
+  /** 한 단지·한 평형의 거래를 날짜순으로 → { sale:[…], rent:[…] }. g 를 비우면 모든 평형 */
+  async function complexTrades(code, key, g, fromYear, toYear) {
+    const data = await loadYears(code, fromYear, toYear);
+    const out = { sale: [], rent: [] };
+    for (const kind of ['sale', 'rent']) {
+      eachTrade(data[kind], k => k === key, (k, t) => { if (g == null || t.g === g) out[kind].push(t); });
+      out[kind].sort((a, b) => a.d - b.d);
+    }
+    return out;
+  }
+
+  /** 저장해 둔 파일을 잊고 다음에 다시 받게 함 (code 를 주면 그 지역만) */
+  function refresh(code) {
+    for (const k of [...cache.keys()]) if (!code || k.includes(`/${code}/`) || k === `index/${code}.json`) cache.delete(k);
+  }
+
+  const summary = () => getJson('summary.json', null);
+
+  return { regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary };
 })();
 
 /* ───────────── 공통 도구 ───────────── */
@@ -134,6 +152,24 @@ const U = {
     }
     XLSX.writeFile(wb, filename);
   },
+  /** CSV 저장 (엑셀에서 한글이 깨지지 않게 BOM 포함). rows = [[…], …] */
+  csv(filename, rows) {
+    const cell = (v) => { const t = String(v ?? ''); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const blob = new Blob(['\uFEFF' + rows.map(r => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  },
+  /** 파일 내려받기 공통: format 이 'csv' 이거나 엑셀 만들기에 실패하면 CSV 로 저장 */
+  download(name, sheets, format) {
+    if (format !== 'csv') {
+      try { U.xlsx(name + '.xlsx', sheets); return; }
+      catch (e) { console.error(e); U.toast('엑셀 파일을 만들지 못해 CSV 로 저장합니다. (' + (e.message || e) + ')'); }
+    }
+    for (const s of sheets) U.csv(sheets.length > 1 ? `${name}_${s.name}.csv` : `${name}.csv`, s.rows);
+  },
+  ymd: (dt) => dt.getFullYear() * 10000 + (dt.getMonth() + 1) * 100 + dt.getDate(),
   stamp: () => { const t = new Date(); return `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, '0')}${String(t.getDate()).padStart(2, '0')}`; },
 };
 

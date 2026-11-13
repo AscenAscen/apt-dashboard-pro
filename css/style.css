@@ -120,3 +120,39 @@ h3.sub { font-size: 14px; margin: 18px 0 8px; }
 #dlAreas { padding: 6px 0 0; flex-wrap: wrap; }
 #dlAreas label { flex-direction: row; align-items: center; color: var(--text); font-size: 14px; }
 input[type=month] { color-scheme: dark; }
+
+/* 트래킹: 직접 입력 칸 */
+th.in { color: var(--accent); }
+td input.num { width: 78px; text-align: right; border-color: #37506e; }
+label.inline { display: flex; align-items: center; gap: 6px; color: var(--sub); font-size: 13px; }
+/* 첫 화면 */
+.tablewrap.tall { max-height: 78vh; }
+tr.group td { background: #0b0c0e; font-weight: 700; font-size: 14px; position: sticky; top: 33px; z-index: 1; border-top: 1px solid var(--line); }
+#homeTable tbody tr.reg { cursor: pointer; }
+/* 단지 비교 */
+.slot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.slot strong { width: 54px; padding-bottom: 8px; }
+.slot label { display: flex; flex-direction: column; gap: 4px; color: var(--sub); font-size: 12px; }
+.chartbox.tall { height: 440px; }
+
+/* 트래킹: 두 줄 머리, 달 묶음 */
+#trkTable thead tr:nth-child(2) th { top: 34px; }
+#trkTable th.grp { color: var(--text); font-size: 13px; border-left: 2px solid var(--accent); }
+#trkTable .gl { border-left: 2px solid var(--accent); }
+#trkTable td.name { font-weight: 600; }
+td input.num.edited { border-color: var(--rent); color: var(--rent); }
+input[type=date] { color-scheme: dark; }
+.presets { display: flex; gap: 4px; padding-bottom: 1px; }
+.presets button.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 700; }
+#cmpTable th, #cmpTable td { text-align: center; }
+#cmpTable td.l, #cmpTable th.l { text-align: left; }
+
+/* 트래킹: 고정 칸을 좁혀 월별 칸이 빨리 보이게 */
+#trkTable th, #trkTable td { padding: 6px 6px; }
+#trkTable input[data-f=rooms], #trkTable input[data-f=baths] { width: 36px; }
+#trkTable input[data-f=structure] { width: 48px; }
+#trkTable input[data-f=households] { width: 58px; }
+#trkTable input[data-f=pyeong] { width: 50px; }
+#trkTable input[data-f=zone] { width: 66px; }
+#trkTable input.wide { width: 80px; }
+#trkTable td input.num { width: 62px; }
