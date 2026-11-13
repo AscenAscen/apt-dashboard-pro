@@ -1,0 +1,33 @@
+{
+ "updatedAt": "2026-11-13 11:06",
+ "lastUpdate": "2026-11-13",
+ "progress": {
+  "sale": {
+   "done": 439,
+   "total": 63001,
+   "priorityDone": 439,
+   "priorityTotal": 11205
+  },
+  "rent": {
+   "done": 415,
+   "total": 47941,
+   "priorityDone": 415,
+   "priorityTotal": 11205
+  }
+ },
+ "lastRun": {
+  "calls": {
+   "sale": 450,
+   "rent": 450
+  },
+  "savedMonths": 854,
+  "failed": 0,
+  "stop": "",
+  "closed": {
+   "rent": "1회 실행 한도(450) 도달",
+   "sale": "1회 실행 한도(450) 도달"
+  },
+  "warnings": []
+ },
+ "emptyRegions": []
+}
