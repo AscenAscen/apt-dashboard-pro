@@ -262,6 +262,63 @@ table.monthly small { margin-left: 5px; }
 /* 배경 고르기 */
 .themepick { display: flex; align-items: center; gap: 6px; color: var(--sub); font-size: 12px; }
 .themepick select { min-width: 0; padding: 5px 8px; font-size: 13px; }
-.status { margin-left: 0; }
-.themepick { margin-left: auto; }
 @media (max-width: 760px) { .themepick { margin-left: 0; } }
+
+/* ── 시세트래킹·전수조사 개편 ── */
+.top { row-gap: 6px; }
+.top .status { flex: 1 1 260px; min-width: 0; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.themepick { margin-left: 0; }
+.lockbtn { margin-left: auto; padding: 5px 10px; font-size: 13px; }
+.lockbtn.on { background: var(--rent); border-color: var(--rent); color: var(--on-accent); font-weight: 700; }
+body.readonly #trkTable input:not([type=checkbox]), body.readonly #svTable input:not([type=checkbox]), body.readonly #trkCards input:not([type=checkbox]),
+body.readonly table.loc input, body.readonly #grpTable textarea, body.readonly #trkTable select, body.readonly #svTable select { opacity: .7; cursor: not-allowed; }
+.notice { background: var(--panel); border: 1px solid var(--rent); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; }
+.notice > div + div { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border-radius: 999px; padding: 6px 14px; }
+.chips button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+.chips button.on small { color: var(--on-accent) !important; }
+.chips button b { margin-left: 2px; } .chips button small { margin-left: 4px; font-size: 11px; }
+details.manage { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+details.manage summary, details.help summary { color: var(--sub); font-size: 13px; }
+details.help { margin: 0 0 10px; }
+.mrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.mlabel { color: var(--sub); font-size: 12px; min-width: 110px; }
+.bkinfo { color: var(--sub); font-size: 12px; } .bkinfo.warn { color: var(--rent); font-weight: 600; }
+.progress { color: var(--sub); font-size: 13px; margin-left: 8px; } .progress b { color: var(--accent); font-size: 15px; }
+.tag { display: inline-block; background: var(--rent); color: var(--on-accent); border-radius: 4px; padding: 0 5px; font-size: 11px; font-weight: 700; margin-left: 4px; }
+.tag.up { background: var(--up); }
+/* 단지 정보 접기 / 단지명 고정 */
+table.hideinfo .info { display: none; }
+#trkTable td.name, #svTable td.name { position: sticky; left: 0; z-index: 1; background: var(--panel); box-shadow: 1px 0 0 var(--line); }
+#trkTable th.name, #svTable th.name { position: sticky; left: 0; z-index: 4; box-shadow: 1px 0 0 var(--line); }
+#trkTable tbody tr:hover td.name, #svTable tbody tr:hover td.name { background: var(--hover); }
+#trkTable select.st, #svTable select.st, .tcard select.st { min-width: 0; padding: 3px 4px; font-size: 12px; border-radius: 6px; }
+#trkTable input.memo, #svTable input.memo { width: 150px; }
+#svTable input[data-f=households] { width: 58px; }
+tr.newtrade td.name { color: var(--rent); }
+button.cand { border: none; background: none; font-size: 17px; padding: 0 4px; color: var(--sub); } button.cand.on { color: var(--rent); }
+/* 조사 기록 */
+#svHist tr.gu td { background: var(--group); } #svHist tr.done td { opacity: .55; }
+#svHist input:not([type=checkbox]) { width: 150px; padding: 3px 6px; border-radius: 6px; }
+#svcTable td, #svcTable th { padding: 6px 8px; }
+#codeText, #pasteText { width: 100%; font: 12px/1.4 ui-monospace, Consolas, monospace; word-break: break-all; }
+code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
+/* 카드 입력 화면 */
+#trkCards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.tcard { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.tcard.newtrade { border-color: var(--rent); }
+.tcard .thead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tcard .thead label { display: flex; align-items: center; gap: 6px; font-size: 15px; min-width: 0; }
+.tcard .tsub { color: var(--sub); font-size: 12px; margin: 4px 0 10px; }
+.tcard .tgrid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px; }
+.tcard .tgrid label { display: flex; flex-direction: column; gap: 3px; color: var(--accent); font-size: 12px; }
+.tcard .tgrid input { width: 100%; font-size: 16px; text-align: right; padding: 8px; background: var(--panel); }
+.tcard .tcalc { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 10px 0; font-size: 12px; color: var(--sub); }
+.tcard .tfoot { display: flex; gap: 6px; align-items: center; } .tcard .tfoot input { flex: 1; min-width: 0; background: var(--panel); }
+@media (max-width: 760px) {
+  .top .status { flex-basis: 100%; text-align: left; white-space: normal; }
+  .lockbtn { margin-left: 0; }
+  .mlabel { min-width: 100%; }
+  #trkCards { grid-template-columns: 1fr; }
+}

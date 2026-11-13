@@ -108,8 +108,9 @@ const App = (() => {
     document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
     $('mapClose').onclick = closeMap;
     $('mapModal').onclick = (e) => { if (e.target.id === 'mapModal') closeMap(); };
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); $('realModal').hidden = true; } });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); ['realModal', 'codeModal', 'pasteModal'].forEach(id => { $(id).hidden = true; }); } });
     Tracking.init();
+    Vault.init();
     Grouping.init();
     Survey.init();
     Trends.init();

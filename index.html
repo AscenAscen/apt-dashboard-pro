@@ -28,6 +28,7 @@
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
   </nav>
+  <button id="btnLock" class="lockbtn">🔓 잠금</button>
   <label class="themepick">배경
     <select id="themeSel">
       <option value="">검정 (기본)</option><option value="dark">짙은 회색</option><option value="navy">남색</option>
@@ -145,9 +146,33 @@
   <section class="panel empty" id="searchEmpty">지역을 고르고 <b>조회</b>를 누르세요.</section>
 </main>
 
-<!-- ═══════════════ 2. 시세트래킹 ═══════════════ -->
 <!-- ═══════════════ 전수조사 ═══════════════ -->
 <main id="tab-survey" class="tab" hidden>
+  <div class="notice" id="svNotice" hidden></div>
+  <section class="panel">
+    <details id="svHistBox" open>
+      <summary><b>내 조사 기록</b> <span class="hint" style="margin:0" id="svHistCount"></span></summary>
+      <div class="filters" style="margin-top:12px">
+        <label>지역 <select id="svhRegion"><option value="">전체 지역</option></select></label>
+        <label>시작 달 <input type="month" id="svhFrom"></label>
+        <label>끝 달 <input type="month" id="svhTo"></label>
+        <span class="grow"></span>
+        <button id="btnSvhExcel">조사 기록 엑셀</button>
+      </div>
+      <div class="tablewrap short" style="margin-top:10px"><table id="svHist"></table></div>
+      <h3 class="sub">지난 조사와 비교</h3>
+      <div class="filters">
+        <label>지역 <select id="svcRegion"></select></label>
+        <label>동 <select id="svcDong"><option value="">구 전체</option></select></label>
+        <label>이전 달 <select id="svcA"></select></label>
+        <label>최근 달 <select id="svcB"></select></label>
+        <button class="primary" id="btnSvCompare">비교하기</button>
+        <button id="btnSvcExcel">비교 엑셀</button>
+      </div>
+      <div class="cards" id="svcCards" style="margin-top:12px"></div>
+      <div class="tablewrap short" hidden><table id="svcTable"></table></div>
+    </details>
+  </section>
   <section class="panel filters">
     <label>시/도 <select id="svSido"></select></label>
     <label>시/군/구 <select id="svSgg"></select></label>
@@ -171,65 +196,112 @@
       <label>매매 가격대 (억)<span class="row"><input type="number" id="svMin" step="0.5" min="0" placeholder="최소"> ~ <input type="number" id="svMax" step="0.5" min="0" placeholder="최대"></span></label>
       <label>준공 연도 <span class="row"><input type="number" id="svYear" placeholder="예: 2000"> 년 이후</span></label>
       <label>세대수 <span class="row"><input type="number" id="svHouse" placeholder="예: 300"> 이상</span></label>
+      <label>생활권 <select id="svZone"><option value="">전체</option></select></label>
+      <label>상태 <select id="svStatus"></select></label>
       <div class="checks">
         <label><input type="checkbox" id="svOnlyQuoted"> 호가 적은 단지만</label>
+        <label><input type="checkbox" id="svUnfilled"> 아직 안 적은 단지만</label>
+        <label><input type="checkbox" id="svCand"> 후보(★)만</label>
         <label><input type="checkbox" id="svRecent" checked> 최근 3년 거래 있는 단지만</label>
       </div>
     </section>
     <section class="panel">
       <div class="bar">
-        <strong id="svTitle"></strong><span class="grow"></span>
+        <strong id="svTitle"></strong><span class="progress" id="svProgress"></span><span class="grow"></span>
         <label class="inline">정렬 <select id="svSort">
           <option value="name">단지명순</option><option value="price">매매 호가 높은 순</option><option value="priceAsc">매매 호가 낮은 순</option>
           <option value="house">세대수 많은 순</option><option value="g">평수 큰 순</option><option value="gAsc">평수 작은 순</option>
           <option value="gap">투자금(매-전) 작은 순</option><option value="year">신축순</option>
+          <option value="chg">전월 대비 변동 큰 순</option><option value="ask">호가-실거래 차이 큰 순</option><option value="zone">생활권별로 묶기</option>
         </select></label>
-        <button id="btnSvTrack">선택 단지 시세트래킹에 담기</button>
+      </div>
+      <div class="bar">
+        <button id="btnSvInfo">단지 정보 펼치기</button>
+        <button id="btnSvSame" title="체크한 단지 중 아직 안 적은 곳에 바로 앞 기록을 그대로 넣습니다">지난 기록과 같음 (체크한 단지)</button>
+        <button id="btnSvPaste">엑셀 붙여넣기</button>
+        <button id="btnSvSeen" hidden>새 거래 확인했음</button>
+        <span class="grow"></span>
+        <button class="primary" id="btnSvTrack">선택 단지 시세트래킹에 담기</button>
         <button id="btnSvExcel">엑셀 다운로드</button>
       </div>
-      <p class="hint">파란 제목 칸(<b>매매·전세·매물수</b>)에 직접 확인한 호가를 억 단위로 적습니다(예: 14.3). <b>세대수·구조·방·화</b>도 직접 적습니다. 여기서 적은 값은 시세트래킹과 함께 쓰입니다.
-        가격대 좁히기와 매매 호가 정렬은 적어 둔 호가 기준이며, 호가가 없는 단지는 최근 실거래가 기준(<span class="star">실</span> 표시)입니다. 정렬은 고를 때 한 번 적용되고, 입력하는 동안에는 줄이 움직이지 않습니다. ★ = 트래킹에 담긴 단지.</p>
+      <details class="help"><summary>도움말</summary>
+        <p class="hint">파란 제목 칸(<b>매매·전세·매물수</b>)에 직접 확인한 호가를 억 단위로 적습니다(예: 14.3). 여기서 적은 값은 시세트래킹과 함께 쓰이고, 위쪽 <b>내 조사 기록</b>에 동·달별로 쌓입니다.
+        가격대 좁히기와 매매 호가 정렬은 적어 둔 호가 기준이며, 호가가 없는 단지는 최근 실거래가 기준(<span class="star">실</span> 표시)입니다. 정렬은 고를 때 한 번 적용되고, 입력하는 동안에는 줄이 움직이지 않습니다.
+        ★ 표시 줄 = 시세트래킹에 담긴 단지, ☆ 버튼 = 후보로 표시. <b>단지 정보 펼치기</b>를 누르면 생활권·구조·방·화 칸이 나옵니다. <b>호가-실거래</b>는 적은 매매 호가에서 최근 매매 실거래가를 뺀 값입니다.</p>
+      </details>
       <div class="tablewrap"><table id="svTable"></table></div>
       <p class="hint" id="svNote"></p>
       <button id="btnSvMore" hidden>더 보기</button>
+      <details class="manage" style="margin-top:12px"><summary>백업 · 기기 사이 옮기기</summary>
+        <div class="mrow"><span class="mlabel">기기 사이 옮기기 · 백업</span>
+          <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
+          <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
+          <span class="bkinfo"></span></div>
+      </details>
     </section>
   </div>
 </main>
 
+<!-- ═══════════════ 시세트래킹 ═══════════════ -->
 <main id="tab-tracking" class="tab" hidden>
-  <section class="panel filters">
-    <label>폴더 <select id="trkFolder"></select></label>
-    <button id="btnFolderNew">새 폴더</button>
-    <button id="btnFolderRename">폴더 이름 변경</button>
-    <button class="danger" id="btnFolderDelete">폴더 삭제</button>
-    <span class="sep"></span>
-    <label>선택한 단지를 <select id="trkMoveTo"></select></label>
-    <button id="btnTrkMove">폴더로 옮기기</button>
-    <span class="grow"></span>
-    <button id="btnTrkBackup">목록 백업(저장)</button>
-    <button id="btnTrkRestore">백업 불러오기</button>
-    <input type="file" id="trkFile" accept=".json" hidden>
-  </section>
-  <section class="panel filters">
-    <label>지역 <select id="trkRegion"><option value="">전체</option></select></label>
-    <label>기록할 달 <input type="month" id="trkNewMonth"></label>
-    <button class="primary" id="btnTrkAddMonth">시세 추가</button>
-    <button id="btnTrkLoad">실거래 불러오기</button>
-    <span class="grow"></span>
-    <button id="btnTrkExcel">표 엑셀 다운로드</button>
-    <label>파일 형식 <select id="trkFormat"><option value="xlsx">엑셀(.xlsx)</option><option value="csv">CSV</option></select></label>
-    <button id="btnTrkTrades">실거래 내역 다운로드</button>
-    <button class="danger" id="btnTrkDelete">선택 삭제</button>
+  <div class="notice" id="trkNotice" hidden></div>
+  <section class="panel">
+    <div class="chips" id="trkFolders"></div>
+    <div class="filters" style="margin-top:12px">
+      <label>기록할 달 <input type="month" id="trkNewMonth"></label>
+      <button class="primary" id="btnTrkAddMonth">시세 추가</button>
+      <button id="btnTrkLoad">실거래 불러오기</button>
+      <span class="sep"></span>
+      <label>지역 <select id="trkRegion"><option value="">전체</option></select></label>
+      <label>상태 <select id="trkStatus"></select></label>
+      <label>보기
+        <select id="trkShow">
+          <option value="">전체</option><option value="empty">최신 달 아직 안 적은 단지</option><option value="down">매매 호가 내린 단지</option>
+          <option value="rentup">전세 호가 오른 단지</option><option value="new">새 실거래 있는 단지</option>
+        </select>
+      </label>
+      <label>정렬
+        <select id="trkSort">
+          <option value="">담은 순</option><option value="price">매매 호가 높은 순</option><option value="up">전월 대비 상승 큰 순</option>
+          <option value="down">전월 대비 하락 큰 순</option><option value="diff">호가-실거래 차이 큰 순</option><option value="name">단지명순</option>
+        </select>
+      </label>
+    </div>
+    <details class="manage" id="trkManage" open><summary>관리 — 폴더 · 옮기기 · 백업 · 내려받기 · 삭제</summary>
+      <div class="mrow"><span class="mlabel">폴더</span>
+        <button id="btnFolderNew">새 폴더</button><button id="btnFolderRename">폴더 이름 변경</button><button class="danger" id="btnFolderDelete">폴더 삭제</button></div>
+      <div class="mrow"><span class="mlabel">체크한 단지를</span>
+        <select id="trkMoveTo"></select><button id="btnTrkAddTo" title="지금 폴더에도 두고 이 폴더에도 담습니다">이 폴더에도 담기</button><button id="btnTrkMove">이 폴더로 옮기기</button>
+        <button id="btnTrkOut">지금 폴더에서 빼기</button><button id="btnTrkSame" title="최신 달이 비어 있는 단지에 바로 앞 기록을 그대로 넣습니다">지난 기록과 같음</button>
+        <button class="danger" id="btnTrkDelete">선택 삭제</button></div>
+      <div class="mrow"><span class="mlabel">기기 사이 옮기기 · 백업</span>
+          <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
+          <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
+          <span class="bkinfo"></span></div>
+      <div class="mrow"><span class="mlabel">내려받기</span>
+        <button id="btnTrkExcel">표 엑셀 다운로드</button>
+        <select id="trkFormat"><option value="xlsx">엑셀(.xlsx)</option><option value="csv">CSV</option></select><button id="btnTrkTrades">실거래 내역 다운로드</button></div>
+    </details>
   </section>
   <section class="panel">
-    <p class="hint"><b>시세 추가</b>를 누르면 그 달의 칸 묶음이 맨 앞에 생기고, 예전 기록은 오른쪽으로 밀려 계속 남습니다.
+    <div class="bar">
+      <button id="btnTrkInfo">단지 정보 펼치기</button>
+      <button id="btnTrkCard">카드로 입력</button>
+      <span class="progress" id="trkProgress"></span>
+      <span class="grow"></span>
+    </div>
+    <details class="help"><summary>도움말</summary>
+      <p class="hint"><b>시세 추가</b>를 누르면 그 달의 칸 묶음이 맨 앞에 생기고, 예전 기록은 오른쪽으로 밀려 계속 남습니다.
       파란 제목 칸(<b>매매·전세·개수</b>)에는 직접 확인한 가격을 억 단위로 적습니다. 예: 14억 3천만 원 → <b>14.3</b>.
       <b>전고점·전저점</b>은 2020년 이후 실거래(직거래 제외)로 자동 기입되며, 칸을 눌러 고칠 수 있고 지우면 자동값으로 돌아갑니다.
-      하락률·상승률은 가장 최근에 적은 매매가 기준이며, 적지 않았으면 최근 실거래가 기준입니다. <b>세대수</b>는 실거래 자료에 없어 직접 입력합니다.
-      목록은 이 브라우저에 저장되니 <b>목록 백업</b>을 가끔 받아 두세요.</p>
+      하락률·상승률은 가장 최근에 적은 매매가 기준이며, 적지 않았으면 최근 실거래가 기준입니다. <b>호가-실거래</b>는 적은 매매 호가에서 최근 매매 실거래가를 뺀 값입니다.
+      <b>단지 정보 펼치기</b>를 누르면 생활권·세대수·구조·방·화·링크 칸이 나옵니다. 단지명에 마우스를 올리면 담긴 폴더가 보입니다.
+      기록은 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 <b>관리 → 코드로 내보내기</b>로 복사한 글자를 그 기기의 <b>코드 가져오기</b>에 붙여 넣으세요.</p>
+    </details>
     <p class="empty" id="trkNoMonth" hidden>아직 기록한 달이 없습니다. 위에서 달을 고르고 <b>시세 추가</b>를 눌러 가격 칸을 만드세요.</p>
+    <div id="trkCards" hidden></div>
     <div class="tablewrap"><table id="trkTable"></table></div>
-    <p class="empty" id="trkEmpty">담아 둔 단지가 없습니다. [실거래 조회]에서 단지를 체크하고 <b>트래킹에 담기</b>를 누르세요.</p>
+    <p class="empty" id="trkEmpty">담아 둔 단지가 없습니다. [실거래 조회]나 [전수조사]에서 단지를 체크하고 <b>트래킹에 담기</b>를 누르세요.</p>
   </section>
 </main>
 
@@ -451,6 +523,26 @@
     <div class="tablewrap short"><table id="realTable"></table></div>
   </div>
 </div>
+<!-- 코드 내보내기 / 가져오기 창 -->
+<div class="modal" id="codeModal" hidden>
+  <div class="modalbox">
+    <div class="bar"><strong id="codeTitle"></strong><span class="grow"></span><button id="codeCopy">복사</button><button class="primary" id="codeApply">가져오기</button><button id="codeClose">닫기</button></div>
+    <p class="hint" id="codeHelp"></p>
+    <textarea id="codeText" rows="9" spellcheck="false"></textarea>
+  </div>
+</div>
+<!-- 엑셀 붙여넣기 창 -->
+<div class="modal" id="pasteModal" hidden>
+  <div class="modalbox">
+    <div class="bar"><strong>엑셀에서 붙여넣기</strong><span class="grow"></span><button class="primary" id="pasteApply">넣기</button><button id="pasteClose">닫기</button></div>
+    <p class="hint">엑셀에서 아래 순서로 된 칸을 복사해 붙여 넣으세요. 한 줄에 한 단지입니다. 지금 고른 <b>기록할 달</b>에 들어갑니다.<br>
+      <b>단지명 / 전용㎡ 또는 평형 / 매매(억) / 전세(억) / 매매 매물 수 / 전세 매물 수</b> — 예: <code>꿈마을라이프　84　9.5　5.2　12　4</code><br>
+      평형이 하나뿐인 단지는 둘째 칸을 비워도 됩니다. 평으로 적으려면 <code>34평</code>처럼 "평"을 붙이세요. 뒤쪽 칸은 없어도 됩니다.</p>
+    <textarea id="pasteText" rows="9" spellcheck="false" placeholder="여기에 붙여 넣기 (Ctrl+V)"></textarea>
+    <p class="hint" id="pasteResult"></p>
+  </div>
+</div>
+<input type="file" id="vaultFile" accept=".json" hidden>
 <div id="toast" hidden></div>
 
 <!-- 비밀번호 화면 (js/config.js 의 PASSWORD_HASH 가 비어 있으면 나타나지 않음) -->
@@ -476,6 +568,7 @@
 <script src="js/infra.js"></script>
 <script src="js/tracking.js"></script>
 <script src="js/survey.js"></script>
+<script src="js/vault.js"></script>
 <script src="js/grouping.js"></script>
 <script src="js/trends.js"></script>
 <script src="js/app.js"></script>
