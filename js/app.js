@@ -35,13 +35,55 @@ const App = (() => {
     el.textContent = text;
   }
 
+  /* ── 접속 비밀번호 (js/config.js 의 PASSWORD_HASH) ── */
+  async function sha(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('apt-dashboard:' + text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function gate() {
+    const making = location.hash === '#pw';             // 주소 뒤에 #pw → 비밀번호 만들기 화면
+    const hash = CONFIG.PASSWORD_HASH || '';
+    if (!making && (!hash || Store.get('apt.unlock', '') === hash)) return Promise.resolve();
+    document.body.classList.add('locked');
+    $('lock').hidden = false;
+    $('lockInput').focus();
+    if (making) {
+      $('lockTitle').textContent = '비밀번호 만들기';
+      $('lockBtn').textContent = '만들기';
+      $('lockMsg').textContent = '사용할 비밀번호를 입력하고 [만들기]를 누르세요.';
+    }
+    return new Promise((resolve) => {
+      $('lockForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const value = $('lockInput').value;
+        if (!value) return;
+        const h = await sha(value);
+        if (making) {
+          $('lockOut').hidden = false;
+          $('lockOut').value = `PASSWORD_HASH: '${h}',`;
+          $('lockOut').select();
+          $('lockMsg').textContent = "위 한 줄을 복사해 js/config.js 의 PASSWORD_HASH: '', 줄과 바꿔 넣고 저장(Commit)하세요.";
+          return;
+        }
+        if (h !== hash) { $('lockMsg').textContent = '비밀번호가 맞지 않습니다.'; $('lockInput').select(); return; }
+        Store.set('apt.unlock', hash);
+        $('lock').hidden = true;
+        document.body.classList.remove('locked');
+        resolve();
+      };
+    });
+  }
+
   async function init() {
+    await gate();
     document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
     $('mapClose').onclick = closeMap;
     $('mapModal').onclick = (e) => { if (e.target.id === 'mapModal') closeMap(); };
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMap(); });
     Tracking.init();
     Grouping.init();
+    Trends.init();
     await Search.init();
     showStatus();
   }

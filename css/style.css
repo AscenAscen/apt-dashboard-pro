@@ -100,3 +100,23 @@ table.grid textarea { width: 100%; min-height: 64px; min-width: 150px; backgroun
   .status { margin-left: 0; text-align: left; width: 100%; }
   select { min-width: 110px; }
 }
+
+/* 그룹핑 단지 검색 결과 */
+.results { display: flex; flex-wrap: wrap; gap: 6px; max-height: 190px; overflow: auto; }
+.results button { text-align: left; font-size: 13px; }
+.results button b { color: var(--accent); margin-left: 6px; }
+.results .none { color: var(--sub); font-size: 13px; padding: 6px 2px; }
+
+/* 비밀번호 화면 */
+.modal.lock { background: #000; z-index: 100; }
+.modalbox.small { width: min(360px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.modalbox.small textarea { width: 100%; font-size: 12px; }
+body.locked > header, body.locked > main { display: none; }
+
+/* 상세 그래프 옵션 */
+.chartopts { margin-bottom: 10px; }
+
+h3.sub { font-size: 14px; margin: 18px 0 8px; }
+#dlAreas { padding: 6px 0 0; flex-wrap: wrap; }
+#dlAreas label { flex-direction: row; align-items: center; color: var(--text); font-size: 14px; }
+input[type=month] { color-scheme: dark; }

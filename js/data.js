@@ -115,7 +115,7 @@ const U = {
     if (/특별시|광역시|특별자치시/.test(sido)) return [sido.replace(/특별자치시|특별시|광역시/, ''), sgg];
     return [sgg, ''];
   },
-  landLink: (sgg, dong, name) => `https://m.land.naver.com/search/result/${encodeURIComponent(`${sgg} ${dong} ${name}`)}`,
+  landLink: (sgg, dong, name) => CONFIG.landLink(sgg, dong, name),
   toast(msg) {
     const el = document.getElementById('toast');
     el.textContent = msg; el.hidden = false;

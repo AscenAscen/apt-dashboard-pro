@@ -14,6 +14,7 @@
     <button data-tab="search" class="on">실거래 조회</button>
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
     <button data-tab="grouping">시세그룹핑</button>
+    <button data-tab="trends">지역 동향</button>
   </nav>
   <div class="status" id="status">데이터 상태 확인 중…</div>
 </header>
@@ -59,11 +60,35 @@
       <span class="grow"></span>
       <button id="btnDetailMap">지도에서 위치 보기</button>
       <button id="btnDetailTrack">트래킹에 담기</button>
-      <button id="btnExcelDetail">엑셀 다운로드</button>
     </div>
     <div class="cards" id="detailCards"></div>
+    <div class="filters chartopts">
+      <label>평형 <select id="detArea"></select></label>
+      <label>그래프 기간
+        <select id="detRange">
+          <option value="0">조회기간 그대로</option><option value="0.5">최근 6개월</option><option value="1">최근 1년</option>
+          <option value="3">최근 3년</option><option value="5">최근 5년</option><option value="10">최근 10년</option><option value="99">불러온 전체</option>
+        </select>
+      </label>
+      <label>표시 방식
+        <select id="detMode">
+          <option value="point">점</option><option value="line">선으로 잇기</option><option value="both">점 + 선</option>
+        </select>
+      </label>
+    </div>
     <div class="chartbox"><canvas id="chart"></canvas></div>
     <div class="tablewrap short"><table id="detailTable"></table></div>
+    <h3 class="sub">실거래 내려받기 — 평형·기간 선택 (최대 20년)</h3>
+    <div class="filters">
+      <label>평형 (여러 개 선택 가능)<span class="checks" id="dlAreas"></span></label>
+      <label>시작 월 <input type="month" id="dlFrom"></label>
+      <label>끝 월 <input type="month" id="dlTo"></label>
+      <div class="checks">
+        <label><input type="checkbox" id="dlSale" checked> 매매</label>
+        <label><input type="checkbox" id="dlRent" checked> 전세</label>
+      </div>
+      <button class="primary" id="btnExcelDetail">엑셀 다운로드</button>
+    </div>
   </section>
 
   <section class="panel empty" id="searchEmpty">지역을 고르고 <b>조회</b>를 누르세요.</section>
@@ -83,7 +108,7 @@
     <button class="danger" id="btnTrkDelete">선택 삭제</button>
   </section>
   <section class="panel">
-    <p class="hint">매매·전세 = 기준월 실거래 <b>평균가</b>(만원). 기준월에 거래가 없으면 그 이전 가장 최근 거래가를 쓰고 <span class="star">*</span> 로 표시합니다. 개수 = 기준월 거래 건수.
+    <p class="hint">매매·전세 = 기준월 실거래 <b>평균가</b>(만원). 기준월에 거래가 없으면 그 이전 가장 최근 거래가를 쓰고 <span class="star">*</span> 로 표시합니다. 개수 = 기준월 거래 건수. 전고점·전저점 = 2020년 이후 기준월까지 매매 실거래 최고·최저가(직거래 제외), 전고대비·전저대비 = 기준월 매매가와의 차이(%).
       세대수·구조·방·화·링크·생활권 칸은 직접 입력하면 자동 저장됩니다. 목록은 이 브라우저에 저장되므로, 다른 PC에서 쓰려면 <b>목록 백업</b> 파일을 옮겨 <b>백업 불러오기</b> 하세요.</p>
     <div class="tablewrap"><table id="trkTable"></table></div>
     <p class="empty" id="trkEmpty">담아 둔 단지가 없습니다. [실거래 조회]에서 단지를 체크하고 <b>트래킹에 담기</b>를 누르세요.</p>
@@ -113,10 +138,58 @@
     <button id="btnGrpBands">가격대 만들기</button>
   </section>
   <section class="panel">
+    <div class="filters">
+      <label>시/도 <select id="grpSido"></select></label>
+      <label>시/군/구 <select id="grpSgg"></select></label>
+      <label>단지 검색 <input id="grpSearch" type="search" placeholder="단지명 또는 동 이름"></label>
+      <label>넣을 생활권 <select id="grpTargetZone"></select></label>
+    </div>
+    <p class="hint">단지명을 입력하면 아래에 결과가 나옵니다. 결과를 누르면 선택한 생활권의 <b>최근 매매 실거래가에 맞는 가격대 칸</b>에 자동으로 들어갑니다.</p>
+    <div class="results" id="grpResults"></div>
+  </section>
+  <section class="panel">
     <p class="hint">칸을 눌러 단지를 직접 적을 수 있습니다(한 줄에 한 단지). 생활권 이름은 머리칸을 눌러 수정, × 로 삭제합니다.
       <b>자동 배치</b>는 시세트래킹에서 "생활권"을 적어 둔 단지를 최근 매매가에 맞는 칸에 넣어 줍니다.</p>
     <div class="tablewrap"><table id="grpTable" class="grid"></table></div>
   </section>
+</main>
+
+<!-- ═══════════════ 4. 지역 동향 ═══════════════ -->
+<main id="tab-trends" class="tab" hidden>
+  <section class="panel filters">
+    <label>시/도 <select id="trSido"></select></label>
+    <label>시/군/구 <select id="trSgg"></select></label>
+    <label>평형대
+      <select id="trSize">
+        <option value="all">전체</option><option value="s">소형 (전용 60㎡ 미만)</option>
+        <option value="m" selected>중형 (전용 60~85㎡)</option><option value="l">대형 (전용 85㎡ 초과)</option>
+      </select>
+    </label>
+    <label>최근 기간
+      <select id="trDays">
+        <option value="1">최근 1개월</option><option value="3" selected>최근 3개월</option><option value="6">최근 6개월</option>
+      </select>
+    </label>
+    <button class="primary" id="btnTrends">보기</button>
+    <span class="grow"></span>
+    <button id="btnTrendsExcel">엑셀 다운로드</button>
+  </section>
+  <section class="panel empty" id="trEmpty">지역을 고르고 <b>보기</b>를 누르세요. 2020년 이후 실거래로 거래량 흐름, 신고가 거래, 전고점 대비 크게 내린 거래를 찾아 줍니다.</section>
+  <div id="trBody" hidden>
+    <section class="panel">
+      <div class="bar"><strong id="trTitle"></strong></div>
+      <div class="cards" id="trCards"></div>
+      <div class="chartbox"><canvas id="trChart"></canvas></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>신고가 거래</strong><span class="hint" style="margin:0">— 2020년 이후 이전 최고가를 넘어선 매매 (직거래 제외)</span></div>
+      <div class="tablewrap short"><table id="trHigh"></table></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>전고점 대비 하락 거래</strong><span class="hint" style="margin:0">— 이전 최고가보다 10% 이상 낮게 거래된 매매, 하락폭 큰 순</span></div>
+      <div class="tablewrap short"><table id="trLow"></table></div>
+    </section>
+  </div>
 </main>
 
 <!-- 지도 창 -->
@@ -126,13 +199,24 @@
       <strong id="mapTitle"></strong><span class="grow"></span>
       <a id="mapNaver" target="_blank" rel="noopener" class="btn">네이버지도</a>
       <a id="mapKakao" target="_blank" rel="noopener" class="btn">카카오맵</a>
-      <a id="mapLand" target="_blank" rel="noopener" class="btn">네이버부동산</a>
+      <a id="mapLand" target="_blank" rel="noopener" class="btn">네이버 검색(부동산)</a>
       <button id="mapClose">닫기</button>
     </div>
     <iframe id="mapFrame" title="지도" loading="lazy"></iframe>
   </div>
 </div>
 <div id="toast" hidden></div>
+
+<!-- 비밀번호 화면 (js/config.js 의 PASSWORD_HASH 가 비어 있으면 나타나지 않음) -->
+<div class="modal lock" id="lock" hidden>
+  <form class="modalbox small" id="lockForm">
+    <strong id="lockTitle">비밀번호를 입력하세요</strong>
+    <input type="password" id="lockInput" autocomplete="current-password" aria-label="비밀번호">
+    <button class="primary" type="submit" id="lockBtn">확인</button>
+    <p class="hint" id="lockMsg"></p>
+    <textarea id="lockOut" readonly hidden rows="2"></textarea>
+  </form>
+</div>
 
 <script src="lib/xlsx.full.min.js"></script>
 <script src="lib/chart.umd.js"></script>
@@ -141,6 +225,7 @@
 <script src="js/search.js"></script>
 <script src="js/tracking.js"></script>
 <script src="js/grouping.js"></script>
+<script src="js/trends.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

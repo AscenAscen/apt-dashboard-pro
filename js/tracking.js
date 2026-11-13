@@ -72,7 +72,7 @@ const Tracking = (() => {
     $('btnTrkLoad').disabled = true; $('btnTrkLoad').textContent = '불러오는 중…';
     try {
       for (const code of new Set(list.map(it => it.code))) {
-        const data = await Data.loadYears(code, Math.floor(low / 100), Math.floor(ym / 100));
+        const data = await Data.loadYears(code, Math.min(Math.floor(low / 100), Math.floor(CONFIG.PEAK_FROM / 10000)), Math.floor(ym / 100));
         const mine = list.filter(it => it.code === code);
         const keys = new Set(mine.map(it => it.key));
         const bucket = new Map(mine.map(it => [it.id, { sale: [], rent: [] }]));
@@ -88,14 +88,22 @@ const Tracking = (() => {
           const value = (arr, m) => {
             const inM = arr.filter(t => Math.floor(t.d / 100) === m);
             if (inM.length) return { v: Math.round(inM.reduce((s, t) => s + t.price, 0) / inM.length), n: inM.length, fb: false };
-            const before = arr.filter(t => Math.floor(t.d / 100) < m).sort((a, b2) => a.d - b2.d).pop();
+            const before = arr.filter(t => Math.floor(t.d / 100) < m && Math.floor(t.d / 100) >= low).sort((a, b2) => a.d - b2.d).pop();
             return before ? { v: before.price, n: 0, fb: true } : { v: null, n: 0, fb: false };
           };
           const s = value(b.sale, ym), sp = value(b.sale, prev), r = value(b.rent, ym), rp = value(b.rent, prev);
           const sub = (a, c) => (a == null || c == null ? null : a - c);
           const gap = sub(s.v, r.v), gapP = sub(sp.v, rp.v);
           const ratio = s.v && r.v ? r.v / s.v * 100 : null, ratioP = sp.v && rp.v ? rp.v / sp.v * 100 : null;
-          calc.set(it.id, { ym, sale: s.v, saleN: s.n, saleFb: s.fb, saleDiff: sub(s.v, sp.v), rent: r.v, rentN: r.n, rentFb: r.fb, rentDiff: sub(r.v, rp.v),
+          // 전고점·전저점: 2020년(설정값) 이후 ~ 기준월까지의 매매 실거래 최고·최저 (직거래 제외)
+          let peak = null, trough = null;
+          for (const t of b.sale) {
+            if (t.d < CONFIG.PEAK_FROM || Math.floor(t.d / 100) > ym) continue;
+            if (!peak || t.price >= peak.price) peak = t;
+            if (!trough || t.price < trough.price) trough = t;
+          }
+          const rate = (base) => (s.v && base ? (s.v / base.price - 1) * 100 : null);
+          calc.set(it.id, { ym, peak: peak?.price ?? null, peakD: peak?.d, trough: trough?.price ?? null, troughD: trough?.d, drop: rate(peak), rise: rate(trough), sale: s.v, saleN: s.n, saleFb: s.fb, saleDiff: sub(s.v, sp.v), rent: r.v, rentN: r.n, rentFb: r.fb, rentDiff: sub(r.v, rp.v),
             gap, gapDiff: sub(gap, gapP), ratio, ratioDiff: sub(ratio, ratioP) });
           if (s.v) it.lastSale = s.v;
         }
@@ -119,6 +127,7 @@ const Tracking = (() => {
       '매매': c.sale ?? '', '매매개수': c.saleN ?? '', '전월대비 매매': c.saleDiff ?? '',
       '전세': c.rent ?? '', '전세개수': c.rentN ?? '', '전월대비전세': c.rentDiff ?? '',
       '매-전': c.gap ?? '', '전월대비 매-전': c.gapDiff ?? '', '전세가율': r1(c.ratio), '전월대비 전세가율': r1(c.ratioDiff),
+      '전고점': c.peak ?? '', '전고대비': r1(c.drop), '전저점': c.trough ?? '', '전저대비': r1(c.rise),
     };
   }
 
@@ -128,10 +137,11 @@ const Tracking = (() => {
     $('trkTable').parentElement.hidden = !items.length;
     const inp = (it, f, cls = '', ph = '') => `<input class="${cls}" data-id="${U.esc(it.id)}" data-f="${f}" value="${U.esc(it[f] || '')}" placeholder="${ph}">`;
     const money = (v, fb) => (v == null ? '-' : U.price(v) + (fb ? '<span class="star">*</span>' : ''));
+    const pk = (v, d) => (v == null ? '-' : `${U.price(v)}<small>${U.date(d)}</small>`);
     const dcell = (v) => `<td class="${U.cls(v)}">${U.diff(v)}</td>`;
     const head = '<thead><tr><th class="c"><input type="checkbox" id="trkAll"></th><th class="l">생활권</th><th>가격대</th><th class="l">시</th><th class="l">구</th><th class="l">동</th><th class="l">단지명</th>' +
       '<th>연식</th><th>연차</th><th>세대수</th><th>평형</th><th>구조</th><th>방</th><th>화</th><th>링크</th>' +
-      '<th>매매</th><th>개수</th><th>전월대비</th><th>전세</th><th>개수</th><th>전월대비</th><th>매-전</th><th>전월대비</th><th>전세가율</th><th>전월대비</th><th class="c">지도</th></tr></thead>';
+      '<th>매매</th><th>개수</th><th>전월대비</th><th>전고점</th><th>전고대비</th><th>전저점</th><th>전저대비</th><th>전세</th><th>개수</th><th>전월대비</th><th>매-전</th><th>전월대비</th><th>전세가율</th><th>전월대비</th><th class="c">지도</th></tr></thead>';
     const body = list.map((it, i) => {
       const v = rowValues(it), c = calc.get(it.id) || {};
       return `<tr><td class="c"><input type="checkbox" data-chk="${i}" ${checked.has(it.id) ? 'checked' : ''}></td>` +
@@ -139,6 +149,7 @@ const Tracking = (() => {
         `<td>${v['연식'] || '-'}</td><td>${v['연차'] === '' ? '-' : v['연차']}</td><td>${inp(it, 'households')}</td><td>${inp(it, 'pyeong', '', pyeong(it))}</td><td>${inp(it, 'structure', '', '계/복')}</td><td>${inp(it, 'rooms')}</td><td>${inp(it, 'baths')}</td>` +
         `<td>${inp(it, 'link', 'wide', '직접 입력')} <a class="btn mini" href="${U.esc(link(it))}" target="_blank" rel="noopener">열기</a></td>` +
         `<td class="sale">${money(c.sale, c.saleFb)}</td><td>${c.saleN ?? '-'}</td>${dcell(c.saleDiff)}` +
+        `<td>${pk(c.peak, c.peakD)}</td><td class="${U.cls(c.drop)}">${U.pct(c.drop)}</td><td>${pk(c.trough, c.troughD)}</td><td class="${U.cls(c.rise)}">${U.pct(c.rise)}</td>` +
         `<td class="rent">${money(c.rent, c.rentFb)}</td><td>${c.rentN ?? '-'}</td>${dcell(c.rentDiff)}` +
         `<td>${c.gap == null ? '-' : U.price(c.gap)}</td>${dcell(c.gapDiff)}` +
         `<td>${c.ratio == null ? '-' : c.ratio.toFixed(1) + '%'}</td><td class="${U.cls(c.ratioDiff)}">${c.ratioDiff == null ? '-' : (c.ratioDiff > 0 ? '+' : '') + c.ratioDiff.toFixed(1) + '%p'}</td>` +
@@ -171,7 +182,7 @@ const Tracking = (() => {
     U.xlsx(`시세트래킹_${ym}_${U.stamp()}.xlsx`, [
       { name: `시세트래킹 ${ym}`, rows: [cols, ...rowsOut] },
       { name: '설명', rows: [['항목', '설명'], ['금액 단위', '만원'], ['매매·전세', '기준월 실거래 평균가 (거래가 없으면 이전 최근 실거래가)'],
-        ['매매개수·전세개수', '기준월 실거래 건수'], ['전월대비', '기준월 값 - 전월 값'], ['전세가율', '전세 ÷ 매매 × 100 (%)'], ['기준월', ym], ['자료', '국토교통부 실거래가 공개시스템']] },
+        ['매매개수·전세개수', '기준월 실거래 건수'], ['전월대비', '기준월 값 - 전월 값'], ['전세가율', '전세 ÷ 매매 × 100 (%)'], ['전고점·전저점', `${String(CONFIG.PEAK_FROM).slice(0, 4)}년 이후 기준월까지 매매 실거래 최고가·최저가 (직거래 제외)`], ['전고대비·전저대비', '기준월 매매가가 전고점·전저점 대비 몇 % 인지'], ['기준월', ym], ['자료', '국토교통부 실거래가 공개시스템']] },
     ]);
   }
 

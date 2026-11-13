@@ -60,6 +60,7 @@ const Grouping = (() => {
       board().bands = bands; save(); render();
     };
     $('btnGrpAuto').onclick = autoPlace;
+    initSearch();
     $('btnGrpExcel').onclick = excel;
   }
 
@@ -72,6 +73,9 @@ const Grouping = (() => {
   function render() {
     $('grpBoard').innerHTML = st.boards.map((b, i) => `<option value="${i}" ${i === st.cur ? 'selected' : ''}>${U.esc(b.name)}</option>`).join('');
     const b = board();
+    const curZone = $('grpTargetZone').value;
+    $('grpTargetZone').innerHTML = b.zones.length ? b.zones.map(z => `<option value="${z.id}">${U.esc(z.name)}</option>`).join('') : '<option value="">(생활권을 먼저 추가)</option>';
+    if (b.zones.some(z => z.id === curZone)) $('grpTargetZone').value = curZone;
     const head = '<thead><tr><th class="band">가격대 \\ 생활권</th>' +
       (b.zones.length ? b.zones.map(z => `<th><input data-zone="${z.id}" value="${U.esc(z.name)}" aria-label="생활권 이름"><button class="mini" data-del="${z.id}" title="생활권 삭제">×</button></th>`).join('')
         : '<th style="color:var(--sub);font-weight:400">위에서 생활권을 추가하세요</th>') + '</tr></thead>';
@@ -105,18 +109,90 @@ const Grouping = (() => {
     if (!b.bands.length) return U.toast('가격대를 먼저 만들어 주세요.');
     for (const it of list) {
       const z = ensureZone(it.zone);
-      const eok = it.lastSale / 10000;
-      const band = b.bands.find(x => eok >= x.lo) || b.bands[b.bands.length - 1];  // 범위를 벗어나면 맨 위/맨 아래 칸
-      const tag = `${it.name} ${Tracking.pyeong(it)}`;
-      for (const x of b.bands) {   // 이전에 넣었던 같은 단지는 지우고 새 위치에
-        const k = `${x.lo}|${z.id}`;
-        if (b.cells[k]) b.cells[k] = b.cells[k].split('\n').filter(line => !line.startsWith(tag + ' ')).join('\n');
-      }
-      const k = `${band.lo}|${z.id}`;
-      b.cells[k] = [b.cells[k], `${tag} ${eok.toFixed(2).replace(/\.?0+$/, '')}억`].filter(Boolean).join('\n');
+      put(z, `${it.name} ${Tracking.pyeong(it)}`, it.lastSale / 10000);
     }
     save(); render();
     U.toast(`${list.length}개 단지를 배치했습니다.` + (skipped ? ` (생활권·시세가 없는 ${skipped}개 제외)` : ''));
+  }
+
+  /** 생활권 z 의 가격대 칸에 "단지 평형 가격" 한 줄 넣기 (같은 단지가 이미 있으면 옮김) */
+  function put(z, tag, eok) {
+    const b = board();
+    const band = b.bands.find(x => eok >= x.lo) || b.bands[b.bands.length - 1];  // 범위를 벗어나면 맨 위/맨 아래 칸
+    for (const x of b.bands) {
+      const k = `${x.lo}|${z.id}`;
+      if (b.cells[k]) b.cells[k] = b.cells[k].split('\n').filter(line => !line.startsWith(tag + ' ')).join('\n');
+    }
+    const k = `${band.lo}|${z.id}`;
+    b.cells[k] = [b.cells[k], `${tag} ${eok.toFixed(2).replace(/\.?0+$/, '')}억`].filter(Boolean).join('\n');
+    return band;
+  }
+
+  /* ── 단지 검색 → 누르면 자동으로 칸에 넣기 ── */
+  let regions = [], latest = [], latestCode = '', hits = [];
+
+  async function initSearch() {
+    regions = await Data.regions();
+    const sidos = [...new Set(regions.map(r => r[1]))];
+    $('grpSido').innerHTML = sidos.map(x => `<option>${U.esc(x)}</option>`).join('');
+    const saved = Store.get('apt.lastRegion', null);
+    if (saved && sidos.includes(saved.sido)) $('grpSido').value = saved.sido;
+    const fillSgg = (code) => {
+      const list = regions.filter(r => r[1] === $('grpSido').value);
+      $('grpSgg').innerHTML = list.map(r => `<option value="${r[0]}">${U.esc(r[2])}</option>`).join('');
+      if (code && list.some(r => r[0] === code)) $('grpSgg').value = code;
+      search();
+    };
+    fillSgg(saved?.code);
+    $('grpSido').onchange = () => fillSgg();
+    $('grpSgg').onchange = search;
+    let timer;
+    $('grpSearch').oninput = () => { clearTimeout(timer); timer = setTimeout(search, 250); };
+    $('grpResults').onclick = (e) => {
+      const btn = e.target.closest('button[data-i]');
+      if (btn) place(hits[+btn.dataset.i]);
+    };
+  }
+
+  /** 한 지역의 단지·평형별 최근 매매 실거래 (최근 3년, 직거래 제외) */
+  async function loadLatest(code) {
+    const y = new Date().getFullYear();
+    const data = await Data.loadYears(code, y - 2, y);
+    const m = new Map();
+    Data.eachTrade(data.sale, null, (key, t) => {
+      if (t.direct) return;
+      const id = key + '#' + t.g, cur = m.get(id);
+      if (!cur || t.d > cur.d) m.set(id, { key, g: t.g, d: t.d, price: t.price });
+    });
+    return [...m.values()].map(x => ({ ...x, ...Data.parseKey(x.key) }));
+  }
+
+  async function search() {
+    const q = $('grpSearch').value.trim().toLowerCase();
+    const box = $('grpResults');
+    if (!q) { hits = []; box.innerHTML = '<span class="none">단지명을 입력하세요.</span>'; return; }
+    const code = $('grpSgg').value;
+    if (latestCode !== code) {
+      box.innerHTML = '<span class="none">불러오는 중…</span>';
+      const got = await loadLatest(code);
+      if (code !== $('grpSgg').value) return;
+      latest = got; latestCode = code;
+    }
+    hits = latest.filter(x => x.name.toLowerCase().includes(q) || x.dong.includes(q))
+      .sort((a, b2) => a.name.localeCompare(b2.name, 'ko') || a.g - b2.g).slice(0, 60);
+    box.innerHTML = hits.length
+      ? hits.map((x, i) => `<button data-i="${i}">${U.esc(x.dong)} ${U.esc(x.name)} ${x.g}㎡(${CONFIG.toPyeong(x.g)}평)<b>${U.price(x.price)}</b> <small>${U.date(x.d)}</small></button>`).join('')
+      : `<span class="none">${latest.length ? '검색 결과가 없습니다.' : '이 지역은 최근 3년 매매 자료가 아직 없습니다.'}</span>`;
+  }
+
+  function place(x) {
+    const b = board();
+    const z = b.zones.find(v => v.id === $('grpTargetZone').value);
+    if (!z) return U.toast('먼저 위에서 생활권을 추가하세요.');
+    if (!b.bands.length) return U.toast('가격대를 먼저 만들어 주세요.');
+    const band = put(z, `${x.name} ${CONFIG.toPyeong(x.g)}평`, x.price / 10000);
+    save(); render();
+    U.toast(`${x.name} → ${z.name} · ${label(band)} 칸에 넣었습니다.`);
   }
 
   function excel() {
