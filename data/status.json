@@ -1,17 +1,17 @@
 {
- "updatedAt": "2026-11-13 14:34",
+ "updatedAt": "2026-11-13 15:48",
  "lastUpdate": "2026-11-13",
  "progress": {
   "sale": {
-   "done": 886,
+   "done": 1293,
    "total": 63001,
-   "priorityDone": 886,
+   "priorityDone": 1293,
    "priorityTotal": 11205
   },
   "rent": {
-   "done": 831,
+   "done": 1200,
    "total": 47941,
-   "priorityDone": 831,
+   "priorityDone": 1200,
    "priorityTotal": 11205
   }
  },
@@ -20,7 +20,7 @@
    "sale": 450,
    "rent": 450
   },
-  "savedMonths": 863,
+  "savedMonths": 776,
   "failed": 0,
   "stop": "",
   "closed": {
