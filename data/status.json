@@ -1,17 +1,17 @@
 {
- "updatedAt": "2026-11-13 15:48",
+ "updatedAt": "2026-11-13 16:25",
  "lastUpdate": "2026-11-13",
  "progress": {
   "sale": {
-   "done": 1293,
+   "done": 1739,
    "total": 63001,
-   "priorityDone": 1293,
+   "priorityDone": 1739,
    "priorityTotal": 11205
   },
   "rent": {
-   "done": 1200,
+   "done": 1581,
    "total": 47941,
-   "priorityDone": 1200,
+   "priorityDone": 1581,
    "priorityTotal": 11205
   }
  },
@@ -20,7 +20,7 @@
    "sale": 450,
    "rent": 450
   },
-  "savedMonths": 776,
+  "savedMonths": 827,
   "failed": 0,
   "stop": "",
   "closed": {
@@ -29,5 +29,16 @@
   },
   "warnings": []
  },
- "emptyRegions": []
+ "emptyRegions": [
+  "인천광역시 중구(28110)",
+  "인천광역시 동구(28140)",
+  "인천광역시 서구(28260)",
+  "인천광역시 옹진군(28720)",
+  "광주광역시 동구(29110)",
+  "광주광역시 서구(29140)",
+  "광주광역시 남구(29155)",
+  "광주광역시 북구(29170)",
+  "광주광역시 광산구(29200)",
+  "경기도 화성시(41590)"
+ ]
 }
