@@ -92,7 +92,18 @@ const App = (() => {
     });
   }
 
+  /* ── 배경 테마 고르기 (색은 css/style.css 맨 위 [data-theme=…] 에서 정함) ── */
+  function initTheme() {
+    const sel = $('themeSel');
+    sel.value = Store.get('apt.theme', '');
+    sel.onchange = () => {
+      Store.set('apt.theme', sel.value);
+      location.reload();        // 그래프 색까지 한 번에 맞추기 위해 화면을 다시 엶 (적어 둔 값은 모두 저장돼 있음)
+    };
+  }
+
   async function init() {
+    initTheme();
     await gate();
     document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
     $('mapClose').onclick = closeMap;

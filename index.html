@@ -8,6 +8,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<script>
+  /* 저장해 둔 배경 테마를 화면이 그려지기 전에 적용 */
+  try { var t = JSON.parse(localStorage.getItem('apt.theme') || '""'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+</script>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -24,6 +28,12 @@
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
   </nav>
+  <label class="themepick">배경
+    <select id="themeSel">
+      <option value="">검정 (기본)</option><option value="dark">짙은 회색</option><option value="navy">남색</option>
+      <option value="white">흰색</option><option value="cream">아이보리</option><option value="mint">연한 민트</option>
+    </select>
+  </label>
   <div class="status" id="status">데이터 상태 확인 중…</div>
 </header>
 
