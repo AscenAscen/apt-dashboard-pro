@@ -1,0 +1,79 @@
+name: 실거래가 자동 수집 · 사이트 배포
+
+on:
+  schedule:
+    - cron: '17 19 * * *'   # 매일 새벽 4시 17분 (한국시간)
+    - cron: '17 4 * * *'    # 매일 오후 1시 17분 (한국시간)
+  workflow_dispatch:         # Actions 화면에서 [Run workflow] 로 직접 실행
+  push:
+    branches: [main]         # 화면 파일을 고쳐 올리면 사이트만 다시 배포
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: apt-dashboard       # 동시에 두 번 돌지 않게 (겹치면 줄 서서 대기)
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: 데이터 수집
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 인증키 확인 (실패하면 여기서 멈춤)
+        env:
+          MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+        run: python scripts/collect.py --check
+
+      - name: 실거래가 수집
+        env:
+          MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+          MAX_CALLS_PER_API: ${{ vars.MAX_CALLS_PER_API }}   # 비워 두면 기본값 4000
+          MAX_MINUTES: ${{ vars.MAX_MINUTES }}               # 비워 두면 기본값 150
+        run: python scripts/collect.py
+
+      - name: 바뀐 데이터 저장(커밋)
+        if: always()
+        run: |
+          git config user.name "apt-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "바뀐 데이터 없음"
+            exit 0
+          fi
+          git commit -q -m "데이터 갱신 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+          for i in 1 2 3; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
+
+  deploy:
+    name: 사이트 배포
+    needs: collect
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
