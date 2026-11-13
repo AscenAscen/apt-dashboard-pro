@@ -156,3 +156,48 @@ input[type=date] { color-scheme: dark; }
 #trkTable input[data-f=zone] { width: 66px; }
 #trkTable input.wide { width: 80px; }
 #trkTable td input.num { width: 62px; }
+
+/* 카카오맵 */
+.kmap { width: 100%; height: 440px; border-radius: 8px; overflow: hidden; background: #1a1b1e; border: 1px solid var(--line); position: relative; color: #000; }
+.kmap .empty { color: var(--sub); position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; margin: 0; text-align: center; }
+#mapKakao { height: min(65vh, 600px); }
+.kdot { display: flex; align-items: center; gap: 5px; transform: translateX(-7px); pointer-events: none; }
+.kdot i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 4px rgba(0,0,0,.6); flex: none; }
+.kdot span { background: #fff; color: #000; font: 600 12px/1.2 system-ui, sans-serif; padding: 2px 6px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.4); white-space: nowrap; }
+.klabel { background: #000; color: #fff; font: 700 12px/1.2 system-ui, sans-serif; padding: 3px 7px; border-radius: 10px; white-space: nowrap; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.split .kmap { height: 460px; }
+.hbar { position: relative; }
+.lg.g0 { color: var(--accent); } .lg.g1 { color: var(--rent); } .lg.g2 { color: #34c759; }
+.card input { width: 64px; padding: 3px 6px; border-radius: 6px; }
+.card .big { font-size: 26px; }
+
+/* ── 휴대폰 화면 ── */
+@media (max-width: 760px) {
+  body { font-size: 13px; }
+  .top { position: static; padding: 8px 10px; gap: 6px; }
+  .top h1 { font-size: 15px; }
+  .tabs { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+  .tabs button { flex: none; padding: 7px 11px; }
+  .status { font-size: 11px; }
+  .tab { padding: 8px 6px 70px; }
+  .panel { padding: 10px; border-radius: 10px; margin-bottom: 10px; }
+  .filters { gap: 8px; }
+  .filters label { flex: 1 1 44%; min-width: 0; }
+  .filters label select, .filters label input[type=search], .filters label input[type=month], .filters label input[type=date] { width: 100%; min-width: 0; max-width: none; }
+  .filters .grow, .filters .sep { display: none; }
+  button, .btn, select, input { min-height: 38px; }
+  input[type=checkbox] { min-height: 0; }
+  button.mini, .btn.mini { min-height: 30px; }
+  .cards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .card .v { font-size: 16px; }
+  .chartbox { height: 260px; } .chartbox.tall { height: 320px; }
+  .tablewrap { max-height: 65vh; }
+  th, td { padding: 6px 7px; }
+  .split { grid-template-columns: 1fr; }
+  .kmap, .split .kmap { height: 320px; }
+  .slot strong { width: 100%; padding: 0; }
+  .slot label { flex: 1 1 44%; } .slot label select, .slot label input { width: 100%; min-width: 0; }
+  .modal { padding: 6px; } .modalbox { padding: 10px; }
+  tr.group td { top: 30px; }
+}

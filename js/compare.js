@@ -5,7 +5,7 @@
 const Compare = (() => {
   const $ = (id) => document.getElementById(id);
   const NAMES = ['A', 'B'], COLORS = ['--accent', '--rent'];
-  let regions = [], chart = null;
+  let regions = [], chart = null, kmap = null, shapes = [], placeSeq = 0;
   const slots = [];   // { el, idx(단지 색인), areas }
 
   const dateText = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -110,6 +110,7 @@ const Compare = (() => {
       $('cmpEmpty').hidden = true; $('cmpBody').hidden = false;
       draw(res, kind);
       table(res, kind, a, b);
+      place(res);
     } catch (e) {
       console.error(e); U.toast('비교 중 오류가 났습니다: ' + (e.message || e));
     } finally {
@@ -155,7 +156,6 @@ const Compare = (() => {
 
   /* ── 비교표 ── */
   function table(res, kind, a, b) {
-    const hub = CONFIG.HUB;
     const rowsDef = [
       ['위치', r => `${U.esc(r.sgg)} ${U.esc(r.dong)} <button class="mini" data-map="${r.s.i}">지도</button>`],
       ['연식', r => (r.buildYear ? `${r.buildYear}년 (${CONFIG.toAge(r.buildYear)}년차)` : '-')],
@@ -169,37 +169,67 @@ const Compare = (() => {
       ['전저 대비', r => `<span class="${U.cls(r.st.rise)}">${U.pct(r.st.rise)}</span>`],
       ['최근 전세 실거래', r => (r.st.rentLast ? `${U.price(r.st.rentLast.price)}<small>${U.date(r.st.rentLast.d)}</small>` : '-')],
       ['전세가율 / 매-전', r => (r.st.ratio == null ? '-' : `${r.st.ratio.toFixed(0)}% / ${U.price(r.st.last.price - r.st.rentLast.price)}`)],
-      [`${hub.name}까지 직선거리`, r => `<span data-dist="${r.s.i}">${isCapital(r) ? '계산 중…' : '수도권 단지만 계산'}</span>`],
-      [`${hub.name}까지 대중교통`, r => (isCapital(r) ? `<a class="btn mini" target="_blank" rel="noopener" href="https://map.kakao.com/?sName=${encodeURIComponent(`${r.sgg} ${r.dong} ${r.name}`)}&eName=${encodeURIComponent(hub.name)}">길찾기 열기</a>` : '-')],
     ];
     $('cmpTable').innerHTML = '<thead><tr><th class="l">항목</th>' + res.map(r => `<th class="${r.s.i ? 'rent' : 'sale'}">${NAMES[r.s.i]} · ${U.esc(r.name)}</th>`).join('') + '</tr></thead><tbody>' +
       rowsDef.map(([name, fn]) => `<tr><td class="l">${name}</td>${res.map(r => `<td>${fn(r)}</td>`).join('')}</tr>`).join('') + '</tbody>';
     $('cmpTable').onclick = (e) => { const i = e.target.dataset.map; if (i != null) App.showMap(res.find(r => r.s.i === +i)); };
-    $('cmpNote').textContent = `기간: ${U.date(a)} ~ ${U.date(b)}. 직선거리는 단지 주소를 지도 좌표로 바꿔 계산한 근사값입니다(지번을 못 찾으면 동 중심 기준). 대중교통 소요 시간은 [길찾기 열기]로 카카오맵에서 확인합니다.`;
-    res.filter(isCapital).forEach(r => distance(r).then(text => { const el = document.querySelector(`[data-dist="${r.s.i}"]`); if (el) el.textContent = text; }));
+    $('cmpNote').textContent = `기간: ${U.date(a)} ~ ${U.date(b)}`;
+  }
+
+  /* ── 카카오맵: 단지 위치(빨간 점), 단지 간·강남역까지 직선거리(점선), 대중교통 접근성 카드 ── */
+  async function place(res) {
+    const seq = ++placeSeq, hub = CONFIG.HUB, msg = $('cmpMapMsg'), cards = $('cmpTransit');
+    const say = (html) => { msg.innerHTML = html; msg.hidden = false; cards.innerHTML = ''; shapes.forEach(x => x.remove()); shapes = []; };
+    const cap = res.filter(isCapital);
+    if (!KMap.ready()) return say(KMap.needKeyHtml);
+    if (!cap.length) return say('서울·경기·인천 단지를 고르면 지도와 거리가 표시됩니다.');
+    try {
+      await KMap.load();
+      for (const r of cap) r.pos = await KMap.geocode(r);
+    } catch (e) { return say(U.esc(e.message || String(e))); }
+    if (seq !== placeSeq) return;
+    const ok = cap.filter(r => r.pos);
+    if (!ok.length) return say('단지 위치를 찾지 못했습니다.');
+    msg.hidden = true;
+    if (!kmap) kmap = KMap.create($('cmpMap'), hub, 8);
+    shapes.forEach(x => x.remove()); shapes = [];
+    shapes.push(KMap.dot(kmap, hub, hub.name, '#1c1c1e'));
+    ok.forEach(r => {
+      shapes.push(KMap.dot(kmap, r.pos, `${NAMES[r.s.i]} ${r.name}`, '#ff3b30'));
+      const l = KMap.line(kmap, r.pos, hub, '#ff3b30'); r.hubKm = l.km; shapes.push(l);
+    });
+    let between = null;
+    if (ok.length === 2) { between = KMap.line(kmap, ok[0].pos, ok[1].pos, '#1c1c1e'); shapes.push(between); }
+    kmap.relayout();
+    KMap.fit(kmap, [hub, ...ok.map(r => r.pos)]);
+
+    // 대중교통 카드: ODsay 키가 있으면 자동, 없으면 직접 입력(브라우저에 저장)
+    const manual = Store.get('apt.transit.v1', {});
+    cards.innerHTML = ok.map(r => `<div class="card" data-id="${U.esc(r.code + '|' + r.key)}"><div class="k">${NAMES[r.s.i]} · ${U.esc(r.name)}</div>
+      <div class="v big" data-t>…</div>
+      <div class="s">${hub.name}까지 직선 ${r.hubKm.toFixed(1)}km${r.pos.exact ? '' : ' (동 중심 기준)'}</div>
+      <div class="s" style="margin-top:6px"><a class="btn mini" target="_blank" rel="noopener" href="https://map.kakao.com/link/from/${encodeURIComponent(r.name)},${r.pos.lat},${r.pos.lng}/to/${encodeURIComponent(hub.name)},${hub.lat},${hub.lng}">카카오맵 길찾기</a></div></div>`).join('') +
+      (between ? `<div class="card"><div class="k">단지 간 직선거리 (A ↔ B)</div><div class="v big">${between.km.toFixed(1)}km</div><div class="s">${hub.name}까지 거리 차이 ${Math.abs(ok[0].hubKm - ok[1].hubKm).toFixed(1)}km</div></div>` : '');
+    for (const r of ok) {
+      const card = cards.querySelector(`[data-id="${CSS.escape(r.code + '|' + r.key)}"]`), slot = card.querySelector('[data-t]');
+      const t = await KMap.transit(r.pos, hub);
+      if (seq !== placeSeq) return;
+      if (t) { slot.innerHTML = `${t.minutes}분 <small>환승 ${t.transfers}회</small>`; continue; }
+      const m = manual[r.code + '|' + r.key] || {};
+      slot.classList.remove('big');
+      slot.innerHTML = `<input data-k="min" inputmode="numeric" placeholder="분" value="${U.esc(m.min ?? '')}"> 분 · 환승 <input data-k="tr" inputmode="numeric" placeholder="회" value="${U.esc(m.tr ?? '')}"> 회`;
+      card.insertAdjacentHTML('beforeend', `<div class="s">${CONFIG.ODSAY_KEY ? '자동 계산에 실패했습니다. ' : ''}길찾기에서 확인한 시간을 적어 두면 저장됩니다.</div>`);
+    }
+    cards.onchange = (e) => {
+      const card = e.target.closest('[data-id]');
+      if (!card || !e.target.dataset.k) return;
+      const all = Store.get('apt.transit.v1', {});
+      (all[card.dataset.id] = all[card.dataset.id] || {})[e.target.dataset.k] = e.target.value.trim();
+      Store.set('apt.transit.v1', all);
+    };
   }
 
   const isCapital = (r) => /^(서울|경기|인천)/.test(r.sido);
-
-  /** 주소 → 좌표(오픈스트리트맵 주소 검색) → 기준점까지 직선거리. 결과는 브라우저에 기억 */
-  async function distance(r) {
-    const geo = Store.get('apt.geo.v1', {});
-    const id = `${r.code}|${r.key}`;
-    if (!geo[id]) {
-      const tries = [[`${r.sido} ${r.sgg} ${r.dong} ${r.jibun}`, ''], [`${r.sido} ${r.sgg} ${r.dong}`, ' (동 중심 기준)']];
-      for (const [q, note] of tries) {
-        try {
-          const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=kr&accept-language=ko&q=' + encodeURIComponent(q));
-          const list = res.ok ? await res.json() : [];
-          if (list.length) { geo[id] = [+list[0].lat, +list[0].lon, note]; Store.set('apt.geo.v1', geo); break; }
-        } catch (e) { /* 다음 방법 시도 */ }
-      }
-    }
-    if (!geo[id]) return '계산하지 못했습니다';
-    const [lat, lng, note] = geo[id], hub = CONFIG.HUB, rad = Math.PI / 180;
-    const h = Math.sin((hub.lat - lat) * rad / 2) ** 2 + Math.cos(lat * rad) * Math.cos(hub.lat * rad) * Math.sin((hub.lng - lng) * rad / 2) ** 2;
-    return `약 ${(2 * 6371 * Math.asin(Math.sqrt(h))).toFixed(1)}km${note}`;
-  }
 
   return { init };
 })();

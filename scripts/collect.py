@@ -3,7 +3,7 @@
 """
 국토교통부 아파트 실거래가(매매·전세) 수집기
 =================================================
-GitHub Actions 가 하루 2번 이 파일을 실행합니다. (직접 실행할 필요 없음)
+GitHub Actions 가 정해진 시각마다 이 파일을 실행합니다. (직접 실행할 필요 없음)
 
 하는 일
   1) [갱신]   최근 달(이번 달·지난달)의 실거래를 다시 받아 최신 상태로 유지
@@ -13,7 +13,8 @@ GitHub Actions 가 하루 2번 이 파일을 실행합니다. (직접 실행할 
   - 하루 호출 한도를 넘지 않게 "1회 실행당 최대 호출 수" 를 제한
   - 한 번에 1건씩 천천히 호출 (호출 사이 0.3초 쉼)
   - 실패하면 3번까지 간격을 늘려가며 재시도
-  - 연속으로 계속 실패하면(=API 장애) 그날은 즉시 중단하고 다음 실행 때 이어서
+  - 연속으로 실패하면 잠시 쉬었다 다시 시도하고, 그래도 안 되면(=API 장애) 중단 후 다음 실행 때 이어서
+  - 하루 호출 수를 기록해 여러 번 실행해도 일일 한도를 넘지 않음
   - 응답이 비정상적으로 적으면(기존보다 급감) 기존 데이터를 덮어쓰지 않음
   - 어디까지 받았는지 data/state.json 에 기록 → 항상 이어받기
 
@@ -37,12 +38,15 @@ def _env_int(name, default):
     except ValueError:
         return default
 
-MAX_CALLS_PER_API = _env_int("MAX_CALLS_PER_API", 4000)  # 1회 실행당 API별 최대 호출 수 (하루 2회 실행 → 8,000)
-MAX_MINUTES = _env_int("MAX_MINUTES", 150)               # 1회 실행 최대 시간(분)
-DELAY_SEC = 0.3                                          # 호출 사이 쉬는 시간(초)
-RETRY = 3                                                # 실패 시 재시도 횟수
-TIMEOUT_SEC = 30
-MAX_CONSECUTIVE_FAIL = 8                                 # 연속 실패 시 중단 기준
+DAILY_MAX_PER_API = _env_int("DAILY_MAX_PER_API", 9500)  # 하루(한국시간) API별 최대 호출 수 — 포털 일일 트래픽 10,000 보다 조금 적게
+MAX_CALLS_PER_API = _env_int("MAX_CALLS_PER_API", 9500)  # 1회 실행당 API별 최대 호출 수 (하루 합계는 위 숫자를 넘지 않음)
+MAX_MINUTES = _env_int("MAX_MINUTES", 100)               # 1회 실행 최대 시간(분)
+DELAY_SEC = 0.2                                          # 호출 사이 쉬는 시간(초)
+RETRY = 2                                                # 실패 시 재시도 횟수
+TIMEOUT_SEC = 20
+MAX_CONSECUTIVE_FAIL = 8                                 # 연속 실패가 이만큼 쌓이면 잠시 쉼
+COOLDOWN_SEC = 120                                       # 쉬는 시간(초)
+MAX_COOLDOWNS = 5                                        # 이만큼 쉬어도 계속 실패하면 이번 실행은 중단
 ROWS_PER_PAGE = 1000
 START_YM = {"sale": 200601, "rent": 201101}              # 수집 시작 연월 (매매 2006~, 전월세 2011~ 제공)
 PRIORITY_FROM_YM = 202001                                # 이 연월 이후를 먼저 수집 (전고점/전저점 계산용)
@@ -172,36 +176,45 @@ def _parse(body):
 
 
 class Api:
-    def __init__(self):
+    def __init__(self, used_today=None):
         self.key = _service_key()
         self.calls = {"sale": 0, "rent": 0}
         self.closed = {}  # kind → 이유 (한도 도달 등)
+        used_today = used_today or {}
+        # 이번 실행에서 쓸 수 있는 호출 수 = min(1회 한도, 하루 한도 - 오늘 이미 쓴 양)
+        self.budget = {k: min(MAX_CALLS_PER_API, DAILY_MAX_PER_API - int(used_today.get(k, 0))) for k in ("sale", "rent")}
+        for k, v in self.budget.items():
+            if v <= 0:
+                self.closed[k] = "오늘 호출 한도(%d)를 이미 사용" % DAILY_MAX_PER_API
+        self.server_quota_hit = set()
 
     def available(self, kind):
         return kind not in self.closed
 
     def _one(self, kind, code, ym, page):
-        if self.calls[kind] >= MAX_CALLS_PER_API:
-            self.closed[kind] = "1회 실행 한도(%d) 도달" % MAX_CALLS_PER_API
+        if self.calls[kind] >= self.budget[kind]:
+            self.closed[kind] = "이번 실행 호출 한도(%d) 도달" % self.budget[kind]
             raise QuotaExceeded(self.closed[kind])
         url = "%s?serviceKey=%s&LAWD_CD=%s&DEAL_YMD=%d&pageNo=%d&numOfRows=%d" % (
             API_URL[kind], self.key, code, ym, page, ROWS_PER_PAGE)
         last = None
         for attempt in range(RETRY + 1):
             if attempt:
-                time.sleep(2 ** attempt * 2)  # 4초, 8초, 16초
+                time.sleep(3 * attempt)  # 3초, 6초
             self.calls[kind] += 1
             time.sleep(DELAY_SEC)
             try:
                 return _parse(_http_get(url))
             except QuotaExceeded as e:
                 self.closed[kind] = "일일 호출 한도 초과: %s" % e
+                self.server_quota_hit.add(kind)
                 raise
             except KeyProblem:
                 raise
             except urllib.error.HTTPError as e:
                 if e.code == 429:
                     self.closed[kind] = "일일 호출 한도 초과(HTTP 429)"
+                    self.server_quota_hit.add(kind)
                     raise QuotaExceeded(self.closed[kind])
                 if e.code in (401, 403):
                     raise KeyProblem("HTTP %d — 인증키 또는 활용신청 상태를 확인하세요" % e.code)
@@ -378,41 +391,64 @@ def backfill_tasks(regions, state, cur):
 
 # ───────────────────────── 첫 화면용 요약 ─────────────────────────
 def build_summary(regions, today):
-    """지역별 최근 30일 / 그 직전 30일 거래 요약 → data/summary.json (대시보드 첫 탭)"""
+    """대시보드 첫 탭용 요약 → data/summary.json
+       · 지역별 최근 30일 / 그 직전 30일 거래 건수, 평균가, 최고가 거래
+       · 지역별 최근 30일 고가 거래 5건(매매: 2020년 이후 전고점 포함, 전세) → 가로 막대그래프"""
     def ymd(d):
         return d.year * 10000 + d.month * 100 + d.day
     hi, mid, lo = ymd(today), ymd(today - dt.timedelta(days=30)), ymd(today - dt.timedelta(days=60))
-    years = sorted({today.year, (today - dt.timedelta(days=60)).year})
-    out = {}
+    peak_from_year = PRIORITY_FROM_YM // 100
+    out, deals = {}, {"sale": [], "rent": []}
     for r in regions:
+        code = r["code"]
         cur = {"s": 0, "sp": 0, "r": 0, "rp": 0}
         total, n, top = 0, 0, None
+        peaks, recent = {}, {"sale": [], "rent": []}   # peaks[(단지키, 평형)] = 2020년 이후 매매 최고가(직거래 제외)
         for kind in ("sale", "rent"):
-            for y in years:
-                ydata = read_json(year_path(kind, r["code"], y), {})
+            for y in (range(peak_from_year, today.year + 1) if kind == "sale" else sorted({today.year, (today - dt.timedelta(days=60)).year})):
+                ydata = read_json(year_path(kind, code, y), {})
                 for key, areas in ydata.items():
                     for akey, flat in areas.items():
+                        direct = akey.endswith("d")
+                        g = int(float(akey[:-1] if direct else akey))
                         for i in range(0, len(flat), 3):
-                            d = y * 10000 + flat[i]
+                            d, price = y * 10000 + flat[i], flat[i + 2]
+                            if kind == "sale" and not direct and d <= hi and price > peaks.get((key, g), 0):
+                                peaks[(key, g)] = price
                             if d <= lo or d > hi:
                                 continue
-                            recent = d > mid
+                            is_recent = d > mid
                             if kind == "rent":
-                                cur["r" if recent else "rp"] += 1
+                                cur["r" if is_recent else "rp"] += 1
+                                if is_recent:
+                                    recent["rent"].append((price, key, g, d))
                                 continue
-                            cur["s" if recent else "sp"] += 1
-                            if recent and not akey.endswith("d"):
-                                price = flat[i + 2]
+                            cur["s" if is_recent else "sp"] += 1
+                            if is_recent and not direct:
                                 total += price
                                 n += 1
+                                recent["sale"].append((price, key, g, d))
                                 if top is None or price > top[3]:
                                     parts = key.split("|")
-                                    top = [parts[0], "|".join(parts[2:]), int(float(akey)), price, d]
+                                    top = [parts[0], "|".join(parts[2:]), g, price, d]
         if cur["s"] or cur["sp"] or cur["r"] or cur["rp"]:
             cur["avg"] = round(total / n) if n else None
             cur["top"] = top
-            out[r["code"]] = cur
-    write_json(os.path.join(DATA, "summary.json"), {"asOf": today.isoformat(), "days": 30, "regions": out}, by_line=False)
+            out[code] = cur
+        for kind in ("sale", "rent"):
+            seen = set()
+            for price, key, g, d in sorted(recent[kind], reverse=True):
+                if (key, g) in seen:
+                    continue                     # 같은 단지·평형은 가장 비싼 1건만
+                seen.add((key, g))
+                parts = key.split("|")
+                row = [code, parts[0], "|".join(parts[2:]), g, price, d]
+                if kind == "sale":
+                    row.append(peaks.get((key, g), price))
+                deals[kind].append(row)
+                if len(seen) >= 5:
+                    break
+    write_json(os.path.join(DATA, "summary.json"), {"asOf": today.isoformat(), "days": 30, "regions": out, "deals": deals}, by_line=False)
 
 
 # ───────────────────────── 실행 ─────────────────────────
@@ -430,14 +466,27 @@ def run():
     state["ptr"].setdefault("sale", {})
     state["ptr"].setdefault("rent", {})
 
-    log = {"saved": 0, "failed": 0, "warnings": [], "stop": ""}
+    daily = state.get("daily") or {}
+    if daily.get("date") != today.isoformat():
+        daily = {"date": today.isoformat(), "sale": 0, "rent": 0}
+    used_before = {"sale": int(daily.get("sale", 0)), "rent": int(daily.get("rent", 0))}
+
+    log = {"saved": 0, "failed": 0, "warnings": [], "stop": "", "cooldowns": 0}
     try:
-        api = Api()
+        api = Api(used_before)
     except KeyProblem as e:
         print("[중단]", e)
         return 1
 
     consecutive = 0
+    restart = {"need": False}
+
+    def save_state():
+        state["daily"] = {"date": today.isoformat(),
+                          "sale": DAILY_MAX_PER_API if "sale" in api.server_quota_hit else used_before["sale"] + api.calls["sale"],
+                          "rent": DAILY_MAX_PER_API if "rent" in api.server_quota_hit else used_before["rent"] + api.calls["rent"]}
+        write_json(spath, state)
+
     blocked = set()  # 이번 실행에서 실패한 (종류, 지역) → 순서 유지를 위해 더 과거로 내려가지 않음
 
     def do(kind, code, ym, is_update):
@@ -459,8 +508,14 @@ def run():
             if len(log["warnings"]) < 50:
                 log["warnings"].append("%s %s %d 실패: %s" % (kind, code, ym, e))
             if consecutive >= MAX_CONSECUTIVE_FAIL:
-                log["stop"] = "연속 %d회 실패 → API 장애로 판단, 다음 실행 때 이어서 진행" % consecutive
-                return False
+                log["cooldowns"] += 1
+                if log["cooldowns"] > MAX_COOLDOWNS:
+                    log["stop"] = "연속 실패가 계속됨(%d번 쉬어도 회복 안 됨) → API 장애로 판단, 다음 실행 때 이어서 진행" % MAX_COOLDOWNS
+                    return False
+                print("  … 연속 %d회 실패 → %d초 쉬고 다시 시도 (%d/%d)" % (consecutive, COOLDOWN_SEC, log["cooldowns"], MAX_COOLDOWNS))
+                time.sleep(COOLDOWN_SEC)
+                consecutive = 0
+                restart["need"] = True   # 순서를 지키기 위해 과거수집을 처음부터 다시 훑음
             return True
         consecutive = 0
         if save_month(kind, code, ym, items, log["warnings"], is_update):
@@ -490,18 +545,27 @@ def run():
 
     # 2) 과거수집
     n = 0
-    if ok:
+    go = ok
+    while go:
+        restart["need"] = False
+        blocked.clear()
         for kind, code, ym in backfill_tasks(regions, state, cur):
             if not (api.available("sale") or api.available("rent")):
+                go = False
                 break
             if not time_left() or not do(kind, code, ym, False):
+                go = False
+                break
+            if restart["need"]:
                 break
             n += 1
             if n % 200 == 0:
-                write_json(spath, state)  # 중간 저장
-                print("  … 과거수집 %d건 진행 (호출: 매매 %d, 전세 %d)" % (n, api.calls["sale"], api.calls["rent"]))
+                save_state()  # 중간 저장
+                print("  … 과거수집 %d건 진행 (호출: 매매 %d, 전세 %d / 실패 %d)" % (n, api.calls["sale"], api.calls["rent"], log["failed"]))
+        else:
+            go = False       # 끝까지 다 돌았음 (남은 일 없음)
 
-    write_json(spath, state)
+    save_state()
 
     # 3) 대시보드용 상태 파일
     progress = {}
@@ -523,11 +587,13 @@ def run():
         "lastUpdate": state.get("lastUpdate", ""),
         "progress": progress,
         "lastRun": {"calls": api.calls, "savedMonths": log["saved"], "failed": log["failed"],
-                    "stop": log["stop"], "closed": api.closed, "warnings": log["warnings"][:50]},
+                    "stop": log["stop"], "closed": api.closed, "cooldowns": log["cooldowns"], "minutes": round((time.time() - t0) / 60),
+                    "usedToday": state.get("daily"), "warnings": log["warnings"][:50]},
         "emptyRegions": empty,  # 1년치 이상 받았는데 단지가 0개 → 지역코드 변경 의심
     })
     build_summary(regions, today)
-    print("[완료] 저장 %d달, 실패 %d건, 호출 매매 %d / 전세 %d" % (log["saved"], log["failed"], api.calls["sale"], api.calls["rent"]))
+    print("[완료] 저장 %d달, 실패 %d건, 호출 매매 %d / 전세 %d, %d분 소요 (오늘 누적 호출: 매매 %d / 전세 %d)" % (
+        log["saved"], log["failed"], api.calls["sale"], api.calls["rent"], round((time.time() - t0) / 60), state["daily"]["sale"], state["daily"]["rent"]))
     for k, v in api.closed.items():
         print("  -", k, ":", v)
     if log["stop"]:
@@ -554,4 +620,8 @@ def check():
 
 
 if __name__ == "__main__":
+    try:
+        sys.stdout.reconfigure(line_buffering=True)   # 진행 상황이 Actions 화면에 바로 보이게
+    except Exception:
+        pass
     sys.exit(check() if "--check" in sys.argv else run())

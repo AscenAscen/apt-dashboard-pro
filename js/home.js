@@ -12,7 +12,8 @@ const Home = (() => {
     { name: '광역시', test: (sido) => /^(부산|대구|광주|대전|울산)/.test(sido) },
     { name: '그 외 지역', test: () => true, extra: true },
   ];
-  let rows = [], sort = { col: 's', dir: -1 }, info = null;
+  let rows = [], sort = { col: 's', dir: -1 }, info = null, regs = [], chart = null;
+  const GROUP_COLORS = ['--accent', '--rent', '#34c759'];
 
   const COLS = [
     { id: 'name', label: '지역', cls: 'l', val: r => r.name },
@@ -33,7 +34,12 @@ const Home = (() => {
       $('homeEmpty').innerHTML = '거래 현황 요약이 아직 없습니다.<br>다음 자동 수집(매일 새벽 4시·오후 1시경)이 끝나면 표시됩니다. 바로 보려면 GitHub Actions 에서 [Run workflow] 를 누르세요.';
       return;
     }
-    info = sum;
+    info = sum; regs = regions;
+    if (sum.deals && (sum.deals.sale.length || sum.deals.rent.length)) {
+      $('homeChartPanel').hidden = false;
+      ['hcGroup', 'hcKind', 'hcMetric', 'hcCount'].forEach(id => { $(id).onchange = drawChart; });
+      drawChart();
+    }
     $('homeTitle').textContent = `최근 1개월 거래 현황 (${sum.asOf} 기준, 계약일 기준 최근 ${sum.days}일)`;
     rows = regions.filter(r => sum.regions[r[0]]).map(r => {
       const v = sum.regions[r[0]];
@@ -72,6 +78,59 @@ const Home = (() => {
       const tr = e.target.closest('tr.reg');
       if (tr) { App.showTab('search'); Search.openRegion(tr.dataset.code); }
     };
+  }
+
+  /* ── 가로 막대그래프: 최근 1개월 고가 거래 ── */
+  function drawChart() {
+    const kind = $('hcKind').value, grp = $('hcGroup').value, n = +$('hcCount').value;
+    if (kind === 'rent' && $('hcMetric').value === 'rec') { $('hcMetric').value = 'price'; U.toast('전고점 대비 회복률은 매매에서만 볼 수 있습니다.'); }
+    const metric = $('hcMetric').value;
+    const byCode = new Map(regs.map(r => [r[0], r]));
+    let list = (info.deals[kind] || []).map(d => {
+      const reg = byCode.get(d[0]); if (!reg) return null;
+      const g = GROUPS.findIndex(x => x.test(reg[1]));
+      const rec = d[6] ? d[4] / d[6] * 100 : null;
+      return { g, place: U.siGu(reg[1], reg[2]).filter(Boolean).pop(), dong: d[1], name: d[2], area: d[3], price: d[4], d: d[5], rec };
+    }).filter(x => x && x.g <= 2 && (grp === 'all' || x.g === +grp) && (metric === 'price' || x.rec != null));
+    list.sort((a, b) => (metric === 'price' ? b.price - a.price : b.rec - a.rec || b.price - a.price));
+    list = list.slice(0, n);
+    const css = getComputedStyle(document.documentElement);
+    const col = (c) => (c.startsWith('--') ? css.getPropertyValue(c).trim() : c);
+    const eok = (v) => +(v / 10000).toFixed(2) + '억';
+    const text = (x) => {
+      const chg = x.rec == null ? '' : (x.rec >= 99.95 ? '신고가' : `${(x.rec - 100).toFixed(0)}%`);
+      return metric === 'price' ? `${eok(x.price)}${chg ? ` (${chg})` : ''}` : `${x.rec.toFixed(0)}% · ${eok(x.price)}`;
+    };
+    const canvas = $('homeChart');
+    canvas.parentElement.style.height = Math.max(160, list.length * 30 + 50) + 'px';
+    if (chart) chart.destroy();
+    const narrow = window.innerWidth < 760;
+    chart = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: list.map(x => (narrow ? `${x.name} ${x.area}㎡` : `${x.name} ${x.area}㎡ (${x.place} ${x.dong})`)),
+        datasets: [{ data: list.map(x => (metric === 'price' ? x.price / 10000 : x.rec)), backgroundColor: list.map(x => col(GROUP_COLORS[x.g])), borderRadius: 4, barPercentage: 0.75 }],
+      },
+      options: {
+        indexAxis: 'y', maintainAspectRatio: false, animation: false,
+        layout: { padding: { right: narrow ? 96 : 130 } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: col('--sub'), callback: (v) => (metric === 'price' ? v + '억' : v + '%') }, grid: { color: col('--line') } },
+          y: { ticks: { color: col('--text'), autoSkip: false, font: { size: narrow ? 11 : 13 } }, grid: { display: false } },
+        },
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${text(list[c.dataIndex])} · ${U.date(list[c.dataIndex].d)}` } } },
+      },
+      // 막대 오른쪽 끝에 수치를 고정 표시
+      plugins: [{
+        id: 'endLabel',
+        afterDatasetsDraw(ch) {
+          const ctx = ch.ctx;
+          ctx.save(); ctx.fillStyle = col('--text'); ctx.font = `600 ${narrow ? 11 : 12}px system-ui, sans-serif`; ctx.textBaseline = 'middle';
+          ch.getDatasetMeta(0).data.forEach((bar, i) => ctx.fillText(text(list[i]), bar.x + 6, bar.y));
+          ctx.restore();
+        },
+      }],
+    });
   }
 
   return { init };

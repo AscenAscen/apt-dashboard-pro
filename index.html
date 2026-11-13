@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>아파트 실거래가 대시보드</title>
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -14,6 +18,7 @@
     <button data-tab="home" class="on">최근 거래</button>
     <button data-tab="search">실거래 조회</button>
     <button data-tab="compare">단지 비교</button>
+    <button data-tab="infra">입지 분석</button>
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
@@ -24,6 +29,17 @@
 <!-- ═══════════════ 1. 실거래 조회 ═══════════════ -->
 <!-- ═══════════════ 0. 최근 거래 (첫 화면) ═══════════════ -->
 <main id="tab-home" class="tab">
+  <section class="panel" id="homeChartPanel" hidden>
+    <div class="bar"><strong>최근 1개월 고가 거래</strong><span class="grow"></span></div>
+    <div class="filters">
+      <label>지역 <select id="hcGroup"><option value="all">전체 (서울·수도권·광역시)</option><option value="0">서울</option><option value="1">수도권 (경기·인천)</option><option value="2">광역시</option></select></label>
+      <label>거래 유형 <select id="hcKind"><option value="sale">매매</option><option value="rent">전세</option></select></label>
+      <label>막대 길이 <select id="hcMetric"><option value="price">실거래 가격 (억)</option><option value="rec">전고점 대비 회복률 (%)</option></select></label>
+      <label>개수 <select id="hcCount"><option>10</option><option selected>20</option><option>30</option></select></label>
+    </div>
+    <p class="hint">단지·평형마다 최근 30일 중 가장 비싼 1건만 골라 비싼 순으로 보여 줍니다. 괄호 안은 2020년 이후 최고가 대비 등락입니다. 색: <span class="lg g0">■</span> 서울 <span class="lg g1">■</span> 수도권 <span class="lg g2">■</span> 광역시</p>
+    <div class="hbar"><canvas id="homeChart"></canvas></div>
+  </section>
   <section class="panel">
     <div class="bar"><strong id="homeTitle">최근 1개월 거래 현황</strong><span class="grow"></span>
       <label class="inline"><input type="checkbox" id="homeAll"> 그 외 지역도 보기</label></div>
@@ -183,6 +199,10 @@
   <section class="panel" id="cmpBody" hidden>
     <div class="cards" id="cmpCards"></div>
     <div class="chartbox tall"><canvas id="cmpChart"></canvas></div>
+    <h3 class="sub">위치와 직선거리 (수도권 단지)</h3>
+    <div class="kmap" id="cmpMap"><p class="empty" id="cmpMapMsg"></p></div>
+    <h3 class="sub">강남역 대중교통 접근성</h3>
+    <div class="cards" id="cmpTransit"></div>
     <h3 class="sub">비교표</h3>
     <div class="tablewrap"><table id="cmpTable"></table></div>
     <p class="hint" id="cmpNote"></p>
@@ -226,6 +246,51 @@
       <b>자동 배치</b>는 시세트래킹에서 "생활권"을 적어 둔 단지를 최근 매매가에 맞는 칸에 넣어 줍니다.</p>
     <div class="tablewrap"><table id="grpTable" class="grid"></table></div>
   </section>
+</main>
+
+<!-- ═══════════════ 입지 분석 (카카오맵) ═══════════════ -->
+<main id="tab-infra" class="tab" hidden>
+  <section class="panel filters">
+    <label>시/도 <select id="inSido"></select></label>
+    <label>시/군/구 <select id="inSgg"></select></label>
+    <label>단지 검색 <input id="inFind" type="search" placeholder="단지명 일부"></label>
+    <label>단지 <select id="inApt"></select></label>
+    <button class="primary" id="btnInfra">분석하기</button>
+  </section>
+  <section class="panel empty" id="inEmpty">단지를 고르고 <b>분석하기</b>를 누르세요. 반경 500m·1km 안의 지하철·학교·마트·병원·학원 수, 3대 업무지구까지 거리, 로드뷰, 가장 가까운 초등학교를 보여 줍니다.</section>
+  <div id="inBody" hidden>
+    <section class="panel">
+      <div class="bar">
+        <strong id="inTitle"></strong><span class="grow"></span>
+        <div class="presets" id="inView">
+          <button data-v="infra" class="on">① 인프라 반경</button>
+          <button data-v="hubs">② 업무지구 거리</button>
+          <button data-v="school">④ 초등학교 통학로</button>
+        </div>
+        <button id="inHybrid">위성 지도</button>
+        <button id="inRvLayer">로드뷰 도로 표시</button>
+      </div>
+      <p class="hint">③ 지도를 누르면 아래 로드뷰가 그 위치로 이동합니다. 파란 선(로드뷰 도로 표시)이 있는 길에서만 로드뷰가 나옵니다.</p>
+      <div class="split">
+        <div class="kmap" id="inMap"></div>
+        <div class="kmap" id="inRoad"><p class="empty" id="inRoadMsg">로드뷰를 불러오는 중…</p></div>
+      </div>
+    </section>
+    <section class="panel" id="inInfraPanel">
+      <div class="bar"><strong>① 인프라 점수표</strong><span class="hint" style="margin:0">— 500m ≈ 도보 7분, 1km ≈ 도보 15분</span></div>
+      <div class="cards" id="inScore"></div>
+      <div class="tablewrap"><table id="inTable"></table></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>② 3대 업무지구 직선거리</strong></div>
+      <div class="cards" id="inHubs"></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>④ 가장 가까운 초등학교</strong></div>
+      <div class="cards" id="inSchool"></div>
+      <p class="hint">큰길 횡단 여부는 자동 판정이 아닙니다. [④ 초등학교 통학로]를 누른 뒤 위성 지도와 로드뷰로 직접 확인하세요.</p>
+    </section>
+  </div>
 </main>
 
 <!-- ═══════════════ 4. 지역 동향 ═══════════════ -->
@@ -272,10 +337,11 @@
     <div class="bar">
       <strong id="mapTitle"></strong><span class="grow"></span>
       <a id="mapNaver" target="_blank" rel="noopener" class="btn">네이버지도</a>
-      <a id="mapKakao" target="_blank" rel="noopener" class="btn">카카오맵</a>
+      <a id="mapKakaoLink" target="_blank" rel="noopener" class="btn">카카오맵</a>
       <a id="mapLand" target="_blank" rel="noopener" class="btn">네이버 검색(부동산)</a>
       <button id="mapClose">닫기</button>
     </div>
+    <div class="kmap" id="mapKakao" hidden></div>
     <iframe id="mapFrame" title="지도" loading="lazy"></iframe>
   </div>
 </div>
@@ -303,9 +369,11 @@
 <script src="lib/chart.umd.js"></script>
 <script src="js/config.js"></script>
 <script src="js/data.js"></script>
+<script src="js/kakao.js"></script>
 <script src="js/home.js"></script>
 <script src="js/search.js"></script>
 <script src="js/compare.js"></script>
+<script src="js/infra.js"></script>
 <script src="js/tracking.js"></script>
 <script src="js/grouping.js"></script>
 <script src="js/trends.js"></script>

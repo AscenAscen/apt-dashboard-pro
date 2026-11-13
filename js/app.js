@@ -10,18 +10,34 @@ const App = (() => {
     if (name === 'tracking') Tracking.open();
   }
 
-  /** 지도 창 열기. 단지 정보(sido, sgg, dong, jibun, name)가 있으면 됩니다 */
-  function showMap(r) {
+  /** 지도 창 열기. 단지 정보(code, key, sido, sgg, dong, jibun, name)가 있으면 됩니다.
+      카카오 키가 있으면 카카오맵, 없거나 실패하면 구글 지도로 보여 줍니다. */
+  let modalMap = null, modalDot = null, mapSeq = 0;
+  async function showMap(r) {
     const addr = `${r.sido} ${r.sgg} ${r.dong} ${r.jibun || ''}`.trim();
     const q = encodeURIComponent(`${r.sgg} ${r.dong} ${r.name}`);
+    const seq = ++mapSeq;
     $('mapTitle').textContent = `${r.name} — ${addr}`;
-    $('mapFrame').src = `https://maps.google.com/maps?q=${encodeURIComponent(addr)}&z=16&hl=ko&output=embed`;
     $('mapNaver').href = `https://map.naver.com/p/search/${q}`;
-    $('mapKakao').href = `https://map.kakao.com/?q=${q}`;
+    $('mapKakao').hidden = true; $('mapFrame').hidden = false;
+    $('mapKakaoLink').href = `https://map.kakao.com/?q=${q}`;
     $('mapLand').href = U.landLink(r.sgg, r.dong, r.name);
     $('mapModal').hidden = false;
+    const google = () => { $('mapKakao').hidden = true; $('mapFrame').hidden = false; $('mapFrame').src = `https://maps.google.com/maps?q=${encodeURIComponent(addr)}&z=16&hl=ko&output=embed`; };
+    if (!KMap.ready()) return google();
+    try {
+      $('mapFrame').hidden = true; $('mapKakao').hidden = false;
+      await KMap.load();
+      const pos = await KMap.geocode(r);
+      if (seq !== mapSeq) return;
+      if (!pos) return google();
+      if (!modalMap) modalMap = KMap.create($('mapKakao'), pos, 4);
+      modalMap.relayout(); modalMap.setLevel(4); modalMap.setCenter(KMap.LL(pos));
+      if (modalDot) modalDot.remove();
+      modalDot = KMap.dot(modalMap, pos, r.name);
+    } catch (e) { console.error(e); if (seq === mapSeq) google(); }
   }
-  function closeMap() { $('mapModal').hidden = true; $('mapFrame').src = 'about:blank'; }
+  function closeMap() { mapSeq++; $('mapModal').hidden = true; $('mapFrame').src = 'about:blank'; }
 
   async function showStatus() {
     const s = await Data.status();
@@ -85,11 +101,14 @@ const App = (() => {
     Grouping.init();
     Trends.init();
     Compare.init();
+    Infra.init();
     Home.init();
     await Search.init();
     showStatus();
   }
 
   document.addEventListener('DOMContentLoaded', init);
+  // 휴대폰 홈 화면에 앱처럼 설치할 수 있게 (PWA)
+  if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
   return { showMap, showTab };
 })();
