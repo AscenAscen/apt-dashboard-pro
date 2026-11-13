@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────
-   kakao.js — 카카오맵 공통 도구 (지도 불러오기, 주소→좌표, 거리, 선·원·점 그리기, 대중교통 시간)
+   kakao.js — 카카오맵 공통 도구 (지도 불러오기, 주소→좌표, 거리, 선·원·점 그리기, 주변 장소 찾기)
    js/config.js 의 KAKAO_JS_KEY 에 카카오 JavaScript 키를 넣어야 동작합니다.
    카카오 정책상 검색 결과(좌표 등)는 저장하지 않고, 화면을 여는 동안에만 기억합니다.
    ───────────────────────────────────────────────────────── */
@@ -108,18 +108,11 @@ const KMap = (() => {
     return new Promise(res => new S.Places().keywordSearch(q, (list, st) => res(st === S.Status.OK ? list : []), { location: LL(p), radius, sort: S.SortBy.DISTANCE }));
   }
 
-  /** 대중교통 최단 소요 시간 (ODsay). 키가 없거나 실패하면 null → 화면에서 직접 입력 */
-  async function transit(from, to) {
-    if (!CONFIG.ODSAY_KEY) return null;
-    try {
-      const url = `https://api.odsay.com/v1/api/searchPubTransPathT?SX=${from.lng}&SY=${from.lat}&EX=${to.lng}&EY=${to.lat}&apiKey=${encodeURIComponent(CONFIG.ODSAY_KEY)}`;
-      const j = await (await fetch(url)).json();
-      const paths = j?.result?.path || [];
-      if (!paths.length) return null;
-      const best = paths.reduce((a, b) => (b.info.totalTime < a.info.totalTime ? b : a));
-      return { minutes: best.info.totalTime, transfers: Math.max(0, (best.info.busTransitCount || 0) + (best.info.subwayTransitCount || 0) - 1) };
-    } catch (e) { console.error(e); return null; }
+  /** 키워드로 찾은 장소 수 (반경 안) */
+  function keywordCount(q, p, radius) {
+    const S = kakao.maps.services;
+    return new Promise(res => new S.Places().keywordSearch(q, (list, st, page) => res(st === S.Status.OK ? page.totalCount : 0), { location: LL(p), radius }));
   }
 
-  return { ready, needKeyHtml, load, geocode, km, create, dot, line, circle, fit, category, keyword, transit, LL };
+  return { ready, needKeyHtml, load, geocode, km, create, dot, line, circle, fit, category, keyword, keywordCount, LL };
 })();

@@ -187,6 +187,8 @@ class Api:
             if v <= 0:
                 self.closed[k] = "오늘 호출 한도(%d)를 이미 사용" % DAILY_MAX_PER_API
         self.server_quota_hit = set()
+        self.ok = {"sale": 0, "rent": 0}      # 성공한 호출 수
+        self.months = {"sale": 0, "rent": 0}  # 받은 달 수 (한 달이 여러 쪽으로 나뉘면 호출 수가 더 많음)
 
     def available(self, kind):
         return kind not in self.closed
@@ -204,12 +206,18 @@ class Api:
             self.calls[kind] += 1
             time.sleep(DELAY_SEC)
             try:
-                return _parse(_http_get(url))
+                out = _parse(_http_get(url))
+                self.ok[kind] += 1
+                return out
             except QuotaExceeded as e:
                 self.closed[kind] = "일일 호출 한도 초과: %s" % e
                 self.server_quota_hit.add(kind)
                 raise
-            except KeyProblem:
+            except KeyProblem as e:
+                if self.ok[kind]:   # 방금까지 잘 되던 키가 거절됨 → 키 문제가 아니라 한도 초과로 봄
+                    self.closed[kind] = "서버가 요청을 거절(일일 한도 초과로 추정): %s" % e
+                    self.server_quota_hit.add(kind)
+                    raise QuotaExceeded(self.closed[kind])
                 raise
             except urllib.error.HTTPError as e:
                 if e.code == 429:
@@ -217,6 +225,10 @@ class Api:
                     self.server_quota_hit.add(kind)
                     raise QuotaExceeded(self.closed[kind])
                 if e.code in (401, 403):
+                    if self.ok[kind]:
+                        self.closed[kind] = "서버가 요청을 거절(HTTP %d, 일일 한도 초과로 추정)" % e.code
+                        self.server_quota_hit.add(kind)
+                        raise QuotaExceeded(self.closed[kind])
                     raise KeyProblem("HTTP %d — 인증키 또는 활용신청 상태를 확인하세요" % e.code)
                 last = TempError("HTTP %d" % e.code)
             except TempError as e:
@@ -231,7 +243,8 @@ class Api:
         while True:
             got, total = self._one(kind, code, ym, page)
             items.extend(got)
-            if not got or len(items) >= total or page >= 50:
+            if not got or len(items) >= total or page >= 300:
+                self.months[kind] += 1
                 return items
             page += 1
 
@@ -587,11 +600,14 @@ def run():
         "lastUpdate": state.get("lastUpdate", ""),
         "progress": progress,
         "lastRun": {"calls": api.calls, "savedMonths": log["saved"], "failed": log["failed"],
-                    "stop": log["stop"], "closed": api.closed, "cooldowns": log["cooldowns"], "minutes": round((time.time() - t0) / 60),
+                    "stop": log["stop"], "closed": api.closed, "months": api.months, "cooldowns": log["cooldowns"], "minutes": round((time.time() - t0) / 60),
                     "usedToday": state.get("daily"), "warnings": log["warnings"][:50]},
         "emptyRegions": empty,  # 1년치 이상 받았는데 단지가 0개 → 지역코드 변경 의심
     })
     build_summary(regions, today)
+    for k, label in (("sale", "매매"), ("rent", "전세")):
+        if api.months[k]:
+            print("  - %s: %d달을 받는 데 %d번 호출 (한 달 평균 %.1f번)" % (label, api.months[k], api.calls[k], api.calls[k] / api.months[k]))
     print("[완료] 저장 %d달, 실패 %d건, 호출 매매 %d / 전세 %d, %d분 소요 (오늘 누적 호출: 매매 %d / 전세 %d)" % (
         log["saved"], log["failed"], api.calls["sale"], api.calls["rent"], round((time.time() - t0) / 60), state["daily"]["sale"], state["daily"]["rent"]))
     for k, v in api.closed.items():
@@ -605,19 +621,25 @@ def run():
 
 
 def check():
-    """인증키 시험: 서울 종로구 지난달 1건 조회"""
+    """인증키 시험: 서울 종로구 지난달 조회. 한도 초과는 오류가 아님(다음 단계에서 알아서 쉼)"""
     today = dt.datetime.now(KST).date()
     ym = ym_add(today.year * 100 + today.month, -1)
     try:
         api = Api()
-        for kind, label in (("sale", "매매"), ("rent", "전월세")):
+    except KeyProblem as e:
+        print("[오류]", e)
+        return 1
+    worst = 0
+    for kind, label in (("sale", "매매"), ("rent", "전월세")):
+        try:
             items, total = api._one(kind, "11110", ym, 1)
             print("[정상] %s API: 종로구 %d → %d건" % (label, ym, total))
-        return 0
-    except Exception as e:
-        print("[오류] %s: %s" % (type(e).__name__, e))
-        return 1
-
+        except QuotaExceeded as e:
+            print("[한도] %s API: 오늘 호출 한도를 다 썼습니다. 한도가 다시 채워지면(보통 자정) 자동으로 이어받습니다. (%s)" % (label, e))
+        except Exception as e:
+            print("[오류] %s API: %s: %s" % (label, type(e).__name__, e))
+            worst = 1
+    return worst
 
 if __name__ == "__main__":
     try:

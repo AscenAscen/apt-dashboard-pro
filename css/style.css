@@ -201,3 +201,41 @@ input[type=date] { color-scheme: dark; }
   .modal { padding: 6px; } .modalbox { padding: 10px; }
   tr.group td { top: 30px; }
 }
+
+/* 전수조사 표 (트래킹과 같은 양식) */
+#svTable thead tr:nth-child(2) th { top: 34px; }
+#svTable th.grp { color: var(--text); font-size: 13px; border-left: 2px solid var(--accent); }
+#svTable .gl { border-left: 2px solid var(--accent); }
+#svTable th, #svTable td { padding: 6px 6px; }
+#svTable td.name { font-weight: 600; }
+#svTable input[data-f=rooms], #svTable input[data-f=baths] { width: 36px; }
+#svTable input[data-f=structure] { width: 48px; }
+#svTable input[data-f=households] { width: 58px; }
+#svTable input[data-f=zone] { width: 66px; }
+#svTable td input.num { width: 62px; }
+#svTable tr.tracked td.name::before { content: "★ "; color: var(--rent); }
+#btnSvMore { margin-top: 8px; }
+
+/* 단지 비교: 표시 항목, 비교표들 */
+details summary { cursor: pointer; }
+.optgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; margin-top: 12px; }
+.optgrid label { display: flex; align-items: center; gap: 7px; font-size: 14px; }
+.optgrid .ogroup { grid-column: 1 / -1; color: var(--sub); font-size: 12px; margin-top: 4px; }
+h3.sub.first { margin-top: 0; }
+h3.sub .hint { font-weight: 400; margin-left: 6px; }
+table.cmp th, table.cmp td { text-align: center; white-space: normal; }
+table.cmp td.l, table.cmp th.l { text-align: left; white-space: nowrap; width: 150px; }
+table.cmp tr.group td { position: static; background: #0b0c0e; font-weight: 700; }
+table.loc input.locin { width: 100%; min-width: 140px; }
+table.loc select { min-width: 90px; }
+table.monthly td { vertical-align: top; font-size: 13px; }
+table.monthly td.ym { font-weight: 700; color: var(--sub); white-space: nowrap; width: 70px; }
+table.monthly td div { white-space: nowrap; }
+table.monthly small { margin-left: 5px; }
+/* 첫 화면 요약 */
+.sumgrid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.sumgrid .cards { grid-template-columns: repeat(3, 1fr); margin: 0; }
+.sumchart { position: relative; min-height: 190px; }
+.card.g0 { border-top: 3px solid var(--accent); } .card.g1 { border-top: 3px solid var(--rent); } .card.g2 { border-top: 3px solid #34c759; }
+@media (max-width: 760px) { .sumgrid { grid-template-columns: 1fr; } .sumgrid .cards { grid-template-columns: repeat(3, 1fr); } .sumchart { height: 200px; } table.cmp td.l, table.cmp th.l { width: 96px; white-space: normal; } }
+.sumgrid .cards { align-self: start; }

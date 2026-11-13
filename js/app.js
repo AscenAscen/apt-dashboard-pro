@@ -8,6 +8,7 @@ const App = (() => {
     document.querySelectorAll('.tab').forEach(el => { el.hidden = el.id !== 'tab-' + name; });
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     if (name === 'tracking') Tracking.open();
+    if (name === 'survey') Survey.open();
   }
 
   /** 지도 창 열기. 단지 정보(code, key, sido, sgg, dong, jibun, name)가 있으면 됩니다.
@@ -99,6 +100,7 @@ const App = (() => {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); $('realModal').hidden = true; } });
     Tracking.init();
     Grouping.init();
+    Survey.init();
     Trends.init();
     Compare.init();
     Infra.init();

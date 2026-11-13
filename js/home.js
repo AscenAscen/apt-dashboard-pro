@@ -12,7 +12,7 @@ const Home = (() => {
     { name: '광역시', test: (sido) => /^(부산|대구|광주|대전|울산)/.test(sido) },
     { name: '그 외 지역', test: () => true, extra: true },
   ];
-  let rows = [], sort = { col: 's', dir: -1 }, info = null, regs = [], chart = null;
+  let rows = [], sort = { col: 's', dir: -1 }, info = null, regs = [], chart = null, volChart = null;
   const GROUP_COLORS = ['--accent', '--rent', '#34c759'];
 
   const COLS = [
@@ -46,7 +46,40 @@ const Home = (() => {
       return { code: r[0], sido: r[1], sgg: r[2], name: `${U.siGu(r[1], r[2]).filter(Boolean).join(' ')}`, ...v,
         chg: v.sp ? (v.s / v.sp - 1) * 100 : null, group: GROUPS.findIndex(g => g.test(r[1])) };
     });
+    summary();
     render();
+  }
+
+  /* ── 한눈에: 묶음별 요약 카드 + 최근 1개월 vs 직전 1개월 그래프 ── */
+  function summary() {
+    const css = getComputedStyle(document.documentElement);
+    const col = (c) => (c.startsWith('--') ? css.getPropertyValue(c).trim() : c);
+    const sums = GROUPS.slice(0, 3).map((g, gi) => {
+      const list = rows.filter(r => r.group === gi);
+      const s = list.reduce((t, r) => t + r.s, 0), sp = list.reduce((t, r) => t + r.sp, 0), r = list.reduce((t, x) => t + x.r, 0), rp = list.reduce((t, x) => t + (x.rp || 0), 0);
+      return { name: g.name.split(' ')[0], full: g.name, n: list.length, s, sp, r, rp, chg: sp ? (s / sp - 1) * 100 : null, rchg: rp ? (r / rp - 1) * 100 : null };
+    });
+    if (!sums.some(x => x.n)) return;
+    $('homeSummary').hidden = false;
+    $('homeSumTitle').textContent = `최근 1개월 한눈에 (${info.asOf} 기준)`;
+    $('homeCards').innerHTML = sums.map((x, i) => `<div class="card g${i}"><div class="k">${x.full}</div><div class="v">매매 ${x.s.toLocaleString()}건</div>` +
+      `<div class="s">직전 1개월 대비 <b class="${U.cls(x.chg)}">${U.pct(x.chg, 0)}</b></div><div class="s" style="margin-top:4px">전세 ${x.r.toLocaleString()}건 <span class="${U.cls(x.rchg)}">${U.pct(x.rchg, 0)}</span></div></div>`).join('');
+    if (volChart) volChart.destroy();
+    volChart = new Chart($('homeVol'), {
+      type: 'bar',
+      data: {
+        labels: sums.map(x => x.name),
+        datasets: [
+          { label: '직전 1개월 매매', data: sums.map(x => x.sp), backgroundColor: sums.map((x, i) => col(GROUP_COLORS[i]) + '55'), borderRadius: 5 },
+          { label: '최근 1개월 매매', data: sums.map(x => x.s), backgroundColor: sums.map((x, i) => col(GROUP_COLORS[i])), borderRadius: 5 },
+        ],
+      },
+      options: {
+        maintainAspectRatio: false, animation: false,
+        scales: { x: { ticks: { color: col('--text') }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: col('--sub') }, grid: { color: col('--line') } } },
+        plugins: { legend: { display: false }, title: { display: true, text: '매매 건수 — 옅은 막대: 직전 1개월 / 진한 막대: 최근 1개월', color: col('--sub'), font: { size: 12, weight: '400' } } },
+      },
+    });
   }
 
   function render() {
@@ -102,23 +135,27 @@ const Home = (() => {
       return metric === 'price' ? `${eok(x.price)}${chg ? ` (${chg})` : ''}` : `${x.rec.toFixed(0)}% · ${eok(x.price)}`;
     };
     const canvas = $('homeChart');
-    canvas.parentElement.style.height = Math.max(160, list.length * 30 + 50) + 'px';
+    canvas.parentElement.style.height = Math.max(180, list.length * 38 + 56) + 'px';
     if (chart) chart.destroy();
     const narrow = window.innerWidth < 760;
     chart = new Chart(canvas, {
       type: 'bar',
       data: {
-        labels: list.map(x => (narrow ? `${x.name} ${x.area}㎡` : `${x.name} ${x.area}㎡ (${x.place} ${x.dong})`)),
-        datasets: [{ data: list.map(x => (metric === 'price' ? x.price / 10000 : x.rec)), backgroundColor: list.map(x => col(GROUP_COLORS[x.g])), borderRadius: 4, barPercentage: 0.75 }],
+        labels: list.map(x => [`${x.name} ${x.area}㎡`, `${x.place} ${x.dong}`]),      // 두 줄: 단지명 / 위치
+        datasets: [
+          { data: list.map(x => (metric === 'price' ? x.price / 10000 : x.rec)), backgroundColor: list.map(x => col(GROUP_COLORS[x.g])), borderRadius: 6, barPercentage: 0.62, grouped: false, order: 1 },
+          // 옅은 막대 = 2020년 이후 전고점(가격) 또는 100%(회복률) → 지금 가격이 전고점에 얼마나 가까운지 보임
+          { data: list.map(x => (metric === 'price' ? (x.rec != null ? x.price / 10000 / (x.rec / 100) : null) : 100)), backgroundColor: list.map(x => col(GROUP_COLORS[x.g]) + '2e'), borderRadius: 6, barPercentage: 0.62, grouped: false, order: 2 },
+        ],
       },
       options: {
         indexAxis: 'y', maintainAspectRatio: false, animation: false,
-        layout: { padding: { right: narrow ? 96 : 130 } },
+        layout: { padding: { right: narrow ? 100 : 136, top: 4 } },
         scales: {
           x: { beginAtZero: true, ticks: { color: col('--sub'), callback: (v) => (metric === 'price' ? v + '억' : v + '%') }, grid: { color: col('--line') } },
-          y: { ticks: { color: col('--text'), autoSkip: false, font: { size: narrow ? 11 : 13 } }, grid: { display: false } },
+          y: { ticks: { color: col('--text'), autoSkip: false, font: { size: narrow ? 11 : 13 } }, grid: { display: false }, border: { display: false } },
         },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${text(list[c.dataIndex])} · ${U.date(list[c.dataIndex].d)}` } } },
+        plugins: { legend: { display: false }, tooltip: { filter: (c) => c.datasetIndex === 0, callbacks: { title: (c) => c[0] ? list[c[0].dataIndex].name + ' ' + list[c[0].dataIndex].area + '㎡' : '', label: (c) => `${text(list[c.dataIndex])} · 계약 ${U.date(list[c.dataIndex].d)}` } } },
       },
       // 막대 오른쪽 끝에 수치를 고정 표시
       plugins: [{
@@ -126,7 +163,8 @@ const Home = (() => {
         afterDatasetsDraw(ch) {
           const ctx = ch.ctx;
           ctx.save(); ctx.fillStyle = col('--text'); ctx.font = `600 ${narrow ? 11 : 12}px system-ui, sans-serif`; ctx.textBaseline = 'middle';
-          ch.getDatasetMeta(0).data.forEach((bar, i) => ctx.fillText(text(list[i]), bar.x + 6, bar.y));
+          const ghost = ch.getDatasetMeta(1).data;
+          ch.getDatasetMeta(0).data.forEach((bar, i) => ctx.fillText(text(list[i]), Math.max(bar.x, ghost[i] ? ghost[i].x || 0 : 0) + 8, bar.y));
           ctx.restore();
         },
       }],

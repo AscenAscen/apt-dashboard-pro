@@ -19,6 +19,7 @@
     <button data-tab="search">실거래 조회</button>
     <button data-tab="compare">단지 비교</button>
     <button data-tab="infra">입지 분석</button>
+    <button data-tab="survey">전수조사</button>
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
@@ -29,6 +30,13 @@
 <!-- ═══════════════ 1. 실거래 조회 ═══════════════ -->
 <!-- ═══════════════ 0. 최근 거래 (첫 화면) ═══════════════ -->
 <main id="tab-home" class="tab">
+  <section class="panel" id="homeSummary" hidden>
+    <div class="bar"><strong id="homeSumTitle">최근 1개월 한눈에</strong></div>
+    <div class="sumgrid">
+      <div class="cards" id="homeCards"></div>
+      <div class="sumchart"><canvas id="homeVol"></canvas></div>
+    </div>
+  </section>
   <section class="panel" id="homeChartPanel" hidden>
     <div class="bar"><strong>최근 1개월 고가 거래</strong><span class="grow"></span></div>
     <div class="filters">
@@ -37,7 +45,7 @@
       <label>막대 길이 <select id="hcMetric"><option value="price">실거래 가격 (억)</option><option value="rec">전고점 대비 회복률 (%)</option></select></label>
       <label>개수 <select id="hcCount"><option>10</option><option selected>20</option><option>30</option></select></label>
     </div>
-    <p class="hint">단지·평형마다 최근 30일 중 가장 비싼 1건만 골라 비싼 순으로 보여 줍니다. 괄호 안은 2020년 이후 최고가 대비 등락입니다. 색: <span class="lg g0">■</span> 서울 <span class="lg g1">■</span> 수도권 <span class="lg g2">■</span> 광역시</p>
+    <p class="hint">단지·평형마다 최근 30일 중 가장 비싼 1건만 골라 비싼 순으로 보여 줍니다. 괄호 안은 2020년 이후 최고가 대비 등락이고, 뒤의 옅은 막대가 그 최고가입니다. 색: <span class="lg g0">■</span> 서울 <span class="lg g1">■</span> 수도권 <span class="lg g2">■</span> 광역시</p>
     <div class="hbar"><canvas id="homeChart"></canvas></div>
   </section>
   <section class="panel">
@@ -128,6 +136,56 @@
 </main>
 
 <!-- ═══════════════ 2. 시세트래킹 ═══════════════ -->
+<!-- ═══════════════ 전수조사 ═══════════════ -->
+<main id="tab-survey" class="tab" hidden>
+  <section class="panel filters">
+    <label>시/도 <select id="svSido"></select></label>
+    <label>시/군/구 <select id="svSgg"></select></label>
+    <button class="primary" id="btnSurvey">이 지역 모든 단지 불러오기</button>
+    <span class="sep"></span>
+    <label>기록할 달 <select id="svMonth"></select></label>
+    <label>새 달 <input type="month" id="svNewMonth"></label>
+    <button id="btnSvAddMonth">달 추가</button>
+  </section>
+  <section class="panel empty" id="svEmpty">지역을 고르고 <b>이 지역 모든 단지 불러오기</b>를 누르세요. 단지·평형이 표로 나오면 매매·전세 호가를 적고, 가격대로 좁혀 시세트래킹에 담을 수 있습니다.</section>
+  <div id="svBody" hidden>
+    <section class="panel filters">
+      <label>읍/면/동 <select id="svDong"><option value="">전체</option></select></label>
+      <label>평형
+        <select id="svSize">
+          <option value="all">전체</option><option value="59">전용 59㎡대</option><option value="84">전용 84㎡대</option>
+          <option value="s">소형 (60㎡ 미만)</option><option value="m">중형 (60~85㎡)</option><option value="l">대형 (85㎡ 초과)</option>
+        </select>
+      </label>
+      <label>단지명 <input type="search" id="svFind" placeholder="단지명 검색"></label>
+      <label>매매 가격대 (억)<span class="row"><input type="number" id="svMin" step="0.5" min="0" placeholder="최소"> ~ <input type="number" id="svMax" step="0.5" min="0" placeholder="최대"></span></label>
+      <label>준공 연도 <span class="row"><input type="number" id="svYear" placeholder="예: 2000"> 년 이후</span></label>
+      <label>세대수 <span class="row"><input type="number" id="svHouse" placeholder="예: 300"> 이상</span></label>
+      <div class="checks">
+        <label><input type="checkbox" id="svOnlyQuoted"> 호가 적은 단지만</label>
+        <label><input type="checkbox" id="svRecent" checked> 최근 3년 거래 있는 단지만</label>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="bar">
+        <strong id="svTitle"></strong><span class="grow"></span>
+        <label class="inline">정렬 <select id="svSort">
+          <option value="name">단지명순</option><option value="price">매매 호가 높은 순</option><option value="priceAsc">매매 호가 낮은 순</option>
+          <option value="house">세대수 많은 순</option><option value="g">평수 큰 순</option><option value="gAsc">평수 작은 순</option>
+          <option value="gap">투자금(매-전) 작은 순</option><option value="year">신축순</option>
+        </select></label>
+        <button id="btnSvTrack">선택 단지 시세트래킹에 담기</button>
+        <button id="btnSvExcel">엑셀 다운로드</button>
+      </div>
+      <p class="hint">파란 제목 칸(<b>매매·전세·매물수</b>)에 직접 확인한 호가를 억 단위로 적습니다(예: 14.3). <b>세대수·구조·방·화</b>도 직접 적습니다. 여기서 적은 값은 시세트래킹과 함께 쓰입니다.
+        가격대 좁히기와 매매 호가 정렬은 적어 둔 호가 기준이며, 호가가 없는 단지는 최근 실거래가 기준(<span class="star">실</span> 표시)입니다. 정렬은 고를 때 한 번 적용되고, 입력하는 동안에는 줄이 움직이지 않습니다. ★ = 트래킹에 담긴 단지.</p>
+      <div class="tablewrap"><table id="svTable"></table></div>
+      <p class="hint" id="svNote"></p>
+      <button id="btnSvMore" hidden>더 보기</button>
+    </section>
+  </div>
+</main>
+
 <main id="tab-tracking" class="tab" hidden>
   <section class="panel filters">
     <label>폴더 <select id="trkFolder"></select></label>
@@ -195,18 +253,45 @@
       <button class="primary" id="btnCompare">비교하기</button>
     </div>
   </section>
-  <section class="panel empty" id="cmpEmpty">단지 A와 B를 고르고 <b>비교하기</b>를 누르세요. 한 단지만 골라도 됩니다.</section>
-  <section class="panel" id="cmpBody" hidden>
-    <div class="cards" id="cmpCards"></div>
-    <div class="chartbox tall"><canvas id="cmpChart"></canvas></div>
-    <h3 class="sub">위치와 직선거리 (수도권 단지)</h3>
-    <div class="kmap" id="cmpMap"><p class="empty" id="cmpMapMsg"></p></div>
-    <h3 class="sub">강남역 대중교통 접근성</h3>
-    <div class="cards" id="cmpTransit"></div>
-    <h3 class="sub">비교표</h3>
-    <div class="tablewrap"><table id="cmpTable"></table></div>
-    <p class="hint" id="cmpNote"></p>
+  <section class="panel">
+    <details id="cmpOptBox">
+      <summary><b>표시 항목 고르기</b> <span class="hint" style="margin:0">— 체크를 끄면 그 항목이 화면에서 빠집니다. 선택은 저장됩니다.</span></summary>
+      <div class="optgrid" id="cmpOpts"></div>
+    </details>
   </section>
+  <section class="panel empty" id="cmpEmpty">단지 A와 B를 고르고 <b>비교하기</b>를 누르세요. 한 단지만 골라도 됩니다.</section>
+  <div id="cmpBody" hidden>
+    <section class="panel">
+      <div class="cards" id="cmpCards"></div>
+      <div class="chartbox tall"><canvas id="cmpChart"></canvas></div>
+    </section>
+    <section class="panel" data-opt="quote">
+      <h3 class="sub first">호가 흐름과 투자금 <span class="hint">— 시세트래킹·전수조사에 적어 둔 값</span></h3>
+      <div class="tablewrap"><table id="cmpQuote" class="cmp"></table></div>
+    </section>
+    <section class="panel" data-opt="ret">
+      <h3 class="sub first">수익률 표 <span class="hint">— 월평균 실거래가 기준</span></h3>
+      <div class="tablewrap"><table id="cmpRet" class="cmp"></table></div>
+    </section>
+    <section class="panel" data-opt="map">
+      <h3 class="sub first">위치와 직선거리 <span class="hint">— 수도권 단지</span></h3>
+      <div class="kmap" id="cmpMap"><p class="empty" id="cmpMapMsg"></p></div>
+      <div class="cards" id="cmpDist" style="margin-top:10px"></div>
+    </section>
+    <section class="panel" data-opt="loc">
+      <h3 class="sub first">입지 비교 <span class="hint">— "직접 입력" 줄은 적어 두면 저장되고, 입지 분석 탭에서도 같이 보입니다</span></h3>
+      <div class="tablewrap"><table id="cmpLoc" class="cmp loc"></table></div>
+    </section>
+    <section class="panel" data-opt="basic">
+      <h3 class="sub first">기본 비교표</h3>
+      <div class="tablewrap"><table id="cmpTable" class="cmp"></table></div>
+      <p class="hint" id="cmpNote"></p>
+    </section>
+    <section class="panel" data-opt="monthly">
+      <h3 class="sub first">월별 실거래 비교표 <span class="hint">— 일자 · 금액 · 층</span></h3>
+      <div class="tablewrap short"><table id="cmpMonthly" class="cmp monthly"></table></div>
+    </section>
+  </div>
 </main>
 
 <!-- ═══════════════ 3. 시세그룹핑 ═══════════════ -->
@@ -275,6 +360,10 @@
         <div class="kmap" id="inMap"></div>
         <div class="kmap" id="inRoad"><p class="empty" id="inRoadMsg">로드뷰를 불러오는 중…</p></div>
       </div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>입지 정리 — 교통 · 학군 · 환경 · 호재</strong><span class="hint" style="margin:0">"직접 입력" 줄은 적어 두면 저장되고, 단지 비교 탭에서도 같이 보입니다</span></div>
+      <div class="tablewrap"><table id="inLoc" class="cmp loc"></table></div>
     </section>
     <section class="panel" id="inInfraPanel">
       <div class="bar"><strong>① 인프라 점수표</strong><span class="hint" style="margin:0">— 500m ≈ 도보 7분, 1km ≈ 도보 15분</span></div>
@@ -372,9 +461,11 @@
 <script src="js/kakao.js"></script>
 <script src="js/home.js"></script>
 <script src="js/search.js"></script>
+<script src="js/locinfo.js"></script>
 <script src="js/compare.js"></script>
 <script src="js/infra.js"></script>
 <script src="js/tracking.js"></script>
+<script src="js/survey.js"></script>
 <script src="js/grouping.js"></script>
 <script src="js/trends.js"></script>
 <script src="js/app.js"></script>

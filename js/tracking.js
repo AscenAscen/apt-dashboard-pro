@@ -8,7 +8,10 @@
    ───────────────────────────────────────────────────────── */
 const Tracking = (() => {
   const $ = (id) => document.getElementById(id);
-  const KEY = 'apt.tracking.v1', FKEY = 'apt.folders.v1', MKEY = 'apt.trkMonths.v1', BASE = '기본';
+  const KEY = 'apt.tracking.v1', FKEY = 'apt.folders.v1', MKEY = 'apt.trkMonths.v1', SKEY = 'apt.survey.v1', BASE = '기본';
+  // 전수조사에서 적었지만 아직 트래킹에 담지 않은 단지의 기록 { id: { households, …, quotes } }
+  let survey = Store.get(SKEY, {});
+  const CARRY = ['households', 'structure', 'rooms', 'baths', 'link', 'zone', 'pyeong', 'peakO', 'troughO', 'quotes'];
   // 표·엑셀의 열 이름 (순서를 바꾸려면 여기서)
   const FIXED = ['가격대', '시', '구', '동', '생활권', '단지명', '연식', '연차', '세대수', '평형', '구조', '방', '화', '링크', '전고점', '전고 대비 하락률', '전저점', '전저 대비 상승률'];
   const GROUP = ['매매', '매매 개수', '전월 대비', '전세', '전세 개수', '전월 대비', '매-전(투자금)', '전월 대비', '전세가율', '전월 대비'];
@@ -26,7 +29,7 @@ const Tracking = (() => {
   if (!months) months = [...new Set(items.flatMap(it => Object.keys(it.quotes).map(Number)))];
   months.sort((a, b) => b - a);
 
-  const save = () => { Store.set(KEY, items); Store.set(FKEY, folders); Store.set(MKEY, months); $('trackCount').textContent = items.length; };
+  const save = () => { Store.set(KEY, items); Store.set(FKEY, folders); Store.set(MKEY, months); Store.set(SKEY, survey); $('trackCount').textContent = items.length; };
   const all = () => items;
   const pyeong = (it) => it.pyeong || CONFIG.toPyeong(it.g) + '평';
   const link = (it) => it.link || U.landLink(it.sgg, it.dong, it.name);
@@ -44,6 +47,8 @@ const Tracking = (() => {
       items.push({ id: r.id, code: r.code, sido: r.sido, sgg: r.sgg, dong: r.dong, jibun: r.jibun, key: r.key, name: r.name,
         g: r.g, buildYear: r.buildYear, households: '', structure: '', rooms: '', baths: '', link: '', zone: '', pyeong: '',
         folder, quotes: {}, lastSale: r.st?.last?.price ?? null });
+      const it = items[items.length - 1], sv = survey[r.id];
+      if (sv) { CARRY.forEach(f => { if (sv[f] != null && sv[f] !== '') it[f] = sv[f]; }); delete survey[r.id]; }   // 전수조사에서 적은 값 이어받기
       n++;
     }
     save(); fillSelects();
@@ -105,7 +110,8 @@ const Tracking = (() => {
     };
     $('btnTrkDelete').onclick = () => {
       if (!checked.size) return U.toast('삭제할 단지를 체크하세요.');
-      if (!confirm(`선택한 ${checked.size}개 단지를 트래킹에서 삭제할까요?\n(적어 둔 가격 기록도 함께 지워집니다)`)) return;
+      if (!confirm(`선택한 ${checked.size}개 단지를 트래킹에서 삭제할까요?\n(적어 둔 가격 기록은 전수조사 탭에 그대로 남습니다)`)) return;
+      items.filter(it => checked.has(it.id)).forEach(it => { const keep = {}; CARRY.forEach(f => { if (it[f] != null && it[f] !== '') keep[f] = it[f]; }); survey[it.id] = keep; });
       items = items.filter(it => !checked.has(it.id)); checked.clear(); save(); fillSelects(); render();
     };
     save(); fillSelects();
@@ -332,7 +338,7 @@ const Tracking = (() => {
   }
 
   function backup() {
-    const blob = new Blob([JSON.stringify({ type: 'apt-tracking', savedAt: new Date().toISOString(), items, folders, months, grouping: Store.get('apt.grouping.v1', null) }, null, 1)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify({ type: 'apt-tracking', savedAt: new Date().toISOString(), items, folders, months, survey, grouping: Store.get('apt.grouping.v1', null) }, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = `시세트래킹_백업_${U.stamp()}.json`;
     document.body.appendChild(a); a.click(); a.remove();
@@ -349,6 +355,7 @@ const Tracking = (() => {
       const merge = items.length && confirm('지금 목록에 합칠까요?\n[확인] 합치기  /  [취소] 백업 내용으로 바꾸기');
       items = merge ? [...items, ...obj.items.filter(n => !items.some(it => it.id === n.id))] : obj.items;
       folders = [...new Set([BASE, ...(merge ? folders : []), ...(obj.folders || []), ...items.map(it => it.folder)])];
+      survey = merge ? { ...(obj.survey || {}), ...survey } : (obj.survey || {});
       months = [...new Set([...(merge ? months : []), ...(obj.months || []), ...items.flatMap(it => Object.keys(it.quotes).map(Number))])].sort((a, b) => b - a);
       if (obj.grouping && (!Store.get('apt.grouping.v1', null) || !merge)) { Store.set('apt.grouping.v1', obj.grouping); Grouping.reload(); }
       save(); fillSelects(); render();
@@ -365,5 +372,21 @@ const Tracking = (() => {
     return it ? Object.keys(it.quotes).map(Number).sort((a, b) => a - b).map(ym => ({ ym, s: it.quotes[ym].s ?? null, r: it.quotes[ym].r ?? null })) : [];
   }
 
-  return { init, add, all, open, pyeong, quotesOf };
+  /* ── 전수조사 탭과 함께 쓰는 기능 ── */
+  /** 단지 기록 꺼내기: 트래킹에 담긴 단지면 그 기록, 아니면 전수조사 기록. create=true 면 없을 때 새로 만듦 */
+  function rec(id, create) {
+    const it = items.find(x => x.id === id);
+    if (it) return it;
+    if (!survey[id] && create) survey[id] = { quotes: {} };
+    if (survey[id] && !survey[id].quotes) survey[id].quotes = {};
+    return survey[id] || null;
+  }
+  const has = (id) => items.some(x => x.id === id);
+  const getMonths = () => months;
+  function addMonth(ym) {
+    if (!ym || months.includes(ym)) return false;
+    months.push(ym); months.sort((a, b) => b - a); save(); return true;
+  }
+
+  return { init, add, all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, FIXED, GROUP };
 })();
