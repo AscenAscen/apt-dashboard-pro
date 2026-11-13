@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>아파트 실거래가 대시보드</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="top">
+  <h1>아파트 실거래가 대시보드</h1>
+  <nav class="tabs" id="tabs">
+    <button data-tab="search" class="on">실거래 조회</button>
+    <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
+    <button data-tab="grouping">시세그룹핑</button>
+  </nav>
+  <div class="status" id="status">데이터 상태 확인 중…</div>
+</header>
+
+<!-- ═══════════════ 1. 실거래 조회 ═══════════════ -->
+<main id="tab-search" class="tab">
+  <section class="panel filters">
+    <label>시/도 <select id="selSido"></select></label>
+    <label>시/군/구 <select id="selSgg"></select></label>
+    <label>읍/면/동 <select id="selDong"><option value="">전체</option></select></label>
+    <label>단지 <select id="selApt"><option value="">전체</option></select></label>
+    <label>조회기간
+      <select id="selPeriod">
+        <option value="1">최근 1년</option><option value="3">최근 3년</option>
+        <option value="5" selected>최근 5년</option><option value="10">최근 10년</option>
+        <option value="20">최근 20년</option>
+      </select>
+    </label>
+    <div class="checks">
+      <label><input type="checkbox" id="chkSale" checked> 매매</label>
+      <label><input type="checkbox" id="chkRent" checked> 전세</label>
+      <label title="가족 간 거래 등 직거래를 전고점·전저점 계산에서 제외합니다"><input type="checkbox" id="chkNoDirect" checked> 직거래 제외</label>
+    </div>
+    <button class="primary" id="btnSearch">조회</button>
+  </section>
+
+  <section class="panel" id="listPanel" hidden>
+    <div class="bar">
+      <strong id="listTitle"></strong>
+      <input type="search" id="listFilter" placeholder="단지명 검색">
+      <span class="grow"></span>
+      <button id="btnAddTrackSel">선택 단지 트래킹에 담기</button>
+      <button id="btnExcelList">엑셀 다운로드</button>
+    </div>
+    <p class="hint">전고점·전저점은 <b>2020년 1월 이후</b> 실거래 기준입니다. 행을 누르면 아래에 상세 내역이 열립니다. 엑셀은 체크한 단지만(체크가 없으면 목록 전체) 내려받습니다.</p>
+    <div class="tablewrap"><table id="listTable"></table></div>
+    <p class="hint" id="listNote"></p>
+  </section>
+
+  <section class="panel" id="detailPanel" hidden>
+    <div class="bar">
+      <strong id="detailTitle"></strong>
+      <span class="grow"></span>
+      <button id="btnDetailMap">지도에서 위치 보기</button>
+      <button id="btnDetailTrack">트래킹에 담기</button>
+      <button id="btnExcelDetail">엑셀 다운로드</button>
+    </div>
+    <div class="cards" id="detailCards"></div>
+    <div class="chartbox"><canvas id="chart"></canvas></div>
+    <div class="tablewrap short"><table id="detailTable"></table></div>
+  </section>
+
+  <section class="panel empty" id="searchEmpty">지역을 고르고 <b>조회</b>를 누르세요.</section>
+</main>
+
+<!-- ═══════════════ 2. 시세트래킹 ═══════════════ -->
+<main id="tab-tracking" class="tab" hidden>
+  <section class="panel filters">
+    <label>지역 <select id="trkRegion"><option value="">전체</option></select></label>
+    <label>기준월 <select id="trkMonth"></select></label>
+    <button class="primary" id="btnTrkLoad">시세 불러오기</button>
+    <span class="grow"></span>
+    <button id="btnTrkExcel">엑셀 다운로드</button>
+    <button id="btnTrkBackup">목록 백업(저장)</button>
+    <button id="btnTrkRestore">백업 불러오기</button>
+    <input type="file" id="trkFile" accept=".json" hidden>
+    <button class="danger" id="btnTrkDelete">선택 삭제</button>
+  </section>
+  <section class="panel">
+    <p class="hint">매매·전세 = 기준월 실거래 <b>평균가</b>(만원). 기준월에 거래가 없으면 그 이전 가장 최근 거래가를 쓰고 <span class="star">*</span> 로 표시합니다. 개수 = 기준월 거래 건수.
+      세대수·구조·방·화·링크·생활권 칸은 직접 입력하면 자동 저장됩니다. 목록은 이 브라우저에 저장되므로, 다른 PC에서 쓰려면 <b>목록 백업</b> 파일을 옮겨 <b>백업 불러오기</b> 하세요.</p>
+    <div class="tablewrap"><table id="trkTable"></table></div>
+    <p class="empty" id="trkEmpty">담아 둔 단지가 없습니다. [실거래 조회]에서 단지를 체크하고 <b>트래킹에 담기</b>를 누르세요.</p>
+  </section>
+</main>
+
+<!-- ═══════════════ 3. 시세그룹핑 ═══════════════ -->
+<main id="tab-grouping" class="tab" hidden>
+  <section class="panel filters">
+    <label>그룹핑 표 <select id="grpBoard"></select></label>
+    <button id="btnGrpNew">새 표</button>
+    <button id="btnGrpRename">이름 변경</button>
+    <button class="danger" id="btnGrpDelete">표 삭제</button>
+    <span class="grow"></span>
+    <button id="btnGrpAuto">트래킹 단지 자동 배치</button>
+    <button id="btnGrpExcel">엑셀 다운로드</button>
+  </section>
+  <section class="panel filters">
+    <label>생활권(가로) <input id="grpZoneName" placeholder="예: 평촌, 범계, 인덕원"></label>
+    <button id="btnGrpAddZone">생활권 추가</button>
+    <span class="sep"></span>
+    <label>가격대(세로)
+      <span class="row"><input id="grpMin" type="number" value="3" min="0" step="0.5"> 억 ~
+      <input id="grpMax" type="number" value="15" min="1" step="0.5"> 억, 간격
+      <input id="grpStep" type="number" value="1" min="0.5" step="0.5"> 억</span>
+    </label>
+    <button id="btnGrpBands">가격대 만들기</button>
+  </section>
+  <section class="panel">
+    <p class="hint">칸을 눌러 단지를 직접 적을 수 있습니다(한 줄에 한 단지). 생활권 이름은 머리칸을 눌러 수정, × 로 삭제합니다.
+      <b>자동 배치</b>는 시세트래킹에서 "생활권"을 적어 둔 단지를 최근 매매가에 맞는 칸에 넣어 줍니다.</p>
+    <div class="tablewrap"><table id="grpTable" class="grid"></table></div>
+  </section>
+</main>
+
+<!-- 지도 창 -->
+<div class="modal" id="mapModal" hidden>
+  <div class="modalbox">
+    <div class="bar">
+      <strong id="mapTitle"></strong><span class="grow"></span>
+      <a id="mapNaver" target="_blank" rel="noopener" class="btn">네이버지도</a>
+      <a id="mapKakao" target="_blank" rel="noopener" class="btn">카카오맵</a>
+      <a id="mapLand" target="_blank" rel="noopener" class="btn">네이버부동산</a>
+      <button id="mapClose">닫기</button>
+    </div>
+    <iframe id="mapFrame" title="지도" loading="lazy"></iframe>
+  </div>
+</div>
+<div id="toast" hidden></div>
+
+<script src="lib/xlsx.full.min.js"></script>
+<script src="lib/chart.umd.js"></script>
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/search.js"></script>
+<script src="js/tracking.js"></script>
+<script src="js/grouping.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
