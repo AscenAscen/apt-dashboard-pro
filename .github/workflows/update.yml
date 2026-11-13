@@ -2,8 +2,7 @@ name: 실거래가 자동 수집 · 사이트 배포
 
 on:
   schedule:
-    - cron: '17 19 * * *'   # 매일 새벽 4시 17분 (한국시간)
-    - cron: '17 4 * * *'    # 매일 오후 1시 17분 (한국시간)
+    - cron: '17 */2 * * *'   # 2시간마다
   workflow_dispatch:         # Actions 화면에서 [Run workflow] 로 직접 실행
   push:
     branches: [main]         # 화면 파일을 고쳐 올리면 사이트만 다시 배포
