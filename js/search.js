@@ -18,6 +18,7 @@ const Search = (() => {
     { id: 'dong', label: '동', cls: 'l', val: r => r.dong, html: r => U.esc(r.dong) },
     { id: 'name', label: '단지명', cls: 'l', val: r => r.name, html: r => U.esc(r.name) },
     { id: 'buildYear', label: '연식', val: r => r.buildYear || 0, html: r => r.buildYear || '-' },
+    { id: 'hh', label: '세대수', val: r => r.hh || 0, html: r => (r.hh ? r.hh.toLocaleString() : '-') },
     { id: 'g', label: '전용㎡(평형)', val: r => r.g, html: r => `${r.g}㎡<small>${CONFIG.toPyeong(r.g)}평</small>` },
     { id: 'last', label: '최근 매매', val: r => r.st.last?.price ?? -1, html: r => priceDate(r.st.last, 'sale') },
     { id: 'peak', label: '전고점', val: r => r.st.peak?.price ?? -1, html: r => priceDate(r.st.peak) },
@@ -30,7 +31,7 @@ const Search = (() => {
     { id: 'nSale', label: '매매건수', val: r => r.nSale, html: r => r.nSale },
     { id: 'nRent', label: '전세건수', val: r => r.nRent, html: r => r.nRent },
   ];
-  const priceDate = (t, cls = '') => (t ? `<span class="${cls}">${U.price(t.price)}</span><small>${U.date(t.d)}</small>` : '-');
+  const priceDate = (t, cls = '') => (t ? `<span class="${cls}">${U.price(t.price)}</span><small>${U.date(t.d)}${cls ? Kit.badge(t.d) : ''}</small>` : '-');
   const pctCell = (v) => `<span class="${U.cls(v)}">${U.pct(v)}</span>`;
 
   /* ── 지역 선택 상자 ── */
@@ -41,7 +42,7 @@ const Search = (() => {
     const saved = Store.get('apt.lastRegion', null);
     if (saved && sidos.includes(saved.sido)) $('selSido').value = saved.sido;
     fillSgg(saved?.code);
-    $('selSido').onchange = () => fillSgg();
+    $('selSido').onchange = () => { fillSgg(); markPin(); };
     $('selSgg').onchange = fillDong;
     $('selDong').onchange = fillApt;
     $('btnSearch').onclick = run;
@@ -61,6 +62,12 @@ const Search = (() => {
     };
     $('btnDetailMap').onclick = () => current && App.showMap(current);
     $('btnDetailTrack').onclick = () => current && Tracking.add([current]);
+    $('btnDetailAlias').onclick = () => { if (current && Alias.ask(current.code, current.key, current.name)) { renderList(); showAlias(); } };
+    // 지역 핀: 자주 보는 지역을 위쪽에 고정
+    $('btnPin').onclick = () => { const on = Pins.toggle($('selSgg').value); markPin(); U.toast(on ? '이 지역을 핀했습니다. 위쪽 핀 줄에서 바로 열 수 있습니다.' : '핀을 뺐습니다.'); };
+    $('selSgg').addEventListener('change', markPin);
+    document.addEventListener('click', (e) => { const c = e.target.dataset?.pin; if (c && e.target.closest('.pinbar')) { App.showTab('search'); openRegion(c); } });
+    Pins.render(); markPin();
     // 상세 그래프 옵션 (평형·기간·점/선) — 선택값은 브라우저에 기억
     const opt = Store.get('apt.chartOpt', { range: '0', mode: 'point' });
     $('detRange').value = ['0', '1', '3', '5', '10', '20'].includes(opt.range) ? opt.range : '0'; $('detMode').value = opt.mode;
@@ -71,6 +78,9 @@ const Search = (() => {
     $('detMode').onchange = () => { saveOpt(); if (current) drawChart(current); };
     $('btnExcelDetail').onclick = downloadDetail;
   }
+
+  const markPin = () => { const on = Pins.has($('selSgg').value); $('btnPin').textContent = on ? '📌 핀 빼기' : '📌 이 지역 핀'; };
+  const showAlias = () => { const a = current ? Alias.of(current.code, current.key) : ''; $('detailAlias').textContent = a ? `별칭: ${a}` : ''; };
 
   function fillSgg(selectCode) {
     const sido = $('selSido').value;
@@ -126,7 +136,7 @@ const Search = (() => {
       $('dlFrom').min = $('dlTo').min = ymText(new Date(now.getFullYear() - 20, now.getMonth(), 1));
       $('dlFrom').max = $('dlTo').max = ymText(now);
       const fromYear = Math.min(from.getFullYear(), Math.floor(CONFIG.PEAK_FROM / 10000));
-      const data = await Data.loadYears(code, fromYear, now.getFullYear());
+      const [data, kp] = await Promise.all([Data.loadYears(code, fromYear, now.getFullYear()), Data.kapt(code)]);
       const dong = $('selDong').value, apt = $('selApt').value;
       const filter = (k) => (apt ? k === apt : !dong || k.split('|')[0] === dong);
 
@@ -135,7 +145,7 @@ const Search = (() => {
         const id = `${code}|${key}#${g}`;
         if (!map.has(id)) {
           const p = Data.parseKey(key);
-          map.set(id, { id, code, sido: reg[1], sgg: reg[2], key, ...p, g, buildYear: idx.c[key] || null, sale: [], rent: [] });
+          map.set(id, { id, code, sido: reg[1], sgg: reg[2], key, ...p, g, buildYear: idx.c[key] || null, hh: kp.m[key]?.[0] || null, sale: [], rent: [] });
         }
         return map.get(id);
       };
@@ -175,7 +185,7 @@ const Search = (() => {
   function renderList() {
     const q = $('listFilter').value.trim();
     const col = COLS.find(c => c.id === sort.col) || COLS[1];
-    view = rows.filter(r => !q || r.name.includes(q) || r.dong.includes(q));
+    view = rows.filter(r => Alias.hit(r.code, r.key, r.name, r.dong, q));       // 단지명·동·별칭으로 검색
     view.sort((a, b) => {
       const x = col.val(a), y = col.val(b);
       const c = typeof x === 'string' ? x.localeCompare(y, 'ko') : x - y;
@@ -225,7 +235,8 @@ const Search = (() => {
     $('dlAreas').innerHTML = same.map(x => `<label><input type="checkbox" value="${x.g}" ${x.id === r.id ? 'checked' : ''}> ${x.g}㎡(${CONFIG.toPyeong(x.g)}평)</label>`).join('');
     document.querySelectorAll('#listTable tbody tr').forEach(tr => tr.classList.toggle('sel', view[+tr.dataset.i]?.id === r.id));
     const st = r.st;
-    $('detailTitle').textContent = `${r.sgg} ${r.dong} ${r.name} · 전용 ${r.g}㎡(${CONFIG.toPyeong(r.g)}평)` + (r.buildYear ? ` · ${r.buildYear}년식` : '');
+    $('detailTitle').textContent = `${r.sgg} ${r.dong} ${r.name} · 전용 ${r.g}㎡(${CONFIG.toPyeong(r.g)}평)` + (r.buildYear ? ` · ${r.buildYear}년식` : '') + (r.hh ? ` · ${r.hh.toLocaleString()}세대` : '');
+    showAlias();
     const card = (k, v, s = '', cls = '') => `<div class="card"><div class="k">${k}</div><div class="v ${cls}">${v}</div><div class="s">${s}</div></div>`;
     const when = (t) => (t ? `${U.date(t.d)} · ${t.floor}층` : '');
     $('detailCards').innerHTML = [
@@ -244,7 +255,7 @@ const Search = (() => {
     drawChart(r);
     const all = [...p.sale.map(t => ({ ...t, kind: '매매' })), ...p.rent.map(t => ({ ...t, kind: '전세' }))].sort((a, b) => b.d - a.d);
     $('detailTable').innerHTML = '<thead><tr><th class="c">구분</th><th class="c">계약일</th><th>금액</th><th>전용㎡</th><th>층</th><th class="l">비고</th></tr></thead><tbody>' +
-      all.map(t => `<tr><td class="c ${t.kind === '매매' ? 'sale' : 'rent'}">${t.kind}</td><td class="c">${U.date(t.d)}</td><td>${U.price(t.price)}</td><td>${t.area}</td><td>${t.floor}</td><td class="l">${t.direct ? '직거래' : ''}</td></tr>`).join('') +
+      all.map(t => `<tr><td class="c ${t.kind === '매매' ? 'sale' : 'rent'}">${t.kind}</td><td class="c">${U.date(t.d)}</td><td>${U.price(t.price)}</td><td>${t.area}</td><td>${t.floor}</td><td class="l">${t.direct ? '직거래 ' : ''}${Kit.badge(t.d)}</td></tr>`).join('') +
       '</tbody>';
     $('detailPanel').hidden = false;
     if (scroll) $('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -401,6 +412,7 @@ const Search = (() => {
 
   /** 다른 탭에서 지역을 넘겨받아 바로 조회 */
   async function openRegion(code) {
+    setTimeout(markPin, 0);
     const reg = regions.find(r => r[0] === code);
     if (!reg) return;
     $('selSido').value = reg[1]; fillSgg(code);

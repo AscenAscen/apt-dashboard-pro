@@ -38,7 +38,7 @@ const Tracking = (() => {
   }
   normalize();
 
-  const save = () => { Store.set(KEY, items); Store.set(FKEY, folders); Store.set(MKEY, months); Store.set(SKEY, survey); const b = $('trackCount'); if (b) b.textContent = items.length; };
+  const save = () => { Store.set(KEY, items); Store.set(FKEY, folders); Store.set(MKEY, months); Store.set(SKEY, survey); const b = $('trackCount'); if (b) b.textContent = items.length; if (typeof QLog !== 'undefined') QLog.check(); };
   const all = () => items;
   const pyeong = (it) => it.pyeong || CONFIG.toPyeong(it.g) + '평';
   const link = (it) => it.link || U.landLink(it.sgg, it.dong, it.name);
@@ -179,8 +179,9 @@ const Tracking = (() => {
       const nowY = new Date().getFullYear();
       for (const code of new Set(list.map(it => it.code))) {
         if (popup) Data.refresh(code);                       // 버튼을 누를 때마다 최신 파일을 다시 받음
-        const data = await Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), nowY);
+        const [data, kp] = await Promise.all([Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), nowY), Data.kapt(code)]);
         const mine = list.filter(it => it.code === code);
+        mine.forEach(it => { if (!it.households && kp.m[it.key]) it.households = String(kp.m[it.key][0]); });   // 세대수 자동 채움 (비어 있을 때만)
         const keys = new Set(mine.map(it => it.key));
         const bucket = new Map(mine.map(it => [it.id, { sale: null, rent: null, peak: null, trough: null }]));
         Data.eachTrade(data.sale, k => keys.has(k), (key, t) => {
@@ -536,7 +537,7 @@ const Tracking = (() => {
       folders = [...new Set([...folders, ...(obj.folders || [])])];
       months = [...new Set([...(months || []), ...(obj.months || []), ...items.flatMap(it => Object.keys(it.quotes || {}).map(Number)), ...Object.values(survey).flatMap(r => Object.keys(r.quotes || {}).map(Number))])];
     }
-    normalize(); real.clear(); checked.clear(); save(); fillSelects(); render();
+    normalize(); real.clear(); checked.clear(); if (typeof QLog !== 'undefined') QLog.reset(); save(); fillSelects(); render();
     return items.length;
   }
 

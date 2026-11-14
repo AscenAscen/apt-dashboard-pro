@@ -10,7 +10,7 @@ const Vault = (() => {
   const $ = (id) => document.getElementById(id);
   const BK = 'apt.lastBackup', REMIND_DAYS = 14;
   // 함께 옮기는 그 밖의 저장 항목 (시세그룹핑 표, 입지 메모, 조사 이름·메모, 대중교통 메모)
-  const EXTRA = ['apt.grouping.v1', 'apt.loc.v1', 'apt.surveyMeta.v1'];
+  const EXTRA = ['apt.grouping.v1', 'apt.loc.v1', 'apt.surveyMeta.v1', 'apt.alias.v1', 'apt.pins.v1', 'apt.land.v1', 'apt.imjang.v1', 'apt.my.v1'];
   let locked = Store.get('apt.lock', false);
 
   /* ── 묶기 / 풀기 ── */
@@ -31,6 +31,7 @@ const Vault = (() => {
     }
     const n = Tracking.importAll(obj, merge);
     if (typeof Grouping !== 'undefined') Grouping.reload();
+    [typeof Alias !== 'undefined' && Alias, typeof Pins !== 'undefined' && Pins, typeof Land !== 'undefined' && Land, typeof Imjang !== 'undefined' && Imjang].forEach(m => m && m.reload());
     if (typeof Survey !== 'undefined') Survey.open();
     return n;
   }

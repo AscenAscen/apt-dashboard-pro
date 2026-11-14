@@ -56,9 +56,11 @@ const Survey = (() => {
     $('btnSvSame').onclick = sameAsLast;
     $('btnSvSeen').onclick = () => { rows.forEach(r => { const rc = Tracking.rec(r.id); if (rc && r.sale) rc.seenSale = r.sale.d; }); Tracking.save(); render(); U.toast('새 거래 표시를 지웠습니다.'); };
     $('btnSvExcel').onclick = excel;
-    $('btnSvPaste').onclick = () => { if (!rows.length) return U.toast('먼저 지역을 불러오세요.'); if (!month()) return U.toast('먼저 [달 추가]로 기록할 달을 만드세요.'); $('pasteText').value = ''; $('pasteResult').textContent = ''; $('pasteModal').hidden = false; $('pasteText').focus(); };
+    $('btnSvPaste').onclick = () => { if (!rows.length) return U.toast('먼저 지역을 불러오세요.'); if (!month()) return U.toast('먼저 [달 추가]로 기록할 달을 만드세요.'); $('pasteText').value = ''; $('pasteResult').textContent = ''; $('pastePreviewWrap').hidden = true; $('pasteApply').disabled = true; pastePlan = []; $('pasteModal').hidden = false; $('pasteText').focus(); };
     $('pasteClose').onclick = () => { $('pasteModal').hidden = true; };
     $('pasteApply').onclick = pasteApply;
+    $('pasteCheck').onclick = pastePreview;
+    $('pasteText').oninput = () => { $('pasteApply').disabled = true; };
     // 조사 기록
     ['svhRegion', 'svhFrom', 'svhTo'].forEach(id => { $(id).onchange = renderHistory; });
     $('btnSvhExcel').onclick = historyExcel;
@@ -254,11 +256,11 @@ const Survey = (() => {
       }
       Store.set('apt.lastRegion', { sido: reg[1], code });
       const nowY = new Date().getFullYear();
-      const data = await Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), nowY);
+      const [data, kp] = await Promise.all([Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), nowY), Data.kapt(code)]);
       const map = new Map();
       const get = (key, g) => {
         const id = `${code}|${key}#${g}`;
-        if (!map.has(id)) map.set(id, { id, code, sido: reg[1], sgg: reg[2], key, ...Data.parseKey(key), g, buildYear: idx.c[key] || null, sale: null, rent: null, peak: null, trough: null });
+        if (!map.has(id)) map.set(id, { id, code, sido: reg[1], sgg: reg[2], key, ...Data.parseKey(key), g, buildYear: idx.c[key] || null, hh: kp.m[key]?.[0] || null, sale: null, rent: null, peak: null, trough: null });
         return map.get(id);
       };
       Data.eachTrade(data.sale, null, (key, t) => {
@@ -341,7 +343,7 @@ const Survey = (() => {
     });
     view = base.filter(r => {
       const c = r._c;
-      if (find && !r.name.toLowerCase().includes(find)) return false;
+      if (find && !Alias.hit(r.code, r.key, r.name, '', find)) return false;
       if (!isNaN(year) && !(r.buildYear >= year)) return false;
       if (zone && c.rc.zone !== zone) return false;
       if (st !== '*' && (c.rc.status || '') !== st) return false;
@@ -350,14 +352,14 @@ const Survey = (() => {
       if (cand && !c.rc.cand) return false;
       if (!isNaN(min) && !(c.base >= min * 10000)) return false;
       if (!isNaN(max) && !(c.base != null && c.base <= max * 10000)) return false;
-      if (!isNaN(house) && !(parseInt(c.rc.households, 10) >= house)) return false;
+      if (!isNaN(house) && !((parseInt(c.rc.households, 10) || r.hh) >= house)) return false;
       return true;
     });
     const by = $('svSort').value, num = (v, none) => (v == null || isNaN(v) ? none : v);
     const key = {
       name: null,
       price: (r) => -num(r._c.base, -1), priceAsc: (r) => num(r._c.base, 1e12),
-      house: (r) => -num(parseInt(r._c.rc.households, 10), -1),
+      house: (r) => -num(parseInt(r._c.rc.households, 10) || r.hh, -1),
       g: (r) => -r.g, gAsc: (r) => r.g,
       gap: (r) => num(r._c.gap, 1e12), year: (r) => -(r.buildYear || 0),
       chg: (r) => -Math.abs(num(r._c.sd, 0)), ask: (r) => -num(r._c.askGap, -1e12),
@@ -407,7 +409,7 @@ const Survey = (() => {
         `<td><select data-f="status" class="st">${Tracking.STATUSES.map(s => `<option ${s === (rc.status || '') ? 'selected' : ''} value="${s}">${s || '-'}</option>`).join('')}</select></td>` +
         `${cell('band')}<td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(r.dong)}</td><td class="l info">${inp('zone', '생활권')}</td>` +
         `<td class="l name">${U.esc(r.name)}${c.isNew ? ' <span class="tag">새 거래</span>' : ''}</td>` +
-        `<td>${r.buildYear || '-'}</td><td>${r.buildYear ? CONFIG.toAge(r.buildYear) : '-'}</td><td>${inp('households', '직접 입력')}</td><td>${r.g}㎡<small>${U.esc(rc.pyeong || CONFIG.toPyeong(r.g) + '평')}</small></td><td class="info">${inp('structure', '계/복')}</td><td class="info">${inp('rooms')}</td><td class="info">${inp('baths')}</td>` +
+        `<td>${r.buildYear || '-'}</td><td>${r.buildYear ? CONFIG.toAge(r.buildYear) : '-'}</td><td>${inp('households', r.hh ? String(r.hh) : '직접 입력')}</td><td>${r.g}㎡<small>${U.esc(rc.pyeong || CONFIG.toPyeong(r.g) + '평')}</small></td><td class="info">${inp('structure', '계/복')}</td><td class="info">${inp('rooms')}</td><td class="info">${inp('baths')}</td>` +
         `<td><a class="btn mini" href="${U.esc(link)}" target="_blank" rel="noopener">열기</a></td>` +
         `${over('peakO', c.peak, r.peak)}${cell('drop')}${over('troughO', c.trough, r.trough)}${cell('rise')}${cell('ask')}` +
         (m ? qin('s', '예: 14.3', true, true) + qin('sn', '개') + cell('sd') + qin('r', '예: 7.5', true) + qin('rn', '개') + cell('rd') + cell('gap') + cell('gd') + cell('ratio') + cell('rtd') : '<td class="gl"></td>') +
@@ -468,35 +470,71 @@ const Survey = (() => {
     U.toast(n ? `${n}개 단지에 ${Tracking.ymLabel(p)} 값을 넣었습니다.` : '채울 단지가 없습니다. (이미 적었거나 지난 기록이 없음)');
   }
 
-  /** 엑셀 붙여넣기: 단지명 / 전용㎡ / 매매(억) / 전세(억) / 매매 개수 / 전세 개수 */
-  function pasteApply() {
-    const m = month(), lines = $('pasteText').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    if (!lines.length) return U.toast('붙여 넣은 내용이 없습니다.');
+  /** 엑셀 붙여넣기: 단지명 / 전용㎡ / 매매(억) / 전세(억) / 매매 개수 / 전세 개수
+      ① [미리보기]로 줄마다 어느 단지에 들어갈지·이상한 값이 없는지 먼저 확인 → ② [넣기] */
+  let pastePlan = [];
+  function pasteParse() {
+    const m = month(), pm = prevMonth(), lines = $('pasteText').value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const norm = (s) => String(s).replace(/\s+/g, '').toLowerCase();
     const byName = new Map();
-    rows.forEach(r => { const k = norm(r.name); if (!byName.has(k)) byName.set(k, []); byName.get(k).push(r); });
-    const dong = $('svDong').value;
-    let ok = 0; const miss = [];
+    rows.forEach(r => { [norm(r.name), ...Alias.of(r.code, r.key).split(',').map(norm).filter(Boolean)].forEach(k => { if (!byName.has(k)) byName.set(k, []); byName.get(k).push(r); }); });
+    const dong = $('svDong').value, plan = [], used = new Set();
     for (const line of lines) {
       const c = line.split(/\t|,| {2,}/).map(x => x.trim());
       const nameKey = norm(c[0] || '');
       if (!nameKey || /단지명|아파트명/.test(c[0])) continue;                    // 제목 줄은 건너뜀
       let cand = byName.get(nameKey) || [...byName.entries()].filter(([k]) => k.includes(nameKey) || nameKey.includes(k)).flatMap(([, v]) => v);
+      cand = [...new Set(cand)];
       if (dong) cand = cand.filter(r => r.dong === dong);
       const a = (c[1] || '').replace(/㎡|m2/gi, '');
       if (/평/.test(a)) { const py = parseInt(a, 10); cand = cand.filter(r => CONFIG.toPyeong(r.g) === py); }
       else if (a && !isNaN(parseFloat(a))) cand = cand.filter(r => r.g === Math.floor(parseFloat(a)));
+      const p = { text: `${c[0]}${c[1] ? ' ' + c[1] : ''}`, s: toMan(c[2] || ''), r: toMan(c[3] || ''), sn: parseInt(c[4], 10), rn: parseInt(c[5], 10), err: '', warn: [] };
       const names = new Set(cand.map(r => r.key));
-      if (cand.length !== 1 || names.size !== 1) { miss.push(`${c[0]}${c[1] ? ' ' + c[1] : ''} — ${cand.length ? '여러 개와 맞음(평형을 적어 주세요)' : '찾지 못함'}`); continue; }
-      const s = toMan(c[2] || ''), r2 = toMan(c[3] || ''), sn = parseInt(c[4], 10), rn = parseInt(c[5], 10);
-      if (s == null && r2 == null) { miss.push(`${c[0]} — 가격이 없음`); continue; }
-      const rc = Tracking.rec(cand[0].id, true), q = rc.quotes[m] = rc.quotes[m] || {};
-      if (s != null) q.s = s; if (r2 != null) q.r = r2; if (!isNaN(sn)) q.sn = sn; if (!isNaN(rn)) q.rn = rn;
+      if (!cand.length) p.err = '단지를 찾지 못함 (이름을 확인하거나 별칭을 등록하세요)';
+      else if (cand.length !== 1 || names.size !== 1) p.err = `여러 개와 맞음 — 평형을 적어 주세요 (${[...new Set(cand.map(r => `${r.name} ${r.g}㎡`))].slice(0, 4).join(', ')})`;
+      else if (p.s == null && p.r == null) p.err = '가격이 없음';
+      else {
+        const r = p.row = cand[0], rc = Tracking.rec(r.id) || { quotes: {} }, old = rc.quotes[m] || {}, last = rc.quotes[pm] || {};
+        if (used.has(r.id)) p.warn.push('같은 단지가 두 번 나옴 (아래 줄 값이 남음)');
+        used.add(r.id);
+        const big = (v) => v != null && (v < 3000 || v > 2000000);
+        if (big(p.s) || big(p.r)) p.warn.push('금액 단위 확인 (억 단위로 적어야 함. 예: 9.5)');
+        if (p.s != null && p.r != null && p.r >= p.s) p.warn.push('전세가 매매보다 비쌈');
+        if (p.s != null && last.s && Math.abs(p.s / last.s - 1) > 0.2) p.warn.push(`지난 기록(${Kit.eok(last.s)})과 20% 넘게 차이`);
+        if (p.s != null && r.sale && Math.abs(p.s / r.sale.price - 1) > 0.3) p.warn.push(`최근 실거래(${Kit.eok(r.sale.price)})와 30% 넘게 차이`);
+        if ((p.s != null && old.s != null && old.s !== p.s) || (p.r != null && old.r != null && old.r !== p.r)) p.warn.push(`이미 적은 값을 바꿈 (${old.s != null ? '매매 ' + Kit.eok(old.s) : ''}${old.r != null ? ' 전세 ' + Kit.eok(old.r) : ''})`);
+      }
+      plan.push(p);
+    }
+    return plan;
+  }
+  function pastePreview() {
+    if (!$('pasteText').value.trim()) return U.toast('붙여 넣은 내용이 없습니다.');
+    pastePlan = pasteParse();
+    const ok = pastePlan.filter(p => !p.err), warn = ok.filter(p => p.warn.length), bad = pastePlan.filter(p => p.err);
+    $('pasteResult').innerHTML = `<b>${Tracking.ymLabel(month())}</b> 기록에 넣을 줄 <b>${ok.length}개</b>` + (warn.length ? ` (그중 확인 필요 <b class="rent">${warn.length}개</b>)` : '') + (bad.length ? ` · 넣지 못하는 줄 <b class="up">${bad.length}개</b>` : '') +
+      (ok.length ? ' — 표를 확인하고 <b>[넣기]</b>를 누르세요.' : '');
+    $('pastePreview').innerHTML = '<thead><tr><th class="c">상태</th><th class="l">붙여 넣은 줄</th><th class="l">들어갈 단지</th><th>매매</th><th>전세</th><th>매물(매/전)</th><th class="l">확인할 점</th></tr></thead><tbody>' +
+      pastePlan.map(p => `<tr><td class="c">${p.err ? '❌' : p.warn.length ? '⚠️' : '✅'}</td><td class="l">${U.esc(p.text)}</td><td class="l">${p.row ? `${U.esc(p.row.dong)} ${U.esc(p.row.name)} ${p.row.g}㎡` : '-'}</td>` +
+        `<td>${Kit.eok(p.s)}</td><td>${Kit.eok(p.r)}</td><td>${isNaN(p.sn) ? '-' : p.sn} / ${isNaN(p.rn) ? '-' : p.rn}</td><td class="l ${p.err ? 'up' : 'rent'}">${U.esc(p.err || p.warn.join(' · '))}</td></tr>`).join('') + '</tbody>';
+    $('pastePreviewWrap').hidden = !pastePlan.length;
+    $('pasteApply').disabled = !ok.length;
+  }
+  function pasteApply() {
+    const m = month(), skipWarn = $('pasteSkipWarn').checked;
+    let ok = 0;
+    for (const p of pastePlan) {
+      if (p.err || (skipWarn && p.warn.length)) continue;
+      const rc = Tracking.rec(p.row.id, true), q = rc.quotes[m] = rc.quotes[m] || {};
+      if (p.s != null) q.s = p.s; if (p.r != null) q.r = p.r; if (!isNaN(p.sn)) q.sn = p.sn; if (!isNaN(p.rn)) q.rn = p.rn;
       (rc.qt = rc.qt || {})[m] = Tracking.sameDay(); ok++;
     }
     Tracking.save(); apply(); renderHistory();
-    $('pasteResult').innerHTML = `<b>${ok}개</b>를 ${Tracking.ymLabel(m)} 기록에 넣었습니다.` + (miss.length ? `<br>넣지 못한 ${miss.length}줄:<br>${miss.slice(0, 30).map(U.esc).join('<br>')}` : '');
-    if (ok && !miss.length) { $('pasteModal').hidden = true; U.toast(`${ok}개 단지의 호가를 넣었습니다.`); }
+    const left = pastePlan.length - ok;
+    pastePlan = []; $('pasteApply').disabled = true;
+    if (!left) { $('pasteModal').hidden = true; U.toast(`${ok}개 단지의 호가를 넣었습니다.`); }
+    else $('pasteResult').innerHTML = `<b>${ok}개</b>를 넣었습니다. 넣지 않은 ${left}줄은 위 표에서 확인해 고친 뒤 다시 [미리보기]를 누르세요.`;
   }
 
   function excel() {
@@ -509,7 +547,7 @@ const Survey = (() => {
     const top = [...F.map(() => ''), ...(m ? [Tracking.ymLabel(m), ...G.slice(1).map(() => '')] : []), ...tail.map(() => '')];
     const out = list.map(r => {
       const c = compute(r), rc = c.rc;
-      return [c.band, si, gu, r.dong, rc.zone || '', r.name, r.buildYear || '', r.buildYear ? CONFIG.toAge(r.buildYear) : '', rc.households || '', rc.pyeong || CONFIG.toPyeong(r.g) + '평',
+      return [c.band, si, gu, r.dong, rc.zone || '', r.name, r.buildYear || '', r.buildYear ? CONFIG.toAge(r.buildYear) : '', rc.households || r.hh || '', rc.pyeong || CONFIG.toPyeong(r.g) + '평',
         rc.structure || '', rc.rooms || '', rc.baths || '', rc.link || U.landLink(r.sgg, r.dong, r.name), c.peak ?? '', r1(c.drop), c.trough ?? '', r1(c.rise),
         ...(m ? [c.q.s ?? '', c.q.sn ?? '', c.sd ?? '', c.q.r ?? '', c.q.rn ?? '', c.rd ?? '', c.gap ?? '', c.gd ?? '', r1(c.ratio), r1(c.rtd)] : []),
         c.askGap ?? '', r.sale?.price ?? '', U.date(r.sale?.d), r.rent?.price ?? '', U.date(r.rent?.d), c.quoted ? '호가' : (c.base ? '실거래' : ''), rc.status || '', rc.cand ? '후보' : '', rc.memo || ''];

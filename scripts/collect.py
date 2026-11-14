@@ -605,6 +605,19 @@ def run():
         "emptyRegions": empty,  # 1년치 이상 받았는데 단지가 0개 → 지역코드 변경 의심
     })
     build_summary(regions, today)
+    # 시장 신호(신고가·급락·히트맵·온도 점수용)와 추가 자료(단지 세대수, R-ONE 통계). 여기서 오류가 나도 실거래 수집 결과는 그대로 둠
+    try:
+        import signals
+        print("[시장 신호] %d개 지역 계산" % signals.build(regions, today, state, DATA))
+    except Exception as e:
+        print("[시장 신호] 건너뜀: %s: %s" % (type(e).__name__, e))
+    if os.environ.get("SKIP_EXTRA") != "1":
+        try:
+            import extra
+            extra.ROOT, extra.DATA = ROOT, DATA
+            extra.run(regions)
+        except Exception as e:
+            print("[추가 자료] 건너뜀: %s: %s" % (type(e).__name__, e))
     for k, label in (("sale", "매매"), ("rent", "전세")):
         if api.months[k]:
             print("  - %s: %d달을 받는 데 %d번 호출 (한 달 평균 %.1f번)" % (label, api.months[k], api.calls[k], api.calls[k] / api.months[k]))

@@ -1,7 +1,7 @@
 /* 서비스 워커 — 휴대폰에 앱처럼 설치할 수 있게 해 주고, 인터넷이 끊겨도 화면 틀은 열리게 합니다.
    항상 최신 파일을 먼저 받고(네트워크 우선), 실패했을 때만 저장해 둔 것을 씁니다.
    그래서 GitHub 에 파일을 고쳐 올리면 새로고침만으로 바로 반영됩니다. */
-const CACHE = 'apt-dashboard-v1';
+const CACHE = 'apt-dashboard-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(

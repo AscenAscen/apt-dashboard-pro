@@ -1,11 +1,12 @@
 /* ─────────────────────────────────────────────────────────
    compare.js — [단지 비교] 탭
-   단지 2개까지: 시세 그래프 겹쳐 보기 + 호가 흐름 + 수익률 + 지도·직선거리 + 입지 비교 + 월별 실거래 비교표
+   단지 4개까지: 시세 그래프 겹쳐 보기 + 호가 흐름 + 수익률 + 지도·직선거리 + 입지 비교 + 월별 실거래 비교표
    화면에 보일 항목은 "표시 항목 고르기"에서 켜고 끕니다. (아래 OPTIONS 에 줄을 추가/삭제하면 목록이 바뀝니다)
    ───────────────────────────────────────────────────────── */
 const Compare = (() => {
   const $ = (id) => document.getElementById(id);
-  const NAMES = ['A', 'B'], COLORS = ['--accent', '--rent'];
+  const NAMES = ['A', 'B', 'C', 'D'], COLORS = ['--accent', '--rent', '--c3', '--c4'];
+  const CLS = ['sale', 'rent', 'c3', 'c4'];        // 단지별 글자색
   const OKEY = 'apt.cmpOpts.v1';
   // 표시 항목 목록: [저장 이름, 화면 이름, 처음 값]
   const OPTIONS = [
@@ -72,7 +73,7 @@ const Compare = (() => {
     if (reload) { s.idx = await Data.index(code); if (code !== s.q('.cSgg').value) return; }
     const find = s.q('.cFind').value.trim().toLowerCase();
     const keys = Object.keys(s.idx.c).map(k => ({ k, ...Data.parseKey(k) }))
-      .filter(x => !find || x.name.toLowerCase().includes(find) || x.dong.includes(find))
+      .filter(x => Alias.hit(code, x.k, x.name, x.dong, find))
       .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
     s.q('.cApt').innerHTML = `<option value="">${keys.length ? `선택하세요 (${keys.length}개)` : (Object.keys(s.idx.c).length ? '검색 결과 없음' : '수집된 자료 없음')}</option>` +
       keys.slice(0, 800).map(x => `<option value="${U.esc(x.k)}">${U.esc(x.name)} (${U.esc(x.dong)})</option>`).join('');
@@ -138,7 +139,7 @@ const Compare = (() => {
       if (opt.basic) basicTable(res, kind, a, b);
       if (opt.monthly) monthlyTable(res);
       if (opt.traffic || opt.school || opt.env || opt.hoje) {
-        Loc.fill($('cmpLoc'), res.map(r => ({ r, title: `${NAMES[r.i]} · ${r.name}`, cls: r.i ? 'rent' : 'sale' })), ['traffic', 'school', 'env', 'hoje'].filter(k => opt[k]));
+        Loc.fill($('cmpLoc'), res.map(r => ({ r, title: `${NAMES[r.i]} · ${r.name}`, cls: CLS[r.i] })), ['traffic', 'school', 'env', 'hoje'].filter(k => opt[k]));
       }
       if (opt.map) place(res);
     } catch (e) {
@@ -206,12 +207,12 @@ const Compare = (() => {
     $('cmpCards').innerHTML = res.map(r => {
       const lastP = r.mon[r.mon.length - 1], first = r.mon[0];
       const chg = lastP && first && r.mon.length > 1 ? (lastP.y / first.y - 1) * 100 : null;
-      return `<div class="card"><div class="k">${NAMES[r.i]} · ${U.esc(r.name)} ${r.g}㎡ · ${kname}</div><div class="v ${r.i ? 'rent' : 'sale'}">${lastP ? U.price(Math.round(lastP.y * 10000)) : '-'}</div><div class="s">기간 중 <span class="${U.cls(chg)}">${U.pct(chg)}</span> · ${r.main.length}건</div></div>`;
+      return `<div class="card"><div class="k">${NAMES[r.i]} · ${U.esc(r.name)} ${r.g}㎡ · ${kname}</div><div class="v ${CLS[r.i]}">${lastP ? U.price(Math.round(lastP.y * 10000)) : '-'}</div><div class="s">기간 중 <span class="${U.cls(chg)}">${U.pct(chg)}</span> · ${r.main.length}건</div></div>`;
     }).join('') + (res.length === 2 && res[0].mon.length && res[1].mon.length
       ? (() => { const x = res[0].mon[res[0].mon.length - 1].y, y = res[1].mon[res[1].mon.length - 1].y; return `<div class="card"><div class="k">최근 월평균 차이 (A - B)</div><div class="v">${U.diff(Math.round((x - y) * 10000))}</div><div class="s">A 가 B 의 ${(x / y * 100).toFixed(0)}%</div></div>`; })() : '');
   }
 
-  const th = (res) => '<thead><tr><th class="l">항목</th>' + res.map(r => `<th class="${r.i ? 'rent' : 'sale'}">${NAMES[r.i]} · ${U.esc(r.name)} ${r.g}㎡</th>`).join('') + '</tr></thead>';
+  const th = (res) => '<thead><tr><th class="l">항목</th>' + res.map(r => `<th class="${CLS[r.i]}">${NAMES[r.i]} · ${U.esc(r.name)} ${r.g}㎡</th>`).join('') + '</tr></thead>';
   const rowsHtml = (res, defs) => '<tbody>' + defs.map(([name, fn]) => `<tr><td class="l">${name}</td>${res.map(r => `<td>${fn(r)}</td>`).join('')}</tr>`).join('') + '</tbody>';
 
   /* ── 호가 흐름과 투자금 (시세트래킹·전수조사에 적은 값) ── */

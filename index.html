@@ -27,6 +27,11 @@
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
+    <button data-tab="market">시장 신호</button>
+    <button data-tab="my">내 분석</button>
+    <button data-tab="land">대장 지도</button>
+    <button data-tab="imjang">임장</button>
+    <button data-tab="guide">가이드·설정</button>
   </nav>
   <button id="btnLock" class="lockbtn">🔓 잠금</button>
   <label class="themepick">배경
@@ -88,7 +93,9 @@
     </div>
     <button class="primary" id="btnSearch">조회</button>
     <button id="btnGraph" title="단지를 고른 뒤 누르면 그 단지의 그래프를 바로 엽니다">단지 그래프 조회</button>
+    <button id="btnPin" title="자주 보는 지역을 위쪽에 고정합니다">📌 이 지역 핀</button>
   </section>
+  <div class="pinbar chips" hidden></div>
 
   <section class="panel" id="listPanel" hidden>
     <div class="bar">
@@ -108,6 +115,8 @@
       <strong id="detailTitle"></strong>
       <span class="grow"></span>
       <button id="btnDetailMap">지도에서 위치 보기</button>
+      <span class="hint" id="detailAlias" style="margin:0"></span>
+      <button id="btnDetailAlias" title="줄임말·별명을 등록하면 그 이름으로도 검색됩니다">별칭</button>
       <button id="btnDetailTrack">트래킹에 담기</button>
     </div>
     <div class="cards" id="detailCards"></div>
@@ -324,6 +333,24 @@
       <label>단지 <select class="cApt"></select></label>
       <label>평형 <select class="cArea"></select></label>
     </div>
+    <details id="cmpMore"><summary><b>단지 C · D 더 고르기</b> <span class="hint" style="margin:0">— 최대 4개까지 비교</span></summary>
+    <div class="slot" data-slot="2">
+      <strong class="c3">단지 C</strong>
+      <label>시/도 <select class="cSido"></select></label>
+      <label>시/군/구 <select class="cSgg"></select></label>
+      <label>단지 검색 <input class="cFind" type="search" placeholder="단지명 일부"></label>
+      <label>단지 <select class="cApt"></select></label>
+      <label>평형 <select class="cArea"></select></label>
+    </div>
+    <div class="slot" data-slot="3">
+      <strong class="c4">단지 D</strong>
+      <label>시/도 <select class="cSido"></select></label>
+      <label>시/군/구 <select class="cSgg"></select></label>
+      <label>단지 검색 <input class="cFind" type="search" placeholder="단지명 일부"></label>
+      <label>단지 <select class="cApt"></select></label>
+      <label>평형 <select class="cArea"></select></label>
+    </div>
+    </details>
     <div class="filters" style="margin-top:12px">
       <div class="presets" id="cmpPresets">
         <button data-y="1">최근 1년</button><button data-y="3">3년</button><button data-y="5" class="on">5년</button><button data-y="20">전체</button>
@@ -341,7 +368,7 @@
       <div class="optgrid" id="cmpOpts"></div>
     </details>
   </section>
-  <section class="panel empty" id="cmpEmpty">단지 A와 B를 고르고 <b>비교하기</b>를 누르세요. 한 단지만 골라도 됩니다.</section>
+  <section class="panel empty" id="cmpEmpty">단지를 고르고 <b>비교하기</b>를 누르세요. 한 단지만 골라도 되고, 최대 4개(A~D)까지 됩니다.</section>
   <div id="cmpBody" hidden>
     <section class="panel">
       <div class="cards" id="cmpCards"></div>
@@ -412,6 +439,17 @@
     <p class="hint">칸을 눌러 단지를 직접 적을 수 있습니다(한 줄에 한 단지). 생활권 이름은 머리칸을 눌러 수정, × 로 삭제합니다.
       <b>자동 배치</b>는 시세트래킹에서 "생활권"을 적어 둔 단지를 최근 매매가에 맞는 칸에 넣어 줍니다.</p>
     <div class="tablewrap"><table id="grpTable" class="grid"></table></div>
+  </section>
+  <section class="panel">
+    <div class="bar"><strong>자동 묶기 (다차원)</strong> <span class="hint" style="margin:0">— 시세트래킹 단지를 고른 두 기준으로 자동으로 나눠 봅니다</span></div>
+    <div class="filters">
+      <label>폴더 <select id="pvFolder"></select></label>
+      <label>세로 기준 <select id="pvRow"></select></label>
+      <label>가로 기준 <select id="pvCol"></select></label>
+      <label>칸에 보일 값 <select id="pvShow"><option value="price">매매가</option><option value="ratio">전세가율</option><option value="gap">갭 (매-전)</option></select></label>
+      <button id="btnPvExcel">엑셀 다운로드</button>
+    </div>
+    <div class="tablewrap"><table id="pvTable" class="grid pivot"></table></div>
   </section>
 </main>
 
@@ -503,6 +541,228 @@
 </main>
 
 <!-- 지도 창 -->
+<!-- ═══════════════ 시장 신호 (신고가·급락, 온도 점수, 히트맵, 가격지수) ═══════════════ -->
+<main id="tab-market" class="tab" hidden>
+  <div class="pinbar chips" hidden></div>
+  <section class="panel filters">
+    <label>볼 지역 <select id="mkScope"></select></label>
+    <span class="hint" id="mkAsOf" style="margin:0"></span>
+  </section>
+  <section class="panel notice" id="mkWarn" hidden></section>
+  <section class="panel empty" id="mkEmpty" hidden>아직 시장 신호 자료가 없습니다. 자동 수집이 한 번 돌면 채워집니다.</section>
+  <div id="mkBody" hidden>
+    <section class="panel">
+      <div class="bar"><strong>신고가 · 급락 알림판</strong>
+        <div class="presets" id="mkKind"><button data-k="highs" class="on">신고가</button><button data-k="drops">급락</button></div>
+        <span class="grow"></span><span class="hint" id="mkAlertNote" style="margin:0"></span></div>
+      <p class="hint"><b>신고가</b>: 같은 단지·평형의 2020년 이후 최고가를 넘긴 거래. <b>급락</b>: 바로 앞 거래(1년 이내)보다 10% 넘게 싸게 팔린 거래. 최근 30일, 직거래 제외, 지역마다 최대 5건. 줄을 누르면 그 지역 실거래 조회가 열립니다.</p>
+      <div class="tablewrap short"><table id="mkAlert"></table></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>지역 온도 점수</strong><span class="grow"></span><button id="btnMkExcel">엑셀 다운로드</button></div>
+      <p class="hint">50점이 보통입니다. <b>거래량</b>(최근 3개월 ÷ 그 앞 12개월) · <b>가격</b>(㎡당 중앙값, 최근 3개월 ÷ 그 앞 3개월) · <b>신고가 비율</b>(최근 90일)을 합친 점수입니다. 이번 달은 신고가 덜 끝나 계산에서 뺐습니다. 점수 공식은 <code>js/config.js</code>의 TEMP 에서 바꿀 수 있습니다.</p>
+      <div class="tablewrap short"><table id="mkTemp"></table></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>히트맵</strong>
+        <label class="inline">보는 값 <select id="mkMetric">
+          <option value="v">매매 거래량</option><option value="rv">전세 거래량</option><option value="p">㎡당 매매가 (전월 대비 %)</option>
+          <option value="rs">R-ONE 매매지수 (전월 대비 %)</option><option value="rr">R-ONE 전세지수 (전월 대비 %)</option>
+        </select></label></div>
+      <p class="hint" id="mkHeatNote"></p>
+      <div class="tablewrap"><table id="mkHeat" class="heat"></table></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>가격지수 흐름</strong> <span class="hint" style="margin:0">— 한국부동산원(R-ONE) 아파트 가격지수, KB 시세(직접 올린 엑셀)</span></div>
+      <div class="filters">
+        <label>지역 <select id="mkIdxRegion"></select></label>
+        <label>KB 엑셀 올리기 <input type="file" id="kbFile" accept=".xlsx,.xls,.csv"></label>
+        <label>KB 시트 <select id="kbSheet"></select></label>
+        <label>KB 지역(열) <select id="kbCol"></select></label>
+        <button id="btnKbClear" class="danger">KB 자료 지우기</button>
+      </div>
+      <p class="hint" id="mkIdxNote"></p>
+      <div class="chartbox"><canvas id="mkIdxChart"></canvas></div>
+    </section>
+  </div>
+</main>
+
+<!-- ═══════════════ 내 분석 (지표표, 가용 자금 필터, 산점도, 갈아타기) ═══════════════ -->
+<main id="tab-my" class="tab" hidden>
+  <section class="panel filters">
+    <label>대상 <select id="myScope"></select></label>
+    <button id="btnMyLoad">실거래 다시 읽기</button>
+    <span class="grow"></span>
+    <button id="btnMyExcel">지표표 엑셀</button>
+  </section>
+  <section class="panel empty" id="myEmpty" hidden>시세트래킹에 담은 단지나 전수조사에 적은 호가가 있어야 합니다.</section>
+  <div id="myBody" hidden>
+    <section class="panel">
+      <div class="bar"><strong>지표표</strong> <span class="hint" style="margin:0">— 머리칸을 누르면 정렬됩니다. 호가는 가장 최근에 적은 값입니다.</span></div>
+      <div class="tablewrap"><table id="myTable"></table></div>
+      <p class="hint"><b>전세가율</b> = 전세 ÷ 매매 · <b>갭</b> = 매매 − 전세 · <b>호가 괴리율</b> = (매매 호가 − 최근 실거래) ÷ 최근 실거래 · <b>매물 증감률</b> = 지난 기록 대비 매매 매물 수 변화 · <b>월 회전율</b> = 최근 90일 월평균 매매 건수 ÷ 지금 매매 매물 수. 호가가 없는 칸은 최근 실거래로 대신하고 <span class="star">실</span> 표시를 붙입니다.</p>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>가용 자금 필터</strong> <span class="hint" style="margin:0">— 내 돈으로 가능한 단지만 추리기</span></div>
+      <div class="filters">
+        <label>방식 <select id="bgMode"><option value="gap">갭투자 (매매 − 전세 ≤ 내 돈)</option><option value="live">실거주 (매매 ≤ 내 돈 + 대출)</option></select></label>
+        <label>내 돈 (억) <input type="number" id="bgCash" step="0.1" min="0" placeholder="예: 1.5"></label>
+        <label>대출 (억) <input type="number" id="bgLoan" step="0.1" min="0" placeholder="실거주만"></label>
+        <label>부대비용 (%) <input type="number" id="bgCost" step="0.1" min="0" value="2" title="취득세·중개보수 등. 매매가의 몇 %로 볼지"></label>
+        <label>전세가율 ≥ (%) <input type="number" id="bgRatio" step="1" min="0" placeholder="선택"></label>
+        <label>세대수 ≥ <input type="number" id="bgHouse" step="100" min="0" placeholder="선택"></label>
+        <label>찾는 범위 <select id="bgSource"><option value="mine">위 "대상"의 내 기록</option><option value="region">한 지역 전체 (실거래 기준)</option></select></label>
+        <label class="bgRegion" hidden>시/도 <select id="bgSido"></select></label>
+        <label class="bgRegion" hidden>시/군/구 <select id="bgSgg"></select></label>
+        <button class="primary" id="btnBudget">찾기</button>
+      </div>
+      <p class="hint" id="bgNote"></p>
+      <div class="tablewrap short"><table id="bgTable"></table></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>산점도</strong>
+        <label class="inline">가로 <select id="scX"></select></label>
+        <label class="inline">세로 <select id="scY"></select></label>
+        <span class="hint" style="margin:0">— 점에 마우스를 올리면 단지 이름이 보입니다. 색은 시군구별입니다.</span></div>
+      <div class="chartbox tall"><canvas id="scChart"></canvas></div>
+    </section>
+  </div>
+  <section class="panel">
+    <div class="bar"><strong>갈아타기 시뮬레이터</strong> <span class="hint" style="margin:0">— 지금 집을 팔고 새 집을 살 때 더 필요한 돈</span></div>
+    <div class="filters">
+      <label>지금 집 (트래킹에서 고르기) <select id="mvFrom"></select></label>
+      <label>파는 가격 (억) <input type="number" id="mvSell" step="0.1" min="0"></label>
+      <label>남은 대출·돌려줄 전세금 (억) <input type="number" id="mvDebt" step="0.1" min="0" value="0"></label>
+      <label>양도세 (억) <input type="number" id="mvTax" step="0.01" min="0" value="0" title="1주택 비과세면 0. 정확한 금액은 세무사 확인"></label>
+    </div>
+    <div class="filters" style="margin-top:10px">
+      <label>새 집 (트래킹에서 고르기) <select id="mvTo"></select></label>
+      <label>사는 가격 (억) <input type="number" id="mvBuy" step="0.1" min="0"></label>
+      <label>새 대출 (억) <input type="number" id="mvLoan" step="0.1" min="0" value="0"></label>
+      <label>모아 둔 현금 (억) <input type="number" id="mvCash" step="0.1" min="0" value="0"></label>
+      <label>이사·수리비 (만원) <input type="number" id="mvEtc" step="100" min="0" value="1000"></label>
+    </div>
+    <div class="cards" id="mvCards" style="margin-top:12px"></div>
+    <p class="hint">취득세는 <b>1주택·전용 85㎡ 이하</b> 기준 대략값(지방교육세 포함), 중개보수는 법정 상한 요율로 계산합니다. 다주택·조정지역·큰 평형이면 달라지니 <b>참고용</b>으로만 보세요. 양도세는 직접 넣어야 합니다.</p>
+  </section>
+</main>
+
+<!-- ═══════════════ 대장 지도 ═══════════════ -->
+<main id="tab-land" class="tab" hidden>
+  <section class="panel">
+    <div class="bar"><strong>대장 단지 등록</strong> <span class="hint" style="margin:0">— 직접 고릅니다. 등급은 나중에 바꿀 수 있습니다.</span></div>
+    <div class="filters">
+      <label>시/도 <select id="ldSido"></select></label>
+      <label>시/군/구 <select id="ldSgg"></select></label>
+      <label>단지 검색 <input type="search" id="ldFind" placeholder="단지명·별칭"></label>
+      <label>단지 <select id="ldApt"></select></label>
+      <label>평형 <select id="ldArea"></select></label>
+      <label>등급 <select id="ldGrade"></select></label>
+      <button class="primary" id="btnLdAdd">대장으로 등록</button>
+      <span class="sep"></span>
+      <label>또는 시세트래킹에서 <select id="ldFromTrack"></select></label>
+      <button id="btnLdAddTrack">등록</button>
+    </div>
+  </section>
+  <section class="panel empty" id="ldEmpty">아직 등록한 대장 단지가 없습니다. 위에서 지역의 대표 단지를 골라 등록하세요.</section>
+  <div id="ldBody" hidden>
+    <section class="panel">
+      <div class="bar"><strong>대장 단지 지도</strong>
+        <label class="inline">지역 <select id="ldRegion"></select></label>
+        <span class="grow"></span><span class="hint" id="ldLegend" style="margin:0"></span></div>
+      <div class="kmap" id="ldMap"><p class="empty" id="ldMapMsg"></p></div>
+      <div class="cards" id="ldCard" style="margin-top:10px"></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>대장 단지 목록</strong><span class="grow"></span><button id="btnLdExcel">엑셀 다운로드</button></div>
+      <div class="tablewrap short"><table id="ldTable"></table></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>대장 대비 격차</strong>
+        <label class="inline">기준 대장 <select id="ldBase"></select></label>
+        <label class="inline">견줄 단지 <select id="ldVs"><option value="sgg">같은 시군구의 내 단지</option><option value="sido">같은 시도의 내 단지</option><option value="all">내 단지 전체</option></select></label></div>
+      <p class="hint">내 단지 = 시세트래킹에 담은 단지. 가격은 가장 최근에 적은 매매 호가, 없으면 최근 실거래(<span class="star">실</span>)입니다. <b>대장 대비 %</b>가 낮을수록 대장보다 쌉니다. 지난 기록이 있으면 격차가 벌어졌는지 좁혀졌는지도 보여 줍니다.</p>
+      <div class="tablewrap short"><table id="ldGap"></table></div>
+    </section>
+  </div>
+</main>
+
+<!-- ═══════════════ 임장 ═══════════════ -->
+<main id="tab-imjang" class="tab" hidden>
+  <section class="panel filters" id="imTop">
+    <label>폴더 <select id="imFolder"></select></label>
+    <label>단지 <select id="imApt"></select></label>
+    <button class="primary" id="btnImMode">📱 임장 모드 (큰 화면)</button>
+    <span class="grow"></span>
+    <button id="btnImExcel">임장 기록 엑셀</button>
+  </section>
+  <section class="panel empty" id="imEmpty" hidden>임장 기록은 시세트래킹에 담은 단지에 남깁니다. 먼저 단지를 트래킹에 담아 주세요.</section>
+  <section class="panel" id="imForm" hidden>
+    <div class="bar"><button id="btnImPrev">◀ 이전</button><strong id="imTitle"></strong><button id="btnImNext">다음 ▶</button><span class="grow"></span>
+      <a class="btn mini" id="imMap" target="_blank" rel="noopener">카카오맵</a><a class="btn mini" id="imLand" target="_blank" rel="noopener">네이버 검색</a>
+      <button id="btnImExit" hidden>임장 모드 끝내기</button></div>
+    <p class="hint" id="imSub"></p>
+    <div class="filters">
+      <label>방문일 <input type="date" id="imDate"></label>
+      <label>상태 <select id="imStatus"></select></label>
+      <label>이번 달 매매 호가 (억) <input type="number" id="imSale" step="0.01" min="0"></label>
+      <label>이번 달 전세 호가 (억) <input type="number" id="imRent" step="0.01" min="0"></label>
+      <div class="imscore" id="imTotal"></div>
+    </div>
+    <div id="imChecks" class="imchecks"></div>
+    <label class="imemo">메모 <textarea id="imMemo" rows="4" placeholder="현장에서 본 것, 부동산 사장님 말, 사진 위치 등"></textarea></label>
+  </section>
+  <section class="panel" id="imListPanel" hidden>
+    <div class="bar"><strong>임장 기록</strong> <span class="hint" style="margin:0">— 총점 높은 순. 줄을 누르면 그 단지가 열립니다.</span></div>
+    <div class="tablewrap short"><table id="imTable"></table></div>
+  </section>
+</main>
+
+<!-- ═══════════════ 가이드 · 설정 ═══════════════ -->
+<main id="tab-guide" class="tab" hidden>
+  <section class="panel">
+    <div class="bar"><strong>처음이라면 이 순서로</strong></div>
+    <ol class="guide">
+      <li><b>실거래 조회</b>에서 지역을 고르고 [조회] → 관심 단지를 체크해 <b>[선택 단지 트래킹에 담기]</b>. 자주 보는 지역은 <b>[📌 이 지역 핀]</b>.</li>
+      <li><b>전수조사</b>에서 [이 지역 모든 단지 불러오기] → 네이버 부동산에서 본 호가를 달마다 적습니다. 엑셀에서 한꺼번에 붙여 넣을 때는 <b>[① 미리보기]</b>로 먼저 확인합니다.</li>
+      <li><b>시세트래킹</b>에서 달마다 [시세 추가] → 매매·전세·매물 수를 적으면 전월 대비 변화가 자동으로 나옵니다.</li>
+      <li><b>내 분석</b>에서 전세가율·갭·호가 괴리율을 한 표로 보고, <b>가용 자금 필터</b>로 내 돈에 맞는 단지만 추립니다.</li>
+      <li><b>대장 지도</b>에 지역 대표 단지를 등록하면, 내 단지가 대장보다 얼마나 싼지 볼 수 있습니다.</li>
+      <li><b>시장 신호</b>에서 신고가·급락 거래와 지역 온도 점수, 히트맵을 봅니다.</li>
+      <li>현장에 나갈 때는 <b>임장</b> 탭의 [임장 모드]로 점수와 메모를 남깁니다.</li>
+      <li>기록은 이 브라우저에만 저장됩니다. <b>시세트래킹 → 관리</b>에서 백업 파일이나 코드로 자주 옮겨 두세요.</li>
+    </ol>
+    <details class="help"><summary>용어 풀이</summary>
+      <p class="hint"><b>전고점·전저점</b>: 2020년 1월 이후 가장 비싸게·싸게 팔린 실거래. <b>잠정</b>: 최근 30일 안에 신고된 거래로, 계약이 해제되면 사라질 수 있습니다. <b>직거래</b>: 중개사 없이 한 거래(가족 간 거래가 많아 계산에서 뺍니다).
+      <b>세대수</b>: 공동주택관리정보(K-apt)에서 자동으로 가져오며, 비어 있으면 직접 적을 수 있습니다. <b>R-ONE</b>: 한국부동산원 통계. <b>호가</b>: 집주인이 부르는 값(직접 적는 값).</p>
+    </details>
+  </section>
+  <section class="panel filters">
+    <label>글자 크기 <select id="fontSel"><option value="0.9">작게</option><option value="1">보통</option><option value="1.1">조금 크게</option><option value="1.25">크게</option><option value="1.4">아주 크게</option></select></label>
+    <span class="hint" style="margin:0">배경색은 오른쪽 위 "배경"에서 고릅니다.</span>
+  </section>
+  <section class="panel">
+    <div class="bar"><strong>점검</strong> <span class="hint" style="margin:0">— 자료가 제대로 들어오고 있는지</span><span class="grow"></span><button id="btnHealth">다시 확인</button></div>
+    <div class="tablewrap"><table id="hcTable" class="cmp"></table></div>
+  </section>
+  <section class="panel">
+    <div class="bar"><strong>월간 리포트</strong>
+      <label class="inline">달 <select id="rpMonth"></select></label>
+      <label class="inline">폴더 <select id="rpFolder"></select></label>
+      <button class="primary" id="btnReport">리포트 만들기</button><button id="btnPrint" hidden>인쇄 / PDF 저장</button></div>
+    <p class="hint">[인쇄 / PDF 저장]을 누른 뒤, 인쇄 창의 "대상(프린터)"에서 <b>PDF로 저장</b>을 고르면 파일로 남습니다.</p>
+    <div id="report" hidden></div>
+  </section>
+  <section class="panel">
+    <div class="bar"><strong>단지 별칭</strong> <span class="hint" style="margin:0">— 실거래 조회에서 단지를 연 뒤 [별칭] 버튼으로 등록합니다. 검색·붙여넣기에서 이 이름으로도 찾습니다.</span></div>
+    <div class="tablewrap short"><table id="alTable"></table></div>
+  </section>
+  <section class="panel">
+    <div class="bar"><strong>호가 수정 이력</strong> <span class="hint" style="margin:0">— 이미 적은 값을 고치거나 지운 기록 (최근 400건, 이 브라우저에만 저장)</span><span class="grow"></span><button id="btnLogClear" class="danger">이력 지우기</button></div>
+    <div class="tablewrap short"><table id="logTable"></table></div>
+  </section>
+</main>
+
 <div class="modal" id="mapModal" hidden>
   <div class="modalbox">
     <div class="bar">
@@ -534,12 +794,16 @@
 <!-- 엑셀 붙여넣기 창 -->
 <div class="modal" id="pasteModal" hidden>
   <div class="modalbox">
-    <div class="bar"><strong>엑셀에서 붙여넣기</strong><span class="grow"></span><button class="primary" id="pasteApply">넣기</button><button id="pasteClose">닫기</button></div>
+    <div class="bar"><strong>엑셀에서 붙여넣기</strong><span class="grow"></span><button id="pasteCheck">① 미리보기</button><button class="primary" id="pasteApply" disabled>② 넣기</button><button id="pasteClose">닫기</button></div>
     <p class="hint">엑셀에서 아래 순서로 된 칸을 복사해 붙여 넣으세요. 한 줄에 한 단지입니다. 지금 고른 <b>기록할 달</b>에 들어갑니다.<br>
       <b>단지명 / 전용㎡ 또는 평형 / 매매(억) / 전세(억) / 매매 매물 수 / 전세 매물 수</b> — 예: <code>꿈마을라이프　84　9.5　5.2　12　4</code><br>
       평형이 하나뿐인 단지는 둘째 칸을 비워도 됩니다. 평으로 적으려면 <code>34평</code>처럼 "평"을 붙이세요. 뒤쪽 칸은 없어도 됩니다.</p>
     <textarea id="pasteText" rows="9" spellcheck="false" placeholder="여기에 붙여 넣기 (Ctrl+V)"></textarea>
     <p class="hint" id="pasteResult"></p>
+    <div id="pastePreviewWrap" hidden>
+      <label class="inline"><input type="checkbox" id="pasteSkipWarn"> ⚠️ 표시된 줄은 넣지 않기</label>
+      <div class="tablewrap short"><table id="pastePreview"></table></div>
+    </div>
   </div>
 </div>
 <input type="file" id="vaultFile" accept=".json" hidden>
@@ -561,6 +825,7 @@
 <script src="js/config.js"></script>
 <script src="js/data.js"></script>
 <script src="js/kakao.js"></script>
+<script src="js/kit.js"></script>
 <script src="js/home.js"></script>
 <script src="js/search.js"></script>
 <script src="js/locinfo.js"></script>
@@ -571,6 +836,11 @@
 <script src="js/vault.js"></script>
 <script src="js/grouping.js"></script>
 <script src="js/trends.js"></script>
+<script src="js/market.js"></script>
+<script src="js/my.js"></script>
+<script src="js/land.js"></script>
+<script src="js/imjang.js"></script>
+<script src="js/guide.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

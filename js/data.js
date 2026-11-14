@@ -107,8 +107,13 @@ const Data = (() => {
   }
 
   const summary = () => getJson('summary.json', null);
+  /** 단지 정보(세대수 등): { m: {단지키: [세대수, 동수, 단지코드]} } — 아직 못 받은 지역은 빈 값 */
+  const kapt = (code) => getJson(`kapt/${code}.json`, { m: {} }).then(k => (k && k.m ? k : { m: {} }));
+  const signals = () => getJson('signals.json', null);      // 시장 신호 (신고가·급락·월별 거래량)
+  const rone = () => getJson('rone.json', null);            // 한국부동산원 가격지수
+  const extraStatus = () => getJson('extra_status.json', null);
 
-  return { regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary };
+  return { regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary, kapt, signals, rone, extraStatus };
 })();
 
 /* ───────────── 공통 도구 ───────────── */

@@ -56,10 +56,11 @@ const KMap = (() => {
     return map;
   }
 
-  /** 점 + 이름표. color 기본 빨강. 돌려받은 값의 remove() 로 지움 */
-  function dot(map, p, label, color = '#ff3b30') {
+  /** 점 + 이름표. color 기본 빨강. 돌려받은 값의 remove() 로 지움. opt = { cls: 추가 모양 이름, onClick: 눌렀을 때 할 일 } */
+  function dot(map, p, label, color = '#ff3b30', opt = {}) {
     const el = document.createElement('div');
-    el.className = 'kdot';
+    el.className = 'kdot' + (opt.cls ? ' ' + opt.cls : '');
+    if (opt.onClick) { el.classList.add('click'); el.onclick = opt.onClick; }    // 누를 수 있는 점 (대장 지도)
     el.innerHTML = `<i style="background:${color}"></i>${label ? `<span>${U.esc(label)}</span>` : ''}`;
     const ov = new kakao.maps.CustomOverlay({ position: LL(p), content: el, yAnchor: 0.5, xAnchor: 0, zIndex: 5 });
     ov.setMap(map);

@@ -9,6 +9,12 @@ const App = (() => {
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     if (name === 'tracking') Tracking.open();
     if (name === 'survey') Survey.open();
+    if (name === 'market') Market.open();
+    if (name === 'my') My.open();
+    if (name === 'land') Land.open();
+    if (name === 'imjang') Imjang.open();
+    if (name === 'guide') Guide.open();
+    if (name === 'grouping') My.pivot();
   }
 
   /** 지도 창 열기. 단지 정보(code, key, sido, sgg, dong, jibun, name)가 있으면 됩니다.
@@ -108,8 +114,10 @@ const App = (() => {
     document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
     $('mapClose').onclick = closeMap;
     $('mapModal').onclick = (e) => { if (e.target.id === 'mapModal') closeMap(); };
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); ['realModal', 'codeModal', 'pasteModal'].forEach(id => { $(id).hidden = true; }); } });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); ['realModal', 'codeModal', 'pasteModal'].forEach(id => { $(id).hidden = true; }); document.body.classList.remove('imjang-mode'); } });
+    Guide.init();
     Tracking.init();
+    QLog.check();              // 지금 상태를 기준으로 삼아, 이후에 고친 호가만 이력에 남김
     Vault.init();
     Grouping.init();
     Survey.init();
@@ -117,7 +125,9 @@ const App = (() => {
     Compare.init();
     Infra.init();
     Home.init();
+    Market.init(); Imjang.init();
     await Search.init();
+    await Promise.all([My.init(), Land.init()]);
     showStatus();
   }
 
