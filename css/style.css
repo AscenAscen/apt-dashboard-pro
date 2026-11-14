@@ -369,3 +369,15 @@ body.imjang-mode .imrow { flex-direction: column; align-items: stretch; }
   body.printing .top, body.printing main > section:not(:has(#report)), body.printing section:has(#report) > :not(#report) { display: none !important; }
   body.printing main, body.printing section:has(#report) { padding: 0; margin: 0; border: 0; background: #fff; }
 }
+
+/* 전국 단지 검색 (Finder) */
+.fhost { position: relative; }
+label.findlab { flex: 1 1 280px; max-width: 460px; }
+label.findlab input { width: 100%; }
+.fdrop { position: absolute; left: 0; right: 0; top: 100%; z-index: 50; margin-top: 4px; max-height: 340px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.45); padding: 4px; min-width: 280px; }
+.fdrop[hidden] { display: none; }
+.fdrop button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; text-align: left; background: none; border: 0; border-radius: 7px; padding: 7px 10px; color: var(--text); font-size: 14px; }
+.fdrop button:hover { background: var(--hover); }
+.fdrop small { color: var(--sub); font-size: 12px; }
+.fdrop p { margin: 0; padding: 10px; color: var(--sub); font-size: 13px; line-height: 1.6; }
+#ldQuotes input.num { width: 72px; }

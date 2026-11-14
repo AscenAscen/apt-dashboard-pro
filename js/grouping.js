@@ -144,6 +144,7 @@ const Grouping = (() => {
       search();
     };
     fillSgg(saved?.code);
+    Finder.attach($('grpFind'), (x) => { $('grpSido').value = x.sido; $('grpSearch').value = x.name; fillSgg(x.code); });
     $('grpSido').onchange = () => fillSgg();
     $('grpSgg').onchange = search;
     let timer;

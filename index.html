@@ -29,7 +29,7 @@
     <button data-tab="trends">지역 동향</button>
     <button data-tab="market">시장 신호</button>
     <button data-tab="my">내 분석</button>
-    <button data-tab="land">대장 지도</button>
+    <button data-tab="land">랜드마크</button>
     <button data-tab="imjang">임장</button>
     <button data-tab="guide">가이드·설정</button>
   </nav>
@@ -74,6 +74,10 @@
 </main>
 
 <main id="tab-search" class="tab" hidden>
+  <section class="panel filters findbar">
+    <label class="findlab">🔎 전국 단지 검색 <input type="search" id="findSearch" placeholder="단지 이름이나 별칭 (예: 헬리오, 평촌 래미안)" autocomplete="off"></label>
+    <span class="hint" style="margin:0">지역을 고르지 않아도 됩니다. 결과를 누르면 그 단지의 실거래가 바로 열립니다.</span>
+  </section>
   <section class="panel filters">
     <label>시/도 <select id="selSido"></select></label>
     <label>시/군/구 <select id="selSgg"></select></label>
@@ -256,6 +260,11 @@
   <div class="notice" id="trkNotice" hidden></div>
   <section class="panel">
     <div class="chips" id="trkFolders"></div>
+    <div class="filters findbar" style="margin-top:12px">
+      <label class="findlab">🔎 단지 검색해서 추가 <input type="search" id="trkFind" placeholder="단지 이름이나 별칭 (예: 헬리오, 평촌 래미안)" autocomplete="off"></label>
+      <label>평형 <select id="trkFindArea"></select></label>
+      <button class="primary" id="btnTrkFindAdd">이 폴더에 추가</button>
+    </div>
     <div class="filters" style="margin-top:12px">
       <label>기록할 달 <input type="month" id="trkNewMonth"></label>
       <button class="primary" id="btnTrkAddMonth">시세 추가</button>
@@ -427,6 +436,8 @@
   </section>
   <section class="panel">
     <div class="filters">
+      <label class="findlab">🔎 전국 단지 검색 <input type="search" id="grpFind" placeholder="단지 이름이나 별칭" autocomplete="off"></label>
+      <span class="sep"></span>
       <label>시/도 <select id="grpSido"></select></label>
       <label>시/군/구 <select id="grpSgg"></select></label>
       <label>단지 검색 <input id="grpSearch" type="search" placeholder="단지명 또는 동 이름"></label>
@@ -647,41 +658,48 @@
   </section>
 </main>
 
-<!-- ═══════════════ 대장 지도 ═══════════════ -->
+<!-- ═══════════════ 랜드마크 ═══════════════ -->
 <main id="tab-land" class="tab" hidden>
   <section class="panel">
-    <div class="bar"><strong>대장 단지 등록</strong> <span class="hint" style="margin:0">— 직접 고릅니다. 등급은 나중에 바꿀 수 있습니다.</span></div>
+    <div class="bar"><strong>랜드마크 단지 등록</strong> <span class="hint" style="margin:0">— 직접 고릅니다. 등급은 나중에 바꿀 수 있습니다.</span></div>
     <div class="filters">
+      <label class="findlab">🔎 전국 단지 검색 <input type="search" id="ldFindAll" placeholder="단지 이름이나 별칭 (예: 헬리오, 평촌 래미안)" autocomplete="off"></label>
+      <span class="sep"></span>
       <label>시/도 <select id="ldSido"></select></label>
       <label>시/군/구 <select id="ldSgg"></select></label>
-      <label>단지 검색 <input type="search" id="ldFind" placeholder="단지명·별칭"></label>
+      <label>지역 안에서 찾기 <input type="search" id="ldFind" placeholder="단지명·별칭"></label>
       <label>단지 <select id="ldApt"></select></label>
       <label>평형 <select id="ldArea"></select></label>
       <label>등급 <select id="ldGrade"></select></label>
-      <button class="primary" id="btnLdAdd">대장으로 등록</button>
-      <span class="sep"></span>
-      <label>또는 시세트래킹에서 <select id="ldFromTrack"></select></label>
-      <button id="btnLdAddTrack">등록</button>
+      <button class="primary" id="btnLdAdd">랜드마크로 등록</button>
     </div>
   </section>
-  <section class="panel empty" id="ldEmpty">아직 등록한 대장 단지가 없습니다. 위에서 지역의 대표 단지를 골라 등록하세요.</section>
+  <section class="panel empty" id="ldEmpty">아직 등록한 랜드마크 단지가 없습니다. 위에서 지역의 대표 단지를 골라 등록하세요.</section>
   <div id="ldBody" hidden>
     <section class="panel">
-      <div class="bar"><strong>대장 단지 지도</strong>
+      <div class="bar"><strong>랜드마크 단지 지도</strong>
         <label class="inline">지역 <select id="ldRegion"></select></label>
         <span class="grow"></span><span class="hint" id="ldLegend" style="margin:0"></span></div>
       <div class="kmap" id="ldMap"><p class="empty" id="ldMapMsg"></p></div>
       <div class="cards" id="ldCard" style="margin-top:10px"></div>
     </section>
     <section class="panel">
-      <div class="bar"><strong>대장 단지 목록</strong><span class="grow"></span><button id="btnLdExcel">엑셀 다운로드</button></div>
+      <div class="bar"><strong>랜드마크 단지 목록</strong><span class="grow"></span><button id="btnLdExcel">엑셀 다운로드</button></div>
       <div class="tablewrap short"><table id="ldTable"></table></div>
     </section>
     <section class="panel">
-      <div class="bar"><strong>대장 대비 격차</strong>
-        <label class="inline">기준 대장 <select id="ldBase"></select></label>
+      <div class="bar"><strong>랜드마크 시세 기록</strong>
+        <label class="inline">기록할 달 <input type="month" id="ldNewMonth"></label>
+        <button class="primary" id="btnLdAddMonth">시세 추가</button>
+        <span class="grow"></span><button id="btnLdQExcel">시세 기록 엑셀</button></div>
+      <p class="hint">랜드마크 단지의 호가를 달마다 적는 표입니다. <b>시세트래킹과는 완전히 따로</b> 저장되어, 여기 적은 값은 시세트래킹 탭에 보이지 않습니다. 가격은 <b>억</b> 단위(예: 15.3), 매물은 개수입니다. [시세 추가]를 누르면 새 달 칸이 맨 왼쪽에 생깁니다.</p>
+      <div class="tablewrap short"><table id="ldQuotes"></table></div>
+    </section>
+    <section class="panel">
+      <div class="bar"><strong>랜드마크 대비 격차</strong>
+        <label class="inline">기준 랜드마크 <select id="ldBase"></select></label>
         <label class="inline">견줄 단지 <select id="ldVs"><option value="sgg">같은 시군구의 내 단지</option><option value="sido">같은 시도의 내 단지</option><option value="all">내 단지 전체</option></select></label></div>
-      <p class="hint">내 단지 = 시세트래킹에 담은 단지. 가격은 가장 최근에 적은 매매 호가, 없으면 최근 실거래(<span class="star">실</span>)입니다. <b>대장 대비 %</b>가 낮을수록 대장보다 쌉니다. 지난 기록이 있으면 격차가 벌어졌는지 좁혀졌는지도 보여 줍니다.</p>
+      <p class="hint">내 단지 = 시세트래킹에 담은 단지. 내 단지 가격은 시세트래킹에 적은 매매 호가, 랜드마크 가격은 위 시세 기록에 적은 매매 호가, 없으면 최근 실거래(<span class="star">실</span>)입니다. <b>랜드마크 대비 %</b>가 낮을수록 랜드마크보다 쌉니다. 지난 기록이 있으면 격차가 벌어졌는지 좁혀졌는지도 보여 줍니다.</p>
       <div class="tablewrap short"><table id="ldGap"></table></div>
     </section>
   </div>
@@ -727,7 +745,7 @@
       <li><b>전수조사</b>에서 [이 지역 모든 단지 불러오기] → 네이버 부동산에서 본 호가를 달마다 적습니다. 엑셀에서 한꺼번에 붙여 넣을 때는 <b>[① 미리보기]</b>로 먼저 확인합니다.</li>
       <li><b>시세트래킹</b>에서 달마다 [시세 추가] → 매매·전세·매물 수를 적으면 전월 대비 변화가 자동으로 나옵니다.</li>
       <li><b>내 분석</b>에서 전세가율·갭·호가 괴리율을 한 표로 보고, <b>가용 자금 필터</b>로 내 돈에 맞는 단지만 추립니다.</li>
-      <li><b>대장 지도</b>에 지역 대표 단지를 등록하면, 내 단지가 대장보다 얼마나 싼지 볼 수 있습니다.</li>
+      <li><b>랜드마크</b> 탭에 지역 대표 단지를 등록하고 달마다 호가를 적으면, 내 단지가 랜드마크보다 얼마나 싼지 볼 수 있습니다. (시세트래킹과는 따로 기록)</li>
       <li><b>시장 신호</b>에서 신고가·급락 거래와 지역 온도 점수, 히트맵을 봅니다.</li>
       <li>현장에 나갈 때는 <b>임장</b> 탭의 [임장 모드]로 점수와 메모를 남깁니다.</li>
       <li>기록은 이 브라우저에만 저장됩니다. <b>시세트래킹 → 관리</b>에서 백업 파일이나 코드로 자주 옮겨 두세요.</li>

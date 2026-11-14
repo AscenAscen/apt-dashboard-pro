@@ -403,6 +403,28 @@ def backfill_tasks(regions, state, cur):
 
 
 # ───────────────────────── 첫 화면용 요약 ─────────────────────────
+def build_names(regions):
+    """전국 단지 이름 목록 → data/names.json  (화면의 '전국 단지 검색'용. API 호출 없음)
+       { asOf, r: { 지역코드: [단지키, …] } }   단지키 = "동|지번|단지명" """
+    out, n = {}, 0
+    for r in regions:
+        code = r["code"]
+        try:
+            with open(os.path.join(DATA, "index", code + ".json"), encoding="utf-8") as f:
+                keys = sorted((json.load(f).get("c") or {}).keys())
+        except (OSError, ValueError):
+            continue
+        if keys:
+            out[code] = keys
+            n += len(keys)
+    path = os.path.join(DATA, "names.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"asOf": dt.datetime.now(KST).strftime("%Y-%m-%d"), "n": n, "r": out}, f, ensure_ascii=False, separators=(",", ":"))
+    os.replace(tmp, path)
+    return n
+
+
 def build_summary(regions, today):
     """대시보드 첫 탭용 요약 → data/summary.json
        · 지역별 최근 30일 / 그 직전 30일 거래 건수, 평균가, 최고가 거래
@@ -605,6 +627,10 @@ def run():
         "emptyRegions": empty,  # 1년치 이상 받았는데 단지가 0개 → 지역코드 변경 의심
     })
     build_summary(regions, today)
+    try:
+        print("[단지 이름 목록] %d개 단지" % build_names(regions))
+    except Exception as e:
+        print("[단지 이름 목록] 건너뜀: %s: %s" % (type(e).__name__, e))
     # 시장 신호(신고가·급락·히트맵·온도 점수용)와 추가 자료(단지 세대수, R-ONE 통계). 여기서 오류가 나도 실거래 수집 결과는 그대로 둠
     try:
         import signals

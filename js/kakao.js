@@ -60,7 +60,7 @@ const KMap = (() => {
   function dot(map, p, label, color = '#ff3b30', opt = {}) {
     const el = document.createElement('div');
     el.className = 'kdot' + (opt.cls ? ' ' + opt.cls : '');
-    if (opt.onClick) { el.classList.add('click'); el.onclick = opt.onClick; }    // 누를 수 있는 점 (대장 지도)
+    if (opt.onClick) { el.classList.add('click'); el.onclick = opt.onClick; }    // 누를 수 있는 점 (랜드마크)
     el.innerHTML = `<i style="background:${color}"></i>${label ? `<span>${U.esc(label)}</span>` : ''}`;
     const ov = new kakao.maps.CustomOverlay({ position: LL(p), content: el, yAnchor: 0.5, xAnchor: 0, zIndex: 5 });
     ov.setMap(map);

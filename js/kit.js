@@ -176,3 +176,75 @@ const Real = (() => {
   const get = (id) => cache.get(id) || null;
   return { load, get };
 })();
+
+/* ─────────────────────────────────────────────────────────
+   Finder — 전국 단지 이름 검색 (지역을 고르지 않고 단지 이름·별칭만 입력)
+   · 자료: data/names.json (자동 수집 때 만들어짐)
+   · 쓰는 법: Finder.attach(입력칸, (단지) => { … })   단지 = { code, sido, sgg, key, dong, jibun, name }
+   · Finder.areas(code, key) → 그 단지의 평형 목록 [{ g, n }] 과 가장 거래가 많은 평형
+   ───────────────────────────────────────────────────────── */
+const Finder = (() => {
+  let list = null, state = '';            // state: '' | 'loading' | 'none' | 'ok'
+  const norm = (t) => String(t || '').replace(/\s+/g, '').toLowerCase();
+  async function load() {
+    if (state) return;
+    state = 'loading';
+    const [names, regs] = await Promise.all([Data.names(), Kit.regions()]);
+    if (!names || !names.r) { state = 'none'; return; }
+    list = [];
+    for (const code of Object.keys(names.r)) {
+      const reg = regs.get(code); if (!reg) continue;
+      for (const key of names.r[code]) { const p = Data.parseKey(key); list.push({ code, sido: reg[1], sgg: reg[2], key, dong: p.dong, jibun: p.jibun, name: p.name, n: norm(p.name), w: norm(reg[1] + reg[2] + p.dong + p.name) }); }
+    }
+    state = 'ok';
+  }
+  /** 검색: 띄어 쓴 낱말이 모두 들어 있는 단지. 예) "평촌 래미안", "송파 헬리오" */
+  function find(q, max = 40) {
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!list || !words.length) return [];
+    const whole = norm(q), out = [], seen = new Set();
+    const push = (x, score) => { const id = x.code + '|' + x.key; if (!seen.has(id)) { seen.add(id); out.push({ x, score }); } };
+    for (const a of Alias.all()) if (norm(a.a).includes(whole)) { const x = list.find(v => v.code === a.code && v.key === a.key); if (x) push(x, 0); }
+    for (const x of list) {
+      if (out.length > 600) break;
+      if (x.n.startsWith(whole)) push(x, 1); else if (x.n.includes(whole)) push(x, 2); else if (words.every(w => x.w.includes(w))) push(x, 3);
+    }
+    return out.sort((a, b) => a.score - b.score || a.x.name.length - b.x.name.length || a.x.name.localeCompare(b.x.name, 'ko')).slice(0, max).map(v => v.x);
+  }
+  function attach(input, onPick) {
+    if (!input) return;
+    const host = input.parentElement; host.classList.add('fhost');
+    const box = document.createElement('div'); box.className = 'fdrop'; box.hidden = true; host.appendChild(box);
+    let hits = [], timer;
+    const show = async () => {
+      const q = input.value.trim();
+      if (q.length < 2) { box.hidden = true; return; }
+      if (state !== 'ok' && state !== 'none') { box.innerHTML = '<p>단지 목록을 불러오는 중…</p>'; box.hidden = false; await load(); if (input.value.trim() !== q) return; }
+      if (state === 'none') { box.innerHTML = '<p>전국 단지 목록이 아직 준비되지 않았습니다. 새 수집이 한 번 돌면 생깁니다.<br>그때까지는 시/도 · 시/군/구를 골라서 찾아 주세요.</p>'; box.hidden = false; return; }
+      hits = find(q);
+      box.innerHTML = hits.length ? hits.map((x, i) => `<button type="button" data-i="${i}"><b>${U.esc(x.name)}</b><small>${U.esc(x.sido)} ${U.esc(x.sgg)} ${U.esc(x.dong)}${Alias.of(x.code, x.key) ? ' · 별칭 ' + U.esc(Alias.of(x.code, x.key)) : ''}</small></button>`).join('')
+        : '<p>검색 결과가 없습니다. 이름의 일부만 넣어 보세요. (예: 래미안)</p>';
+      box.hidden = false;
+    };
+    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(show, 180); });
+    input.addEventListener('focus', () => { if (input.value.trim().length >= 2) show(); });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') box.hidden = true; if (e.key === 'Enter' && !box.hidden && hits.length) { e.preventDefault(); pick(0); } });
+    const pick = (i) => { const x = hits[i]; if (!x) return; box.hidden = true; input.value = x.name; onPick(x); };
+    box.addEventListener('mousedown', (e) => e.preventDefault());       // 누르는 동안 입력칸의 포커스 유지
+    box.addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (b) pick(+b.dataset.i); });
+    input.addEventListener('blur', () => setTimeout(() => { box.hidden = true; }, 150));
+  }
+  /** 단지의 평형 목록 (최근 5년 거래 기준, 없으면 20년) */
+  async function areas(code, key) {
+    const y = new Date().getFullYear();
+    let tr = await Data.complexTrades(code, key, null, y - 5, y);
+    if (!tr.sale.length && !tr.rent.length) tr = await Data.complexTrades(code, key, null, y - 20, y);
+    const cnt = new Map();
+    [...tr.sale, ...tr.rent].forEach(t => cnt.set(t.g, (cnt.get(t.g) || 0) + 1));
+    const all = [...cnt.entries()].map(([g, n]) => ({ g, n })).sort((a, b) => a.g - b.g);
+    const lastSale = (g) => tr.sale.filter(t => t.g === g && !t.direct).sort((a, b) => b.d - a.d)[0] || null;
+    return { list: all, best: [...all].sort((a, b) => b.n - a.n)[0]?.g ?? null, lastSale,
+      html: all.map(a => `<option value="${a.g}">${a.g}㎡ (${CONFIG.toPyeong(a.g)}평) · ${a.n}건</option>`).join('') };
+  }
+  return { attach, areas, find, load };
+})();

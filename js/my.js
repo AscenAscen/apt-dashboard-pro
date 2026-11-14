@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────
    my.js — [내 분석] 탭  (+ 시세그룹핑 탭의 "자동 묶기")
    내가 적어 둔 호가와 실거래를 합쳐 계산합니다.
-   · 지표표: 전세가율, 갭, 호가 괴리율, 매물 증감률, 월 회전율, 전고 대비, 12개월 추세, 대장 대비
+   · 지표표: 전세가율, 갭, 호가 괴리율, 매물 증감률, 월 회전율, 전고 대비, 12개월 추세, 랜드마크 대비
    · 가용 자금 필터 · 산점도 · 갈아타기 시뮬레이터
    지표를 추가하려면 아래 COLS 에 한 줄을 더하면 됩니다.
    ───────────────────────────────────────────────────────── */
@@ -28,7 +28,7 @@ const My = (() => {
     { id: 'drop', label: '전고 대비', val: r => r.drop, html: r => pct(r.drop), x: r => r.drop },
     { id: 'hh', label: '세대수', val: r => r.hh, html: r => (r.hh ? r.hh.toLocaleString() : '-'), x: r => r.hh },
     { id: 'spark', label: '12개월 실거래', val: r => { const m = (r.rl.mon || []).filter(v => v != null); return m.length > 1 ? m[m.length - 1] / m[0] : null; }, html: r => Kit.spark(r.rl.mon || []), x: () => '' },
-    { id: 'lead', label: '대장 대비', val: r => r.lead?.pct, html: r => (r.lead ? `${r.lead.pct.toFixed(0)}%<small>${U.esc(r.lead.name)}</small>` : '-'), x: r => r.lead?.pct },
+    { id: 'lead', label: '랜드마크 대비', val: r => r.lead?.pct, html: r => (r.lead ? `${r.lead.pct.toFixed(0)}%<small>${U.esc(r.lead.name)}</small>` : '-'), x: r => r.lead?.pct },
   ];
   // 산점도·자동 묶기에 쓰는 숫자 축
   const AXES = [['s', '매매가 (억)', r => r.s / 10000], ['r', '전세가 (억)', r => r.r / 10000], ['ratio', '전세가율 (%)', r => r.ratio], ['gap', '갭 (억)', r => r.gap / 10000],

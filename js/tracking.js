@@ -68,6 +68,25 @@ const Tracking = (() => {
   }
 
   function init() {
+    // 전국 단지 검색 → 평형 고르기 → 지금 보는 폴더에 추가
+    let found = null;
+    Finder.attach($('trkFind'), async (x) => {
+      found = x; $('trkFindArea').innerHTML = '<option>불러오는 중…</option>';
+      const a = await Finder.areas(x.code, x.key);
+      if (found !== x) return;
+      found.areas = a;
+      $('trkFindArea').innerHTML = a.html || '<option value="">거래 자료 없음</option>';
+      if (a.best != null) $('trkFindArea').value = a.best;
+    });
+    $('btnTrkFindAdd').onclick = async () => {
+      const g = +$('trkFindArea').value;
+      if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');
+      const idx = await Data.index(found.code), last = found.areas?.lastSale(g);
+      add([{ id: `${found.code}|${found.key}#${g}`, code: found.code, sido: found.sido, sgg: found.sgg, dong: found.dong, jibun: found.jibun, key: found.key, name: found.name, g,
+        buildYear: idx.c[found.key] || '', st: { last } }]);
+      render();
+    };
+
     const now = new Date();
     $('trkNewMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     $('btnTrkAddMonth').onclick = () => {

@@ -54,6 +54,7 @@ const Search = (() => {
       if (current) $('detailPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     $('listFilter').oninput = renderList;
+    Finder.attach($('findSearch'), openComplex);
     $('btnExcelList').onclick = excelList;
     $('btnAddTrackSel').onclick = () => {
       const sel = rows.filter(r => checked.has(r.id));
@@ -420,5 +421,19 @@ const Search = (() => {
     run();
   }
 
-  return { init, openRegion };
+  /** 전국 단지 검색에서 고른 단지를 바로 엶 */
+  async function openComplex(x) {
+    const reg = regions.find(r => r[0] === x.code);
+    if (!reg) return;
+    setTimeout(markPin, 0);
+    $('selSido').value = reg[1]; fillSgg(x.code);
+    $('selDong').value = '';
+    await fillDong();
+    $('selApt').value = x.key;
+    if ($('selApt').value !== x.key) U.toast('이 단지는 아직 수집된 자료가 없습니다.');
+    await run();
+    if (!rows.length && $('selApt').value === x.key && $('selPeriod').value !== '20') { $('selPeriod').value = '20'; await run(); }   // 최근 거래가 없으면 기간을 넓혀 다시
+  }
+
+  return { init, openRegion, openComplex };
 })();

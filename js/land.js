@@ -1,25 +1,26 @@
 /* ─────────────────────────────────────────────────────────
-   land.js — [대장 지도] 탭
-   · 지역 대표(대장) 단지를 직접 골라 등급(S/A/B)을 매기고 지도에 표시
+   land.js — [랜드마크] 탭
+   · 지역 대표(랜드마크) 단지를 직접 골라 등급(S/A/B)을 매기고 지도에 표시
    · 점을 누르면 단지 카드(가격·전고 대비·추세), 지도를 멀리 보면 낮은 등급 이름표는 숨김
-   · 대장 대비 격차: 내 단지(시세트래킹)가 대장보다 얼마나 싼지
+   · 랜드마크 대비 격차: 내 단지(시세트래킹)가 랜드마크보다 얼마나 싼지
    등급 이름·색은 js/config.js 의 GRADES 에서 바꿉니다. 좌표는 저장하지 않고 열 때마다 다시 찾습니다.
    ───────────────────────────────────────────────────────── */
 const Land = (() => {
   const $ = (id) => document.getElementById(id);
-  const KEY = 'apt.land.v1';
-  let map = Store.get(KEY, {});        // { 단지번호: { grade, name, sido, sgg, dong, jibun, t } }
+  const KEY = 'apt.land.v1', MKEY = 'apt.landMonths.v1';
+  let map = Store.get(KEY, {});        // { 단지번호: { grade, name, sido, sgg, dong, jibun, t, quotes: { 연월: { s, sn, r, rn } } } }  ← 시세트래킹과 따로 저장
+  let months = Store.get(MKEY, []);    // 시세 기록 표에 있는 달들 (예: 202611)
   let regions = [], idx = { c: {} }, kmap = null, shapes = [], seq = 0, inited = false;
   const grade = (k) => CONFIG.GRADES.find(g => g.k === k) || CONFIG.GRADES[CONFIG.GRADES.length - 1];
   const rank = (k) => { const i = CONFIG.GRADES.findIndex(g => g.k === k); return i < 0 ? 99 : i; };
-  const save = () => Store.set(KEY, map);
+  const save = () => { Store.set(KEY, map); Store.set(MKEY, months); };
   const all = () => Object.keys(map).map(id => ({ ...Kit.parseId(id), ...map[id] })).sort((a, b) => rank(a.grade) - rank(b.grade) || a.name.localeCompare(b.name, 'ko'));
-  /** 대장의 지금 가격: 적어 둔 매매 호가 → 없으면 최근 실거래 */
+  /** 랜드마크의 지금 가격: 이 탭의 시세 기록에 적은 매매 호가 → 없으면 최근 실거래 */
   function price(l) {
-    const q = Kit.quote(Tracking.rec(l.id)), rl = Real.get(l.id);
+    const q = Kit.quote(map[l.id]), rl = Real.get(l.id);
     return q?.s != null ? { v: q.s, quoted: true, p: q.p?.s ?? null } : rl?.sale ? { v: rl.sale.price, quoted: false, p: null } : null;
   }
-  /** 같은 시군구에서 등급이 가장 높은 대장과 견준 값 (내 분석 탭의 "대장 대비" 칸) */
+  /** 같은 시군구에서 등급이 가장 높은 랜드마크와 견준 값 (내 분석 탭의 "랜드마크 대비" 칸) */
   function leadOf(row) {
     if (!row.s) return null;
     const cand = all().filter(l => l.code === row.code && l.id !== row.id).map(l => ({ l, p: price(l) })).filter(x => x.p).sort((a, b) => rank(a.l.grade) - rank(b.l.grade) || b.p.v - a.p.v)[0];
@@ -33,11 +34,11 @@ const Land = (() => {
   }
 
   /* ── 등록 칸 ── */
-  function fillSgg(code) {
+  function fillSgg(code) {   // 끝나면 단지 목록까지 채워짐
     const list = regions.filter(r => r[1] === $('ldSido').value);
     $('ldSgg').innerHTML = list.map(r => `<option value="${r[0]}">${U.esc(r[2])}</option>`).join('');
     if (code && list.some(r => r[0] === code)) $('ldSgg').value = code;
-    fillApt(true);
+    return fillApt(true);
   }
   async function fillApt(reload) {
     const code = $('ldSgg').value;
@@ -47,7 +48,7 @@ const Land = (() => {
     $('ldApt').innerHTML = `<option value="">${keys.length ? `선택하세요 (${keys.length}개)` : (Object.keys(idx.c).length ? '검색 결과 없음' : '수집된 자료 없음')}</option>` +
       keys.slice(0, 800).map(x => `<option value="${U.esc(x.k)}">${U.esc(x.name)} (${U.esc(x.dong)})</option>`).join('');
     if (find && keys.length === 1) $('ldApt').value = keys[0].k;
-    fillArea();
+    return fillArea();
   }
   async function fillArea() {
     const code = $('ldSgg').value, key = $('ldApt').value, sel = $('ldArea');
@@ -67,8 +68,6 @@ const Land = (() => {
   async function render() {
     const list = all();
     $('ldEmpty').hidden = list.length > 0; $('ldBody').hidden = !list.length;
-    const tr = Tracking.all().filter(it => !map[it.id]);
-    $('ldFromTrack').innerHTML = tr.length ? tr.map(it => `<option value="${U.esc(it.id)}">${U.esc(it.name)} ${it.g}㎡</option>`).join('') : '<option value="">(담은 단지 없음)</option>';
     if (!list.length) return;
     await Real.load(list);
     const sidos = [...new Set(list.map(l => l.sido))], cur = $('ldRegion').value;
@@ -76,6 +75,7 @@ const Land = (() => {
     if (sidos.includes(cur)) $('ldRegion').value = cur;
     $('ldLegend').innerHTML = CONFIG.GRADES.map(g => `<span style="color:${g.color}">●</span> ${U.esc(g.name)}`).join(' &nbsp; ') + ' · 지도를 멀리 보면 낮은 등급 이름은 숨겨집니다';
     table(list);
+    quoteTable(list);
     const b = $('ldBase').value;
     $('ldBase').innerHTML = list.map(l => `<option value="${U.esc(l.id)}">[${l.grade}] ${U.esc(l.sgg)} ${U.esc(l.name)} ${l.g}㎡</option>`).join('');
     if (map[b]) $('ldBase').value = b;
@@ -97,11 +97,31 @@ const Land = (() => {
   }
   function excel() {
     const list = all();
-    U.download(`대장단지_${U.stamp()}`, [{ name: '대장 단지', rows: [['등급', '시도', '시군구', '동', '단지', '전용㎡', '지금 가격(만원)', '호가 여부', '최근 실거래(만원)', '전고점(만원)', '전고 대비(%)', '세대수'],
+    U.download(`랜드마크_${U.stamp()}`, [{ name: '랜드마크 단지', rows: [['등급', '시도', '시군구', '동', '단지', '전용㎡', '지금 가격(만원)', '호가 여부', '최근 실거래(만원)', '전고점(만원)', '전고 대비(%)', '세대수'],
       ...list.map(l => { const x = info(l); return [l.grade, l.sido, l.sgg, l.dong, l.name, l.g, x.p?.v ?? '', x.p ? (x.p.quoted ? '호가' : '실거래') : '', x.rl.sale?.price ?? '', x.rl.peak?.price ?? '', x.drop == null ? '' : +x.drop.toFixed(1), x.rl.hh || '']; })] }]);
   }
 
-  /* ── 대장 대비 격차 ── */
+  /* ── 랜드마크 시세 기록 (달마다 적는 호가. 시세트래킹과 따로) ── */
+  const QF = [['s', '매매(억)'], ['sn', '매물'], ['r', '전세(억)'], ['rn', '매물']];
+  const sortedMonths = () => [...months].sort((a, b) => b - a);
+  function quoteTable(list) {
+    const ms = sortedMonths();
+    if (!ms.length) { $('ldQuotes').innerHTML = '<tbody><tr><td style="color:var(--sub);padding:18px">아직 기록한 달이 없습니다. 위에서 달을 고르고 [시세 추가]를 누르세요.</td></tr></tbody>'; return; }
+    const val = (l, m, f) => { const v = l.quotes?.[m]?.[f]; return v == null ? '' : (f === 's' || f === 'r') ? +(v / 10000).toFixed(2) : v; };
+    $('ldQuotes').innerHTML = '<thead><tr><th rowspan="2">등급</th><th rowspan="2" class="l">단지</th><th rowspan="2">평형</th>' +
+      ms.map((m, k) => `<th colspan="4" class="grp c">${Kit.ymText(m)}${k === 0 ? ' · 최신' : ''} <button class="mini" data-delm="${m}" title="이 달 기록 삭제">×</button></th>`).join('') + '</tr><tr>' +
+      ms.map(() => QF.map(f => `<th>${f[1]}</th>`).join('')).join('') + '</tr></thead><tbody>' +
+      list.map(l => `<tr data-id="${U.esc(l.id)}"><td><b style="color:${grade(l.grade).color}">${U.esc(l.grade)}</b></td><td class="l">${U.esc(l.sgg)} ${U.esc(l.dong)} <b>${U.esc(l.name)}</b></td><td>${l.g}㎡<small>${CONFIG.toPyeong(l.g)}평</small></td>` +
+        ms.map(m => QF.map(f => `<td><input class="num" inputmode="decimal" data-m="${m}" data-f="${f[0]}" value="${val(l, m, f[0])}" placeholder="${f[0] === 's' || f[0] === 'r' ? '억' : '개'}"></td>`).join('')).join('') + '</tr>').join('') + '</tbody>';
+  }
+  function quoteExcel() {
+    const ms = sortedMonths(), list = all();
+    U.download(`랜드마크_시세기록_${U.stamp()}`, [{ name: '랜드마크 시세', rows: [
+      ['등급', '시도', '시군구', '동', '단지', '전용㎡', ...ms.flatMap(m => [`${Kit.ymText(m)} 매매(만원)`, `${Kit.ymText(m)} 매매 매물`, `${Kit.ymText(m)} 전세(만원)`, `${Kit.ymText(m)} 전세 매물`])],
+      ...list.map(l => [l.grade, l.sido, l.sgg, l.dong, l.name, l.g, ...ms.flatMap(m => QF.map(f => l.quotes?.[m]?.[f[0]] ?? ''))])] }]);
+  }
+
+  /* ── 랜드마크 대비 격차 ── */
   async function gap() {
     const base = all().find(l => l.id === $('ldBase').value), vs = $('ldVs').value;
     if (!base) { $('ldGap').innerHTML = ''; return; }
@@ -110,7 +130,7 @@ const Land = (() => {
     const bp = price(base);
     const rows = mine.map(x => { const r = My.calc(x), q = r.q; return { r, pct: bp && r.s ? r.s / bp.v * 100 : null, diff: bp && r.s ? bp.v - r.s : null,
       prev: bp?.p && q?.p?.s ? bp.p - q.p.s : null }; }).sort((a, b) => (b.r.s || 0) - (a.r.s || 0));
-    $('ldGap').innerHTML = `<thead><tr><th class="l">단지</th><th>평형</th><th>내 단지 가격</th><th>대장 가격<small>${U.esc(base.name)} ${base.g}㎡</small></th><th>격차 (대장 − 내 단지)</th><th>대장 대비</th><th>지난 기록의 격차</th><th>격차 변화</th></tr></thead><tbody>` +
+    $('ldGap').innerHTML = `<thead><tr><th class="l">단지</th><th>평형</th><th>내 단지 가격</th><th>랜드마크 가격<small>${U.esc(base.name)} ${base.g}㎡</small></th><th>격차 (랜드마크 − 내 단지)</th><th>랜드마크 대비</th><th>지난 기록의 격차</th><th>격차 변화</th></tr></thead><tbody>` +
       (rows.length ? rows.map(({ r, pct, diff, prev }) => { const chg = prev != null && diff != null ? diff - prev : null;
         return `<tr><td class="l">${U.esc(r.sgg)} ${U.esc(r.dong)} <b>${U.esc(r.name)}</b></td><td>${r.g}㎡<small>${CONFIG.toPyeong(r.g)}평</small></td><td class="sale">${r.s == null ? '-' : U.price(r.s) + (r.sQ ? '' : ' <span class="star">실</span>')}</td>` +
           `<td>${bp ? U.price(bp.v) + (bp.quoted ? '' : ' <span class="star">실</span>') : '-'}</td><td>${diff == null ? '-' : U.diff(diff)}</td><td><b>${pct == null ? '-' : pct.toFixed(0) + '%'}</b></td>` +
@@ -120,7 +140,7 @@ const Land = (() => {
 
   /* ── 지도 ── */
   function card(l) {
-    const x = info(l), q = Kit.quote(Tracking.rec(l.id));
+    const x = info(l), q = Kit.quote(map[l.id]);
     const c = (k, v, s = '', cls = '') => `<div class="card"><div class="k">${k}</div><div class="v ${cls}">${v}</div><div class="s">${s}</div></div>`;
     $('ldCard').innerHTML = [
       c(`<b style="color:${grade(l.grade).color}">●</b> ${U.esc(grade(l.grade).name)}`, U.esc(l.name), `${U.esc(l.sgg)} ${U.esc(l.dong)} · ${l.g}㎡(${CONFIG.toPyeong(l.g)}평)${x.rl.hh ? ` · ${x.rl.hh.toLocaleString()}세대` : ''}`),
@@ -172,14 +192,44 @@ const Land = (() => {
       if (!key || !g) return U.toast('단지와 평형을 고르세요.');
       add({ id: `${code}|${key}#${g}`, sido: reg[1], sgg: reg[2], ...Data.parseKey(key) }, $('ldGrade').value);
     };
-    $('btnLdAddTrack').onclick = () => { const it = Tracking.all().find(x => x.id === $('ldFromTrack').value); if (!it) return U.toast('시세트래킹에 담은 단지가 없습니다.'); add(it, $('ldGrade').value); };
+    Finder.attach($('ldFindAll'), async (x) => {           // 전국 검색 → 아래 칸들을 채워 줌. 평형·등급을 확인하고 [랜드마크로 등록]
+      $('ldSido').value = x.sido; $('ldFind').value = '';
+      await fillSgg(x.code);
+      $('ldApt').value = x.key;
+      if ($('ldApt').value !== x.key) return U.toast('이 단지는 아직 수집된 자료가 없습니다.');
+      await fillArea();
+      U.toast('평형과 등급을 확인하고 [랜드마크로 등록]을 누르세요.');
+    });
+    const now = new Date(); $('ldNewMonth').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    $('btnLdAddMonth').onclick = () => {
+      const ym = +$('ldNewMonth').value.replace('-', '');
+      if (!ym) return U.toast('기록할 달을 고르세요.');
+      if (months.includes(ym)) return U.toast('이미 있는 달입니다.');
+      months.push(ym); save(); quoteTable(all()); U.toast(`${Kit.ymText(ym)} 칸을 만들었습니다.`);
+    };
+    $('btnLdQExcel').onclick = quoteExcel;
+    $('ldQuotes').onchange = (e) => {
+      const t = e.target, id = t.closest('tr')?.dataset.id; if (!id || !map[id] || !t.dataset.f) return;
+      const m = t.dataset.m, f = t.dataset.f, raw = t.value.trim().replace(/,/g, ''), v = raw === '' ? null : Number(raw);
+      if (v != null && (isNaN(v) || v < 0)) { U.toast('숫자만 적어 주세요.'); t.value = ''; return; }
+      const q = ((map[id].quotes = map[id].quotes || {})[m] = map[id].quotes[m] || {});
+      if (v == null) delete q[f]; else q[f] = (f === 's' || f === 'r') ? Math.round(v * 10000) : Math.round(v);
+      if (!Object.keys(q).length) delete map[id].quotes[m];
+      save(); table(all()); gap();
+    };
+    $('ldQuotes').onclick = (e) => {
+      const m = e.target.dataset.delm; if (!m) return;
+      if (!confirm(`${Kit.ymText(+m)} 랜드마크 시세 기록을 모두 지울까요? 되돌릴 수 없습니다.`)) return;
+      months = months.filter(x => x !== +m); Object.values(map).forEach(v => { if (v.quotes) delete v.quotes[m]; });
+      save(); render();
+    };
     $('ldRegion').onchange = () => { $('ldCard').innerHTML = ''; draw(); };
     $('ldBase').onchange = $('ldVs').onchange = gap;
     $('btnLdExcel').onclick = excel;
     $('ldTable').onchange = (e) => { const id = e.target.closest('tr')?.dataset.id; if (id && e.target.dataset.grade != null) { map[id].grade = e.target.value; save(); render(); } };
     $('ldTable').onclick = (e) => {
       const id = e.target.closest('tr')?.dataset.id; if (!id) return;
-      if (e.target.dataset.del != null) { if (!confirm(`${map[id].name} 을(를) 대장 목록에서 뺄까요?`)) return; delete map[id]; save(); $('ldCard').innerHTML = ''; render(); }
+      if (e.target.dataset.del != null) { if (!confirm(`${map[id].name} 을(를) 랜드마크 목록에서 뺄까요?`)) return; delete map[id]; save(); $('ldCard').innerHTML = ''; render(); }
       if (e.target.dataset.track != null && !Tracking.has(id)) { const l = all().find(x => x.id === id), rl = Real.get(id); Tracking.add([{ ...l, buildYear: rl?.buildYear, st: { last: rl?.sale } }]); render(); }
     };
     $('ldCard').onclick = async (e) => {
@@ -193,6 +243,6 @@ const Land = (() => {
     inited = true;
   }
   const open = () => { if (inited) render(); };
-  const reload = () => { map = Store.get(KEY, {}); };
+  const reload = () => { map = Store.get(KEY, {}); months = Store.get(MKEY, []); };
   return { init, open, all, leadOf, reload };
 })();
