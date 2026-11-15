@@ -51,6 +51,20 @@ const Compare = (() => {
     $('cmpFrom').onchange = $('cmpTo').onchange = () => { markPreset(0); if (last) run(); };
     $('cmpKind').onchange = $('cmpMode').onchange = () => { if (last) run(); };
     $('btnCompare').onclick = run;
+    // 전국 검색: 이름을 치면 고른 단지를 빈 칸(또는 고른 칸)에 넣어 줌
+    Finder.attach($('cmpNat'), async (x) => {
+      const want = $('cmpNatSlot').value;
+      let i = want === 'auto' ? slots.findIndex(s => !s.q('.cApt').value) : +want;
+      if (i < 0) i = 0;
+      if (i >= 2) $('cmpMore').open = true;
+      const s = slots[i];
+      s.q('.cSido').value = x.sido;
+      await fillSgg(s, x.code);
+      s.q('.cFind').value = '';
+      s.q('.cApt').value = x.key;
+      await fillArea(s);
+      U.toast(`단지 ${NAMES[i]} 칸에 ${x.name} 을(를) 넣었습니다. [비교하기]를 누르세요.`);
+    });
   }
 
   function markPreset(y) { $('cmpPresets').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.y === y)); }
@@ -67,7 +81,7 @@ const Compare = (() => {
     const list = regions.filter(r => r[1] === s.q('.cSido').value);
     s.q('.cSgg').innerHTML = list.map(r => `<option value="${r[0]}">${U.esc(r[2])}</option>`).join('');
     if (code && list.some(r => r[0] === code)) s.q('.cSgg').value = code;
-    fillApt(s, true);
+    return fillApt(s, true);
   }
 
   async function fillApt(s, reload) {

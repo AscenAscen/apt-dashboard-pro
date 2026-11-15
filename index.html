@@ -22,6 +22,7 @@
     <button data-tab="home" class="on">최근 거래</button>
     <button data-tab="search">실거래 조회</button>
     <button data-tab="compare">단지 비교</button>
+    <button data-tab="eval">비교 평가</button>
     <button data-tab="infra">입지 분석</button>
     <button data-tab="survey">전수조사</button>
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
@@ -107,6 +108,7 @@
       <strong id="listTitle"></strong>
       <input type="search" id="listFilter" placeholder="단지명 검색">
       <span class="grow"></span>
+      <button id="btnTradeSel" class="primary" title="체크한 단지의 매매·전세 실거래를 아래에서 기간 골라 봅니다">선택 단지 실거래 조회</button>
       <button id="btnAddTrackSel">선택 단지 트래킹에 담기</button>
       <button id="btnExcelList">엑셀 다운로드</button>
     </div>
@@ -114,6 +116,8 @@
     <div class="tablewrap"><table id="listTable"></table></div>
     <p class="hint" id="listNote"></p>
   </section>
+
+  <section class="panel" id="tpSearch" hidden></section>
 
   <section class="panel" id="briefPanel" hidden>
     <div class="bar"><strong id="briefTitle">선택 단지 브리핑</strong><span class="grow"></span><button id="btnBriefClear">선택 모두 해제</button></div>
@@ -128,6 +132,7 @@
       <button id="btnDetailMap">지도에서 위치 보기</button>
       <span class="hint" id="detailAlias" style="margin:0"></span>
       <button id="btnDetailAlias" title="줄임말·별명을 등록하면 그 이름으로도 검색됩니다">별칭</button>
+      <button id="btnDetailTrades" title="이 단지의 매매·전세 실거래를 기간 골라 봅니다">이 단지 실거래 조회</button>
       <button id="btnDetailTrack">트래킹에 담기</button>
     </div>
     <div class="cards" id="detailCards"></div>
@@ -276,6 +281,7 @@
       <label>기록할 달 <input type="month" id="trkNewMonth"></label>
       <button class="primary" id="btnTrkAddMonth">시세 추가</button>
       <button id="btnTrkLoad">실거래 불러오기</button>
+      <button id="btnTrkTrades" class="primary" title="체크한 단지의 매매·전세 실거래를 아래에서 기간 골라 봅니다">선택 단지 실거래 조회</button>
       <span class="sep"></span>
       <label>지역 <select id="trkRegion"><option value="">전체</option></select></label>
       <label>상태 <select id="trkStatus"></select></label>
@@ -308,6 +314,7 @@
         <select id="trkFormat"><option value="xlsx">엑셀(.xlsx)</option><option value="csv">CSV</option></select><button id="btnTrkTrades">실거래 내역 다운로드</button></div>
     </details>
   </section>
+  <section class="panel" id="tpTrack" hidden></section>
   <section class="panel">
     <div class="bar">
       <button id="btnTrkInfo">단지 정보 펼치기</button>
@@ -332,6 +339,10 @@
 
 <!-- ═══════════════ 2-1. 단지 비교 ═══════════════ -->
 <main id="tab-compare" class="tab" hidden>
+  <section class="panel filters findbar">
+    <label class="findlab">🔎 전국 단지 검색 <input type="search" id="cmpNat" placeholder="단지 이름이나 별칭 (예: 헬리오, 평촌 래미안)" autocomplete="off"></label>
+    <label>넣을 칸 <select id="cmpNatSlot"><option value="auto">비어 있는 칸 자동</option><option value="0">단지 A</option><option value="1">단지 B</option><option value="2">단지 C</option><option value="3">단지 D</option></select></label>
+  </section>
   <section class="panel">
     <div class="slot" data-slot="0">
       <strong class="sale">단지 A</strong>
@@ -419,6 +430,27 @@
   </div>
 </main>
 
+<!-- ═══════════════ 2-2. 비교 평가 (수도권 · 지방) ═══════════════ -->
+<main id="tab-eval" class="tab" hidden>
+  <section class="panel filters findbar">
+    <label class="findlab">🔎 전국 단지 검색 <input type="search" id="evNat" placeholder="단지 이름이나 별칭 (고르면 열이 추가됩니다)" autocomplete="off"></label>
+    <span class="hint" style="margin:0">최대 4개. 모두 수도권이면 수도권 기준, 모두 지방이면 지방 기준으로 자동 정해집니다.</span>
+  </section>
+  <section class="panel filters">
+    <div class="presets" id="evMode"><button data-m="auto" class="on">자동</button><button data-m="metro">수도권 기준</button><button data-m="local">지방 기준</button></div>
+    <span class="hint" id="evModeNote" style="margin:0"></span>
+    <span class="grow"></span>
+    <label>새 항목 적용 <select id="evAddScope"><option value="both">공통</option><option value="metro">수도권만</option><option value="local">지방만</option></select></label>
+    <button id="evAddRow">+ 항목 추가</button>
+    <button id="evReset" class="danger">표 비우기</button>
+  </section>
+  <section class="panel empty" id="evEmpty">위 검색창에서 단지를 고르면 열이 추가됩니다. 입지·교통·학군·환경 값은 단지 비교·입지 분석 탭과 같은 값을 씁니다. 자동으로 채운 값은 <b>✎</b>로 고치면 📌 고정됩니다.</section>
+  <section class="panel">
+    <div class="tablewrap"><table id="evTable" class="cmp loc"></table></div>
+    <p class="hint">✎ 자동 값을 고치면 📌이 붙고, 📌을 누르면 자동 값으로 돌아갑니다. 항목 이름은 이름 칸을 눌러 바꿉니다. 교통 시간은 직선거리로 계산한 <b>추정치</b>이며, 실제 대중교통 시간은 직접 적어 주세요.</p>
+  </section>
+</main>
+
 <!-- ═══════════════ 3. 시세그룹핑 ═══════════════ -->
 <main id="tab-grouping" class="tab" hidden>
   <section class="panel filters">
@@ -473,6 +505,10 @@
 
 <!-- ═══════════════ 입지 분석 (카카오맵) ═══════════════ -->
 <main id="tab-infra" class="tab" hidden>
+  <section class="panel filters findbar">
+    <label class="findlab">🔎 전국 단지 검색 <input type="search" id="inNat" placeholder="단지 이름이나 별칭" autocomplete="off"></label>
+    <span class="hint" style="margin:0">시/도·시/군/구를 몰라도 됩니다. 고르면 바로 분석합니다.</span>
+  </section>
   <section class="panel filters">
     <label>시/도 <select id="inSido"></select></label>
     <label>시/군/구 <select id="inSgg"></select></label>
@@ -890,6 +926,7 @@
 <script src="js/kakao.js"></script>
 <script src="js/kit.js"></script>
 <script src="js/home.js"></script>
+<script src="js/trades.js"></script>
 <script src="js/search.js"></script>
 <script src="js/locinfo.js"></script>
 <script src="js/compare.js"></script>
@@ -907,6 +944,7 @@
 <script src="js/maplabel.js"></script>
 <script src="js/pricemap.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/eval.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

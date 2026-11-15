@@ -21,6 +21,15 @@ const Infra = (() => {
     $('inSgg').onchange = () => fillApt(true);
     $('inFind').oninput = () => fillApt(false);
     $('btnInfra').onclick = run;
+    // 전국 검색: 고른 단지를 바로 분석
+    Finder.attach($('inNat'), async (x) => {
+      $('inSido').value = x.sido;
+      await fillSgg(x.code);
+      $('inFind').value = '';
+      await fillApt(false);
+      $('inApt').value = x.key;
+      run();
+    });
     $('inView').onclick = (e) => { if (e.target.dataset.v && cur) view(e.target.dataset.v); };
     $('inHybrid').onclick = () => {
       if (!map) return;
@@ -40,7 +49,7 @@ const Infra = (() => {
     const list = regions.filter(r => r[1] === $('inSido').value);
     $('inSgg').innerHTML = list.map(r => `<option value="${r[0]}">${U.esc(r[2])}</option>`).join('');
     if (code && list.some(r => r[0] === code)) $('inSgg').value = code;
-    fillApt(true);
+    return fillApt(true);
   }
 
   async function fillApt(reload) {

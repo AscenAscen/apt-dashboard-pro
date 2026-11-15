@@ -62,6 +62,14 @@ const Search = (() => {
       Tracking.add(sel);
     };
     $('btnBriefClear').onclick = () => { checked.clear(); renderList(); };
+    // 실거래 조회 패널: 체크한 단지(없으면 지금 보는 단지)를 아래에서 기간 골라 보기
+    $('btnTradeSel').onclick = () => {
+      const sel = rows.filter(r => checked.has(r.id));
+      const list = sel.length ? sel : (current ? [current] : []);
+      if (!list.length) return U.toast('목록에서 단지를 체크하거나 단지 상세를 먼저 여세요.');
+      TradePanel.get('tpSearch').open(list, '실거래 조회');
+    };
+    $('btnDetailTrades').onclick = () => { if (current) TradePanel.get('tpSearch').open([current], '실거래 조회'); };
     $('briefGrid').onclick = (e) => { const id = e.target.dataset.open; if (!id) return; e.preventDefault(); const r = rows.find(x => x.id === id); if (r) openDetail(r); };
     $('btnDetailMap').onclick = () => current && App.showMap(current);
     $('btnDetailTrack').onclick = () => current && Tracking.add([current]);

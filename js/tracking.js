@@ -78,6 +78,13 @@ const Tracking = (() => {
       $('trkFindArea').innerHTML = a.html || '<option value="">거래 자료 없음</option>';
       if (a.best != null) $('trkFindArea').value = a.best;
     });
+    // 실거래 조회 패널: 체크한 단지(없으면 지금 보이는 단지)를 아래에서 기간 골라 보기
+    $('btnTrkTrades').onclick = () => {
+      const sel = visible().filter(it => checked.has(it.id));
+      const list = sel.length ? sel : visible();
+      if (!list.length) return U.toast('보이는 단지가 없습니다.');
+      TradePanel.get('tpTrack').open(list, '시세트래킹 실거래');
+    };
     $('btnTrkFindAdd').onclick = async () => {
       const g = +$('trkFindArea').value;
       if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');

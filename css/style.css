@@ -420,3 +420,17 @@ button.pin.off { opacity: .35; }
 .brief dt { color: var(--sub); } .brief dd { margin: 0; text-align: right; }
 .locsum { border: 1px dashed var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: 13px; }
 .locsum b { color: var(--sub); font-weight: 600; }
+
+/* ── 실거래 조회 패널 (trades.js) ── */
+.tpdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+table.tp { font-size: 13px; }
+
+/* ── 비교 평가 (eval.js) ── */
+table.ev th.sale, table.ev th.rent, table.ev th.c3, table.ev th.c4 { min-width: 170px; vertical-align: top; }
+table.ev .evhead { display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+table.ev .evhead select { flex: 1; min-width: 0; font-weight: normal; }
+table.ev td.l { min-width: 190px; }
+table.ev tr.group td { background: var(--line); font-weight: 700; font-size: 13px; }
+table.ev .autoval { display: block; color: var(--sub); margin-top: 3px; }
+table.ev .ovbox { display: flex; gap: 4px; align-items: center; }
+table.ev .ovbox input { flex: 1; min-width: 0; }
