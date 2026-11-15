@@ -10,7 +10,7 @@ const Vault = (() => {
   const $ = (id) => document.getElementById(id);
   const BK = 'apt.lastBackup', REMIND_DAYS = 14;
   // 함께 옮기는 그 밖의 저장 항목 (시세그룹핑 표, 입지 메모, 조사 이름·메모, 대중교통 메모)
-  const EXTRA = ['apt.grouping.v1', 'apt.loc.v1', 'apt.surveyMeta.v1', 'apt.alias.v1', 'apt.pins.v1', 'apt.land.v1', 'apt.landMonths.v1', 'apt.imjang.v1', 'apt.my.v1'];
+  const EXTRA = ['apt.grouping.v1', 'apt.loc.v1', 'apt.surveyMeta.v1', 'apt.alias.v1', 'apt.pins.v1', 'apt.land.v1', 'apt.landMonths.v1', 'apt.imjang.v1', 'apt.my.v1', 'apt.tabs.v1', 'apt.hubs.v1', 'apt.mapLabel.v1', 'apt.cmpPrice.v1'];
   let locked = Store.get('apt.lock', false);
 
   /* ── 묶기 / 풀기 ── */
@@ -126,8 +126,8 @@ const Vault = (() => {
   }
 
   /* ── 잠금: 적어 둔 값 고치기 막기 ── */
-  const PROTECT = '#trkTable input:not([type=checkbox]), #trkTable select, #trkCards input:not([type=checkbox]), #trkCards select, #svTable input:not([type=checkbox]), #svTable select, #svHist input, table.loc input, table.loc select, #grpTable textarea, #grpTable input, #cmpDist input, #ldQuotes input';
-  const BUTTONS = '#btnTrkAddMonth, #btnTrkSame, #btnTrkDelete, #btnTrkMove, #btnTrkAddTo, #btnTrkOut, #btnFolderNew, #btnFolderRename, #btnFolderDelete, [data-delmonth], #btnSvAddMonth, #btnSvSame, #btnSvPaste, #btnSvTrack, #btnAddTrackSel, #btnDetailTrack, [data-vault=in], [data-vault=restore], #btnGrpNew, #btnGrpRename, #btnGrpDelete, #btnGrpAuto, #btnGrpAddZone, #btnGrpBands, #grpResults button, #grpTable button, [data-track], [data-cand], #svHist [data-done]';
+  const PROTECT = '#trkTable input:not([type=checkbox]), #trkTable select, #trkCards input:not([type=checkbox]), #trkCards select, #svTable input:not([type=checkbox]), #svTable select, #svHist input, table.loc input, table.loc select, #grpTable textarea, #grpTable input, #cmpDist input, #ldQuotes input, #cmpTable input.cur';
+  const BUTTONS = '#btnTrkAddMonth, #btnTrkSame, #btnTrkDelete, #btnTrkMove, #btnTrkAddTo, #btnTrkOut, #btnFolderNew, #btnFolderRename, #btnFolderDelete, [data-delmonth], #btnSvAddMonth, #btnSvSame, #btnSvPaste, #btnSvTrack, #btnAddTrackSel, #btnDetailTrack, [data-vault=in], [data-vault=restore], #btnGrpNew, #btnGrpRename, #btnGrpDelete, #btnGrpAuto, #btnGrpAddZone, #btnGrpBands, #grpResults button, #grpTable button, [data-track], [data-cand], #svHist [data-done], table.loc .pin, table.loc .rowlab';
   function showLock() {
     document.body.classList.toggle('readonly', locked);
     const b = $('btnLock'); if (b) { b.textContent = locked ? '🔒 잠금 켜짐' : '🔓 잠금'; b.classList.toggle('on', locked); b.title = locked ? '적어 둔 값을 고칠 수 없는 상태입니다. 누르면 풀립니다.' : '누르면 적어 둔 값을 고칠 수 없게 잠급니다.'; }

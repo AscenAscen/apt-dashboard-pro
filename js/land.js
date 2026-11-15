@@ -10,7 +10,7 @@ const Land = (() => {
   const KEY = 'apt.land.v1', MKEY = 'apt.landMonths.v1';
   let map = Store.get(KEY, {});        // { 단지번호: { grade, name, sido, sgg, dong, jibun, t, quotes: { 연월: { s, sn, r, rn } } } }  ← 시세트래킹과 따로 저장
   let months = Store.get(MKEY, []);    // 시세 기록 표에 있는 달들 (예: 202611)
-  let regions = [], idx = { c: {} }, kmap = null, shapes = [], seq = 0, inited = false;
+  let regions = [], idx = { c: {} }, kmap = null, ctrl = null, seq = 0, inited = false;
   const grade = (k) => CONFIG.GRADES.find(g => g.k === k) || CONFIG.GRADES[CONFIG.GRADES.length - 1];
   const rank = (k) => { const i = CONFIG.GRADES.findIndex(g => g.k === k); return i < 0 ? 99 : i; };
   const save = () => { Store.set(KEY, map); Store.set(MKEY, months); };
@@ -148,7 +148,7 @@ const Land = (() => {
       c('최근 실거래', x.rl.sale ? U.price(x.rl.sale.price) : '-', x.rl.sale ? `${U.date(x.rl.sale.d)} · ${x.rl.sale.floor}층 ${Kit.badge(x.rl.sale.d)}` : ''),
       c('전고 대비', U.pct(x.drop), x.rl.peak ? `전고점 ${U.price(x.rl.peak.price)} (${U.date(x.rl.peak.d)})` : '', U.cls(x.drop)),
       c('12개월 실거래 흐름', Kit.spark(x.rl.mon || [], 130, 30), `최근 90일 매매 ${x.rl.n90 ?? 0}건 · <button class="mini" data-open="${U.esc(l.id)}">실거래 그래프</button>`),
-    ].join('');
+    ].join('') + `<div style="grid-column:1/-1">${Loc.summary(l)}</div>`;      // 입지 메모(단지 비교에서 적은 값)도 함께
   }
   async function draw() {
     const my = ++seq, msg = $('ldMapMsg'), sido = $('ldRegion').value;
@@ -166,14 +166,12 @@ const Land = (() => {
     msg.hidden = true;
     if (!kmap) {
       kmap = KMap.create($('ldMap'), ok[0].pos, 7);
-      const zoom = () => { const lv = kmap.getLevel(); $('ldMap').dataset.zoom = lv >= 10 ? 'far' : lv >= 8 ? 'mid' : 'near'; };
-      kakao.maps.event.addListener(kmap, 'zoom_changed', zoom); zoom();
+      // 라벨(겹침 방지·끌어 옮기기·크기·캡처 모드)은 js/maplabel.js — 시세지도와 같은 도구
+      ctrl = MapLabel.create({ key: 'land', map: kmap, panel: $('ldPanel'), ctl: $('ldCtl'), onPick: (it) => { const l = all().find(x => x.id === it.id); if (l) card(l); } });
     }
-    shapes.forEach(x => x.remove()); shapes = [];
-    ok.forEach(l => { const p = price(l); shapes.push(KMap.dot(kmap, l.pos, `${l.name}${p ? ' ' + Kit.eok(p.v, 1) : ''}`, grade(l.grade).color, { cls: 'g' + rank(l.grade), onClick: () => card(l) })); });
+    ctrl.set(ok.map(l => { const p = price(l); return { id: l.id, pos: l.pos, text: `${l.name}${p ? ' ' + Kit.eok(p.v, 1) : ''}`, color: grade(l.grade).color, rank: rank(l.grade) }; }));
     kmap.relayout();
     if (ok.length > 1) KMap.fit(kmap, ok.map(l => l.pos)); else { kmap.setCenter(KMap.LL(ok[0].pos)); kmap.setLevel(5); }
-    $('ldMap').dataset.zoom = kmap.getLevel() >= 10 ? 'far' : kmap.getLevel() >= 8 ? 'mid' : 'near';
     if (!$('ldCard').innerHTML) card(ok[0]);
   }
 

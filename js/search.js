@@ -61,6 +61,8 @@ const Search = (() => {
       if (!sel.length) return U.toast('먼저 목록에서 단지를 체크하세요.');
       Tracking.add(sel);
     };
+    $('btnBriefClear').onclick = () => { checked.clear(); renderList(); };
+    $('briefGrid').onclick = (e) => { const id = e.target.dataset.open; if (!id) return; e.preventDefault(); const r = rows.find(x => x.id === id); if (r) openDetail(r); };
     $('btnDetailMap').onclick = () => current && App.showMap(current);
     $('btnDetailTrack').onclick = () => current && Tracking.add([current]);
     $('btnDetailAlias').onclick = () => { if (current && Alias.ask(current.code, current.key, current.name)) { renderList(); showAlias(); } };
@@ -210,11 +212,36 @@ const Search = (() => {
     $('chkAll').onclick = (e) => { shown.forEach(r => (e.target.checked ? checked.add(r.id) : checked.delete(r.id))); renderList(); $('chkAll').checked = e.target.checked; };
     table.querySelector('tbody').onclick = (e) => {
       const t = e.target;
-      if (t.dataset.chk != null) { const r = shown[+t.dataset.chk]; t.checked ? checked.add(r.id) : checked.delete(r.id); return; }
+      if (t.dataset.chk != null) { const r = shown[+t.dataset.chk]; t.checked ? checked.add(r.id) : checked.delete(r.id); renderBrief(); return; }
       if (t.dataset.map != null) return App.showMap(shown[+t.dataset.map]);
       const tr = t.closest('tr');
       if (tr) openDetail(shown[+tr.dataset.i]);
     };
+    renderBrief();
+  }
+
+  /* ── 선택 단지 브리핑: 체크한 단지를 카드로 한 번에 요약 (최대 12개) ── */
+  function renderBrief() {
+    const sel = rows.filter(r => checked.has(r.id));
+    $('briefPanel').hidden = !sel.length;
+    if (!sel.length) return;
+    const show = sel.slice(0, 12);
+    $('briefTitle').textContent = `선택 단지 브리핑 · ${sel.length}개` + (sel.length > show.length ? ` (앞 ${show.length}개만 표시)` : '');
+    const tp = (t, cls = '') => (t ? `<span class="${cls}">${U.price(t.price)}</span> <small>${U.date(t.d)}${cls ? Kit.badge(t.d) : ''}</small>` : '-');
+    $('briefGrid').innerHTML = show.map(r => {
+      const st = r.st, q = Kit.quote(Tracking.rec(r.id));
+      const gap = st.last && st.rentLast ? st.last.price - st.rentLast.price : null;
+      const ask = q?.s != null && st.last ? (q.s / st.last.price - 1) * 100 : null;
+      return `<div class="brief"><h4><a href="#" data-open="${U.esc(r.id)}">${U.esc(r.name)}</a> <small style="color:var(--sub)">${U.esc(r.dong)} · ${r.g}㎡(${CONFIG.toPyeong(r.g)}평)${r.buildYear ? ` · ${r.buildYear}년` : ''}${r.hh ? ` · ${r.hh.toLocaleString()}세대` : ''}</small></h4><dl>` +
+        `<dt>최근 매매</dt><dd>${tp(st.last, 'sale')}</dd>` +
+        `<dt>전고점 (2020~)</dt><dd>${tp(st.peak)}</dd>` +
+        `<dt>전고 대비</dt><dd><b class="${U.cls(st.drop)}">${U.pct(st.drop)}</b>${st.peak && st.last ? ` <small>${U.diff(st.last.price - st.peak.price)}</small>` : ''}</dd>` +
+        `<dt>전저 대비</dt><dd><span class="${U.cls(st.rise)}">${U.pct(st.rise)}</span></dd>` +
+        `<dt>최근 전세</dt><dd>${tp(st.rentLast, 'rent')}</dd>` +
+        `<dt>전세가율 · 매-전</dt><dd>${st.ratio == null ? '-' : st.ratio.toFixed(0) + '%'}${gap != null ? ` · ${U.price(gap)}` : ''}</dd>` +
+        (q?.s != null ? `<dt>내 매매 호가</dt><dd><b>${U.price(q.s)}</b>${ask != null ? ` <small class="${U.cls(ask)}">실거래 대비 ${U.pct(ask)}</small>` : ''}</dd>` : '') +
+        `<dt>거래 건수</dt><dd>매매 ${r.nSale} · 전세 ${r.nRent}</dd></dl></div>`;
+    }).join('');
   }
 
   /* ── 단지 상세 ── */

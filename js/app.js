@@ -8,6 +8,7 @@ const App = (() => {
     document.querySelectorAll('.tab').forEach(el => { el.hidden = el.id !== 'tab-' + name; });
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     if (name === 'tracking') Tracking.open();
+    if (name === 'map') PriceMap.open();
     if (name === 'survey') Survey.open();
     if (name === 'market') Market.open();
     if (name === 'my') My.open();
@@ -125,9 +126,10 @@ const App = (() => {
     Compare.init();
     Infra.init();
     Home.init();
-    Market.init(); Imjang.init();
+    Market.init(); Imjang.init(); PriceMap.init();
     await Search.init();
     await Promise.all([My.init(), Land.init()]);
+    Settings.init();           // 탭 순서·보이기, 업무지구 — 다른 탭이 모두 준비된 뒤에 적용해야 첫 화면이 바뀌어도 안전합니다
     showStatus();
   }
 

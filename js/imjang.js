@@ -40,6 +40,7 @@ const Imjang = (() => {
     $('imSub').textContent = `${cur.sgg} ${cur.dong} · ${cur.buildYear ? cur.buildYear + '년식 · ' : ''}${cur.households ? cur.households + '세대 · ' : ''}${i + 1} / ${list.length}`;
     $('imMap').href = `https://map.kakao.com/?q=${encodeURIComponent(`${cur.sgg} ${cur.dong} ${cur.name}`)}`;
     $('imLand').href = cur.link || U.landLink(cur.sgg, cur.dong, cur.name);
+    $('imLoc').innerHTML = Loc.summary(cur);                     // 단지 비교·입지 분석에서 적은 입지 메모 (같은 값)
     $('imDate').value = n.date || '';
     $('imStatus').value = cur.status || '';
     $('imSale').value = q.s != null ? +(q.s / 10000).toFixed(4) : '';

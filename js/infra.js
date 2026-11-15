@@ -97,7 +97,7 @@ const Infra = (() => {
         rows.map(x => `<tr><td class="l">${x.icon} ${x.name}</td><td>${x.n500}개</td><td>${x.n1000}개</td><td class="l">${x.list.slice(0, 4).map(p => `${U.esc(p.place_name)} ${meters(+p.distance)}`).join(' · ') || '-'}</td></tr>`).join('') + '</tbody>';
 
       // ② 업무지구
-      const hubs = CONFIG.HUBS.map(h => ({ ...h, km: KMap.km(pos, h) }));
+      const hubs = (await Settings.hubs()).map(h => ({ ...h, km: KMap.km(pos, h) }));
       const near = hubs.reduce((a, b) => (b.km < a.km ? b : a));
       $('inHubs').innerHTML = hubs.map(h => `<div class="card"><div class="k"><span style="color:${h.color}">●</span> ${U.esc(h.name)}</div><div class="v">${h.km.toFixed(1)}km</div><div class="s">${h === near ? '<b class="up">가장 가까운 업무지구</b>' : '&nbsp;'}</div></div>`).join('');
       cur.hubs = hubs;

@@ -25,6 +25,7 @@
     <button data-tab="infra">입지 분석</button>
     <button data-tab="survey">전수조사</button>
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
+    <button data-tab="map">시세지도</button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
     <button data-tab="market">시장 신호</button>
@@ -112,6 +113,12 @@
     <p class="hint">전고점·전저점은 <b>2020년 1월 이후</b> 실거래 기준입니다. 행을 누르면 아래에 상세 내역이 열립니다. 엑셀은 체크한 단지만(체크가 없으면 목록 전체) 내려받습니다.</p>
     <div class="tablewrap"><table id="listTable"></table></div>
     <p class="hint" id="listNote"></p>
+  </section>
+
+  <section class="panel" id="briefPanel" hidden>
+    <div class="bar"><strong id="briefTitle">선택 단지 브리핑</strong><span class="grow"></span><button id="btnBriefClear">선택 모두 해제</button></div>
+    <p class="hint">목록에서 체크한 단지를 한 번에 요약해 보여 줍니다. 단지 이름을 누르면 아래에 그래프와 거래내역이 열립니다.</p>
+    <div class="briefgrid" id="briefGrid"></div>
   </section>
 
   <section class="panel" id="detailPanel" hidden>
@@ -659,6 +666,25 @@
 </main>
 
 <!-- ═══════════════ 랜드마크 ═══════════════ -->
+<!-- ═══════════════ 시세지도 ═══════════════ -->
+<main id="tab-map" class="tab" hidden>
+  <section class="panel empty" id="pmEmpty" hidden>시세트래킹에 담은 단지가 없습니다. 실거래 조회에서 단지를 담으면 이 지도에 가격 라벨로 나타납니다.</section>
+  <div id="pmBody">
+    <section class="panel" id="pmPanel">
+      <div class="bar"><strong>시세지도</strong>
+        <label class="inline">폴더 <select id="pmFolder"><option value="">시세트래킹 전체</option></select></label>
+        <label class="inline">라벨에 표시 <select id="pmShow"><option value="s">매매 가격</option><option value="r">전세 가격</option><option value="gap">매-전 (투자금)</option><option value="ratio">전세가율</option><option value="none">단지명만</option></select></label>
+        <label class="inline">글자 <select id="pmName"><option value="both">단지명 + 값</option><option value="val">값만</option><option value="name">단지명만</option></select></label>
+        <button id="btnPmRefresh">새로 그리기</button>
+        <span class="grow"></span><span class="hint" id="pmCount" style="margin:0"></span></div>
+      <p class="hint">시세트래킹에 담은 단지의 가격을 지도에 보여 줍니다. <span style="color:#4f9cff">●</span> 파랑 = 내가 적은 호가, <span style="color:#f5a742">●</span> 주황(·실) = 호가가 없어 최근 실거래로 대신한 값. 임장 보고서용으로 라벨 위치를 정리하려면 <b>라벨 편집 모드</b>를 켜고 끌어서 옮기세요.</p>
+      <div id="pmCtl"></div>
+      <div class="kmap tallmap" id="pmMap"><p class="empty" id="pmMapMsg"></p></div>
+      <div class="cards" id="pmCard" style="margin-top:10px"></div>
+    </section>
+  </div>
+</main>
+
 <main id="tab-land" class="tab" hidden>
   <section class="panel">
     <div class="bar"><strong>랜드마크 단지 등록</strong> <span class="hint" style="margin:0">— 직접 고릅니다. 등급은 나중에 바꿀 수 있습니다.</span></div>
@@ -676,10 +702,11 @@
   </section>
   <section class="panel empty" id="ldEmpty">아직 등록한 랜드마크 단지가 없습니다. 위에서 지역의 대표 단지를 골라 등록하세요.</section>
   <div id="ldBody" hidden>
-    <section class="panel">
+    <section class="panel" id="ldPanel">
       <div class="bar"><strong>랜드마크 단지 지도</strong>
         <label class="inline">지역 <select id="ldRegion"></select></label>
         <span class="grow"></span><span class="hint" id="ldLegend" style="margin:0"></span></div>
+      <div id="ldCtl"></div>
       <div class="kmap" id="ldMap"><p class="empty" id="ldMapMsg"></p></div>
       <div class="cards" id="ldCard" style="margin-top:10px"></div>
     </section>
@@ -720,6 +747,7 @@
       <a class="btn mini" id="imMap" target="_blank" rel="noopener">카카오맵</a><a class="btn mini" id="imLand" target="_blank" rel="noopener">네이버 검색</a>
       <button id="btnImExit" hidden>임장 모드 끝내기</button></div>
     <p class="hint" id="imSub"></p>
+    <div id="imLoc"></div>
     <div class="filters">
       <label>방문일 <input type="date" id="imDate"></label>
       <label>상태 <select id="imStatus"></select></label>
@@ -746,6 +774,7 @@
       <li><b>시세트래킹</b>에서 달마다 [시세 추가] → 매매·전세·매물 수를 적으면 전월 대비 변화가 자동으로 나옵니다.</li>
       <li><b>내 분석</b>에서 전세가율·갭·호가 괴리율을 한 표로 보고, <b>가용 자금 필터</b>로 내 돈에 맞는 단지만 추립니다.</li>
       <li><b>랜드마크</b> 탭에 지역 대표 단지를 등록하고 달마다 호가를 적으면, 내 단지가 랜드마크보다 얼마나 싼지 볼 수 있습니다. (시세트래킹과는 따로 기록)</li>
+      <li><b>시세지도</b>에서 시세트래킹에 담은 단지를 지도 위 가격 라벨로 봅니다. 임장 보고서용으로 라벨을 정리하려면 <b>라벨 편집 모드</b>로 끌어서 옮기고, <b>📷 깔끔하게 캡처 모드</b>로 지도만 남긴 뒤 화면을 캡처하세요.</li>
       <li><b>시장 신호</b>에서 신고가·급락 거래와 지역 온도 점수, 히트맵을 봅니다.</li>
       <li>현장에 나갈 때는 <b>임장</b> 탭의 [임장 모드]로 점수와 메모를 남깁니다.</li>
       <li>기록은 이 브라우저에만 저장됩니다. <b>시세트래킹 → 관리</b>에서 백업 파일이나 코드로 자주 옮겨 두세요.</li>
@@ -758,6 +787,22 @@
   <section class="panel filters">
     <label>글자 크기 <select id="fontSel"><option value="0.9">작게</option><option value="1">보통</option><option value="1.1">조금 크게</option><option value="1.25">크게</option><option value="1.4">아주 크게</option></select></label>
     <span class="hint" style="margin:0">배경색은 오른쪽 위 "배경"에서 고릅니다.</span>
+  </section>
+  <section class="panel">
+    <div class="bar"><strong>탭 설정</strong> <span class="hint" style="margin:0">— 체크를 끄면 그 탭이 위쪽 메뉴에서 사라지고, ▲▼ 로 순서를 바꿉니다. 이 브라우저에 저장됩니다.</span><span class="grow"></span><button id="btnTabsReset">처음 상태로</button></div>
+    <div class="tabsettings" id="tabSettings"></div>
+  </section>
+  <section class="panel">
+    <div class="bar"><strong>업무지구 (기준점) 설정</strong> <span class="hint" style="margin:0">— 단지 비교·입지 분석에서 "직선거리"를 재는 기준점입니다. 지방이면 그 지역 도심·산업단지·KTX역으로 바꾸세요. 비워 두면 강남·여의도·광화문을 씁니다.</span></div>
+    <div id="hubSettings"></div>
+    <div class="filters" style="margin-top:8px"><button id="btnHubAdd">+ 업무지구 추가</button><button class="primary" id="btnHubSave">저장</button><button id="btnHubReset">기본값으로</button></div>
+  </section>
+  <section class="panel">
+    <div class="bar"><strong>백업·옮기기</strong> <span class="hint" style="margin:0">— 시세트래킹, 호가, 라벨 위치, 입지 메모, 탭 설정 등 이 브라우저에 적어 둔 모든 값이 들어갑니다.</span></div>
+    <div class="filters">
+      <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
+      <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
+      <span class="bkinfo"></span></div>
   </section>
   <section class="panel">
     <div class="bar"><strong>점검</strong> <span class="hint" style="margin:0">— 자료가 제대로 들어오고 있는지</span><span class="grow"></span><button id="btnHealth">다시 확인</button></div>
@@ -859,6 +904,9 @@
 <script src="js/land.js"></script>
 <script src="js/imjang.js"></script>
 <script src="js/guide.js"></script>
+<script src="js/maplabel.js"></script>
+<script src="js/pricemap.js"></script>
+<script src="js/settings.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

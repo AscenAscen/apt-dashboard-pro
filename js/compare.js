@@ -22,6 +22,8 @@ const Compare = (() => {
   const dateText = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const toNum = (text) => +text.replace(/-/g, '');
   const eokText = (v) => +(v / 10000).toFixed(2) + '억';
+  const CPKEY = 'apt.cmpPrice.v1';                                  // 직접 적은 현재 가격 { 단지번호#평형: { p: 만원 } }
+  const curPrice = (id) => Store.get(CPKEY, {})[id]?.p ?? null;
 
   async function init() {
     // 표시 항목 체크 상자
@@ -269,12 +271,25 @@ const Compare = (() => {
       ['최근 매매 실거래', r => (r.st.last ? `${U.price(r.st.last.price)}<small>${U.date(r.st.last.d)}</small>` : '-')],
       ['전고점 (2020년~)', r => (r.st.peak ? `${U.price(r.st.peak.price)}<small>${U.date(r.st.peak.d)}</small>` : '-')],
       ['전고 대비', r => `<span class="${U.cls(r.st.drop)}">${U.pct(r.st.drop)}</span>`],
+      ['현재 가격 (직접 입력, 억)', r => { const p = curPrice(r.id), q = Kit.quote(Tracking.rec(r.id)); return `<input class="cur num" inputmode="decimal" data-cur="${U.esc(r.id)}" value="${p == null ? '' : +(p / 10000).toFixed(4)}" placeholder="${q?.s != null ? '호가 ' + +(q.s / 10000).toFixed(2) : '예: 15.3'}">`; }],
+      ['현재가 기준 전고점 대비', r => {
+        const p = curPrice(r.id);
+        if (p == null || !r.st.peak) return '<small>현재 가격을 적으면 계산됩니다</small>';
+        const pct = (p / r.st.peak.price - 1) * 100;
+        return `<b class="${U.cls(pct)}">${U.pct(pct)}</b><small>${U.diff(p - r.st.peak.price)} · 전고점 ${U.price(r.st.peak.price)} (${U.date(r.st.peak.d)})</small>`;
+      }],
       ['전저점 (2020년~)', r => (r.st.trough ? `${U.price(r.st.trough.price)}<small>${U.date(r.st.trough.d)}</small>` : '-')],
       ['전저 대비', r => `<span class="${U.cls(r.st.rise)}">${U.pct(r.st.rise)}</span>`],
       ['최근 전세 실거래', r => (r.st.rentLast ? `${U.price(r.st.rentLast.price)}<small>${U.date(r.st.rentLast.d)}</small>` : '-')],
       ['전세가율 / 매-전', r => (r.st.ratio == null ? '-' : `${r.st.ratio.toFixed(0)}% / ${U.price(r.st.last.price - r.st.rentLast.price)}`)],
     ]);
     $('cmpTable').onclick = (e) => { const i = e.target.dataset.map; if (i != null) App.showMap(res.find(r => r.i === +i)); };
+    $('cmpTable').onchange = (e) => {              // 현재 가격을 적으면 저장하고 하락률을 다시 계산
+      const id = e.target.dataset.cur; if (!id) return;
+      const all = Store.get(CPKEY, {}), v = parseFloat(String(e.target.value).replace(/,/g, ''));
+      if (isNaN(v) || v <= 0) delete all[id]; else all[id] = { p: Math.round(v * 10000) };
+      Store.set(CPKEY, all); basicTable(res, kind, a, b);
+    };
     $('cmpNote').textContent = `기간: ${U.date(a)} ~ ${U.date(b)}` + (opt.noDirect ? ' · 직거래 숨김' : '') + (opt.noLow ? ' · 1~3층 제외' : '');
   }
 

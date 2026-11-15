@@ -52,7 +52,8 @@ const KMap = (() => {
   /** 지도 만들기 */
   function create(el, center, level = 5) {
     const map = new kakao.maps.Map(el, { center: LL(center), level });
-    map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
+    map._zc = new kakao.maps.ZoomControl();            // 캡처 모드에서 숨겼다가 다시 달 수 있게 기억해 둠
+    map.addControl(map._zc, kakao.maps.ControlPosition.RIGHT);
     return map;
   }
 
