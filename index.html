@@ -756,7 +756,10 @@
       <button id="btnPmAdd" class="primary" disabled>지도에 추가</button>
       <span class="hint" id="pmAddHint" style="margin:0">시세트래킹에 없는 단지도 골라서 지도에 올릴 수 있습니다.</span>
     </div>
-    <div id="pmAdded" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    <details id="pmAddedBox" hidden style="margin-top:8px">
+      <summary id="pmAddedSum" style="cursor:pointer;color:var(--sub)">직접 추가한 단지</summary>
+      <div id="pmAdded" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;max-height:160px;overflow:auto"></div>
+    </details>
   </section>
   <div id="pmBody">
     <section class="panel" id="pmPanel">

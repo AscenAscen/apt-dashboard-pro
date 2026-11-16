@@ -137,10 +137,12 @@ const PriceMap = (() => {
     $('pmAddHint').textContent = '시세트래킹에 없는 단지도 골라서 지도에 올릴 수 있습니다.';
     fillFolders(); renderAdded(); draw();
   }
+  /** 추가한 단지는 접어 두고, 한 줄 요약(개수)만 보여 줍니다. 펼치면 목록 */
   function renderAdded() {
-    const ids = Store.get(XKEY, []);
-    $('pmAdded').innerHTML = ids.map(id => { const q = Kit.parseId(id); return `<span class="chip" style="border:1px solid var(--line);border-radius:14px;padding:3px 8px;font-size:13px">${U.esc(q.name)} ${CONFIG.toPyeong(q.g)}평 <button class="mini" data-rm="${U.esc(id)}" title="지도에서 빼기">✕</button></span>`; }).join('')
-      || '<span class="hint" style="margin:0">직접 추가한 단지가 없습니다.</span>';
+    const ids = Store.get(XKEY, []), box = $('pmAddedBox');
+    box.hidden = !ids.length;
+    $('pmAddedSum').textContent = `직접 추가한 단지 ${ids.length}개 (눌러서 보기·빼기)`;
+    $('pmAdded').innerHTML = ids.map(id => { const q = Kit.parseId(id); return `<span style="border:1px solid var(--line);border-radius:12px;padding:1px 4px 1px 8px;font-size:12px;white-space:nowrap">${U.esc(q.name)} ${CONFIG.toPyeong(q.g)}평 <button class="mini" data-rm="${U.esc(id)}" title="지도에서 빼기">✕</button></span>`; }).join('');
   }
 
   function init() {
