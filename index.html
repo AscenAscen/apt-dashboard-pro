@@ -683,7 +683,17 @@
     <button id="btnIvExcel">엑셀 다운로드</button>
     <span class="hint" style="margin:0">투자금 = 전용 평균 매매가 − 평균 전세가 (취득세·중개료·대출 제외). 직거래는 뺍니다.</span>
   </section>
-  <section class="panel" id="ivOut"><p class="hint">지역을 고르고 [조회]를 누르세요.</p></section>
+  <section class="panel filters">
+    <strong style="align-self:center">여러 지역 한눈에</strong>
+    <label>범위 <select id="ivmScope"></select></label>
+    <label>기준 월 <select id="ivmMonth"></select></label>
+    <label>기간 <select id="ivmSpan"><option value="1">그 달만</option><option value="3">최근 3개월 합산</option><option value="6">최근 6개월 합산</option></select></label>
+    <button id="btnIvm" class="primary">한눈에 보기</button>
+    <button id="btnIvmExcel">엑셀 다운로드</button>
+    <span class="hint" style="margin:0">거래가 적은 지역은 [최근 3개월 합산]이 더 안정적입니다. 전국은 불러오는 데 시간이 걸립니다.</span>
+  </section>
+  <section class="panel" id="ivmOut"><p class="hint">범위와 기준 월을 고르고 [한눈에 보기]를 누르세요.</p></section>
+  <section class="panel" id="ivOut"><p class="hint">한 지역의 월별 흐름: 위에서 지역을 고르고 [조회]를 누르세요.</p></section>
 </main>
 
 <!-- ═══════════════ 시장 신호 (신고가·급락, 온도 점수, 히트맵, 가격지수) ═══════════════ -->
