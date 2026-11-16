@@ -234,6 +234,7 @@
             <div id="svAreaList"></div>
           </div>
         </details>
+        <span class="row"><input type="number" id="svAreaMin" min="0" step="1" placeholder="최소"> ~ <input type="number" id="svAreaMax" min="0" step="1" placeholder="최대"> <select id="svAreaUnit"><option value="p">평</option><option value="m">㎡</option></select></span>
       </div>
       <label>단지명 <input type="search" id="svFind" placeholder="단지명 검색"></label>
       <label>매매 가격대 (억)<span class="row"><input type="number" id="svMin" step="0.5" min="0" placeholder="최소"> ~ <input type="number" id="svMax" step="0.5" min="0" placeholder="최대"></span></label>
@@ -276,6 +277,7 @@
         가격대 좁히기와 매매 호가 정렬은 적어 둔 호가 기준이며, 호가가 없는 단지는 최근 실거래가 기준(<span class="star">실</span> 표시)입니다. 정렬은 고를 때 한 번 적용되고, 입력하는 동안에는 줄이 움직이지 않습니다.
         ★ 표시 줄 = 시세트래킹에 담긴 단지, ☆ 버튼 = 후보로 표시. <b>단지 정보 펼치기</b>를 누르면 생활권·구조·방·화 칸이 나옵니다. <b>호가-실거래</b>는 적은 매매 호가에서 최근 매매 실거래가를 뺀 값입니다.</p>
       </details>
+      <div id="svColPop" class="colpop" hidden></div>
       <div class="tablewrap"><table id="svTable"></table></div>
       <p class="hint" id="svNote"></p>
       <button id="btnSvMore" hidden>더 보기</button>

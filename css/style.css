@@ -472,3 +472,15 @@ details.areabox > summary { cursor: pointer; list-style: none; border: 1px solid
 details.areabox > summary::-webkit-details-marker { display: none; }
 details.areabox .areapick { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 280px; max-height: 320px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
 #svAreaList label { display: block; margin: 4px 0; color: var(--text); }
+
+/* 엑셀식 열 필터 */
+button.colf{font-size:11px;padding:0 4px;margin-left:3px;border:1px solid #bbb;background:#fff;border-radius:3px;cursor:pointer;line-height:1.4;vertical-align:middle;color:inherit}
+button.colf.on{background:#2563eb;color:#fff;border-color:#2563eb}
+.colpop{position:fixed;z-index:60;width:230px;max-height:380px;display:flex;flex-direction:column;background:#fff;color:#222;border:1px solid #bbb;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:8px;font-size:13px}
+.colpop[hidden]{display:none}
+.colpop .cfh{font-weight:600;margin-bottom:6px}
+.colpop .cfbtns{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
+.colpop .cflist{overflow:auto;flex:1;min-height:60px;max-height:230px;border:1px solid #e5e5e5;border-radius:4px;padding:4px}
+.colpop .cflist label{display:flex;gap:6px;align-items:center;padding:2px 0;white-space:nowrap}
+.colpop .cflist small{color:#888;margin-left:auto}
+.colpop .cfend{display:flex;justify-content:flex-end;gap:4px;margin-top:8px;flex-wrap:wrap}
