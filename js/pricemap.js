@@ -8,8 +8,12 @@
 const PriceMap = (() => {
   const $ = (id) => document.getElementById(id);
   const SKEY = 'apt.pmOpts.v1', UKEY = 'apt.pmLabels.v1', XKEY = 'apt.pmExtra.v1', SENT = '(직접 추가·전수조사 단지)';
-  const LKEY = 'apt.pmLandmarks.v1', HKEY = 'apt.pmHidden.v1', MCKEY = 'apt.pmChecked.v1', TCKEY = 'apt.trkChecked.v1';   // 랜드마크 · 지도에서 숨김 · 지도에서 체크 · 시세트래킹 체크
-  const VIEWS = [['all', '전체'], ['trk', '시세트래킹'], ['lm', '랜드마크'], ['sent', '전수조사 선택'], ['chk', '내가 선택']];
+  const LAND = 'apt.land.v1';                                  // 랜드마크 탭 목록 (☆ 과 같은 목록)
+  const LKEY = 'apt.pmLandmarks.v1';                           // 예전 지도 전용 ☆ 목록 (한 번 옮긴 뒤 비움)
+  const DKEY = 'apt.pmDirect.v1';                              // 직접 추가한 단지
+  const HKEY = 'apt.pmHidden.v1', MCKEY = 'apt.pmChecked.v1', TCKEY = 'apt.trkChecked.v1';   // 지도에서 숨김 · 지도에서 체크 · 시세트래킹 체크
+  const SIZE = 'apt.pmSize.v1';                                // 지도 크기 { w: 가로 %, h: 세로 px }
+  const VIEWS = [['all', '전체'], ['trk', '시세트래킹'], ['lm', '랜드마크'], ['sent', '전수조사 선택'], ['mine', '직접 추가'], ['chk', '내가 선택']];
   let view = 'all', lastRows = [], notFound = '', countBase = 0;
   let baseItems = [], pick = null;     // pick: 검색으로 고른 단지 (아직 추가 전)
   const userItems = () => Store.get(UKEY, []).map(u => ({ id: u.id, pos: { lat: u.lat, lng: u.lng }, text: u.text, color: u.color || '#8e8e93', rank: 0, user: true }));
@@ -20,7 +24,7 @@ const PriceMap = (() => {
 
   function fillFolders() {
     const folders = Tracking.exportAll().folders || [], cur = $('pmFolder').value || Store.get(SKEY, {}).folder || '';
-    const sent = Store.get(XKEY, []).length;
+    const sent = Store.get(XKEY, []).length + Store.get(DKEY, []).length;
     $('pmFolder').innerHTML = '<option value="">시세트래킹 전체' + (sent ? ' + 전수조사에서 보낸 단지' : '') + '</option>' + folders.map(f => `<option>${U.esc(f)}</option>`).join('') + (sent ? `<option>${SENT}</option>` : '');
     if (folders.includes(cur) || (sent && cur === SENT)) $('pmFolder').value = cur;
     $('btnPmClearSent').hidden = !sent;
@@ -30,6 +34,15 @@ const PriceMap = (() => {
   }
   const saveOpts = () => Store.set(SKEY, { folder: $('pmFolder').value, show: $('pmShow').value, name: $('pmName').value, month: $('pmMonth').value, view });
   const setOf = (k) => new Set(Store.get(k, []));
+  const landMap = () => Store.get(LAND, {});
+  const landSet = () => new Set(Object.keys(landMap()));
+  /** ☆: 랜드마크 탭과 같은 목록(apt.land.v1)에 넣거나 뺌. 탭이 열려 있어도 바로 맞춰짐 */
+  function toggleLand(row, on) {
+    const m = landMap();
+    if (on) { if (!m[row.id]) m[row.id] = { grade: CONFIG.GRADES[0].k, name: row.name, sido: row.sido || '', sgg: row.sgg || '', dong: row.dong || '', jibun: row.jibun || '', t: Date.now() }; }
+    else delete m[row.id];
+    Store.set(LAND, m); if (typeof Land !== 'undefined') Land.reload();
+  }
   const toggleSet = (k, id, on) => { const s = setOf(k); on ? s.add(id) : s.delete(id); Store.set(k, [...s]); };
   const labelHidden = (id) => !!(Store.get('apt.mapLabel.v1', {})[`map:${id}`] || {}).hide;
   /** 라벨만 숨기기: 지도 라벨 저장값의 hide 표시를 켜거나 끔 (숨긴 라벨 보이기 버튼과 같은 값) */
@@ -48,14 +61,14 @@ const PriceMap = (() => {
   }
   /** 개별 단지 목록: 체크(지도 전용 선택), 지도 보이기, 라벨 보이기, ★ 랜드마크 */
   function renderList() {
-    const mc = setOf(MCKEY), hid = setOf(HKEY), lm = setOf(LKEY), sent = setOf(XKEY);
+    const mc = setOf(MCKEY), hid = setOf(HKEY), lm = landSet(), sent = setOf(XKEY), mine = setOf(DKEY);
     $('pmListTable').innerHTML = '<thead><tr><th>체크</th><th>지도</th><th>라벨</th><th>★</th><th class="l">단지</th><th>평형</th><th class="l">출처</th></tr></thead><tbody>' +
       lastRows.map(r => `<tr><td><input type="checkbox" data-mc="${U.esc(r.id)}" ${mc.has(r.id) ? 'checked' : ''}></td>` +
         `<td><input type="checkbox" data-mh="${U.esc(r.id)}" ${!hid.has(r.id) ? 'checked' : ''} ${r.pos ? '' : 'disabled'} title="끄면 지도에서 빠집니다"></td>` +
         `<td><input type="checkbox" data-pl="${U.esc(r.id)}" ${!labelHidden(r.id) ? 'checked' : ''} ${r.pos ? '' : 'disabled'} title="끄면 이 단지의 라벨만 숨깁니다"></td>` +
         `<td><button class="mini" data-lm="${U.esc(r.id)}" title="랜드마크로 지정하거나 해제">${lm.has(r.id) ? '★' : '☆'}</button></td>` +
         `<td class="l">${U.esc(r.name)}${r.pos ? '' : ' <small>(위치 없음)</small>'}</td><td>${r.g}㎡</td>` +
-        `<td class="l">${[r.tracked ? '시세트래킹' : '', sent.has(r.id) ? '전수조사' : '', lm.has(r.id) ? '랜드마크' : ''].filter(Boolean).join(' · ') || '-'}</td></tr>`).join('') + '</tbody>';
+        `<td class="l">${[r.tracked ? '시세트래킹' : '', sent.has(r.id) ? '전수조사' : '', mine.has(r.id) ? '직접 추가' : '', lm.has(r.id) ? '랜드마크' : ''].filter(Boolean).join(' · ') || '-'}</td></tr>`).join('') + '</tbody>';
   }
 
   /** 라벨에 쓸 글자 */
@@ -91,12 +104,18 @@ const PriceMap = (() => {
     const sentIds = new Set(Store.get(XKEY, []));
     let list = await Kit.records(true);                                                       // 시세트래킹 단지
     const have = new Set(list.map(x => x.id)), regs = await Kit.regions();
-    const lmSet = setOf(LKEY);
-    for (const id of new Set([...sentIds, ...lmSet])) if (!have.has(id)) {                    // + 전수조사에서 보낸 단지·랜드마크 (호가는 전수조사에 적은 값)
+    const oldL = Store.get(LKEY, []);                           // 예전 지도 전용 ☆ 목록 → 랜드마크 탭 목록으로 한 번 옮김
+    if (oldL.length) {
+      const m = landMap();
+      oldL.forEach(id => { if (!m[id]) { const q = Kit.parseId(id), reg = regs.get(q.code); m[id] = { grade: CONFIG.GRADES[0].k, name: q.name, sido: reg?.[1] || '', sgg: reg?.[2] || '', dong: q.dong, jibun: q.jibun, t: Date.now() }; } });
+      Store.set(LAND, m); Store.set(LKEY, []); if (typeof Land !== 'undefined') Land.reload();
+    }
+    const mineIds = setOf(DKEY), lmSet = landSet();
+    for (const id of new Set([...sentIds, ...mineIds, ...lmSet])) if (!have.has(id)) {                    // + 전수조사에서 보낸 단지·랜드마크 (호가는 전수조사에 적은 값)
       const q = Kit.parseId(id), reg = regs.get(q.code);
       list.push({ ...q, sido: reg?.[1] || '', sgg: reg?.[2] || '', rec: Tracking.rec(id) || { quotes: {} }, tracked: false });
     }
-    if (folder === SENT) list = list.filter(x => sentIds.has(x.id));
+    if (folder === SENT) list = list.filter(x => sentIds.has(x.id) || mineIds.has(x.id));
     else if (folder) list = list.filter(x => x.tracked && (x.rec.folders || []).includes(folder));
     $('pmEmpty').hidden = list.length > 0; $('pmBody').hidden = !list.length;
     if (!list.length) return;
@@ -104,6 +123,7 @@ const PriceMap = (() => {
     if (view === 'trk') list = list.filter(x => x.tracked);
     else if (view === 'lm') list = list.filter(x => lmSet.has(x.id));
     else if (view === 'sent') list = list.filter(x => sentIds.has(x.id));
+    else if (view === 'mine') list = list.filter(x => mineIds.has(x.id));
     else if (view === 'chk') list = list.filter(x => mcSet.has(x.id) || tcSet.has(x.id));
     if (!list.length) { baseItems = []; lastRows = []; renderList(); refreshMap(); $('pmCount').textContent = ''; return say('이 보기에 해당하는 단지가 없습니다.'); }
     if (!KMap.ready()) return say(KMap.needKeyHtml);
@@ -130,6 +150,7 @@ const PriceMap = (() => {
     if (!ok.length) return say('단지 위치를 찾지 못했습니다.');
     msg.hidden = true;
     if (!map) {
+      applySize();
       map = KMap.create($('pmMap'), ok[0].pos, 7);
       ctrl = MapLabel.create({ key: 'map', map, panel: $('pmPanel'), ctl: $('pmCtl'), onPick: (it) => { if (!it.user) card(byId.get(it.id)); },
         onAdd: (pos) => {                             // [＋ 라벨 추가] → 지도를 누른 자리에 메모 라벨
@@ -171,9 +192,9 @@ const PriceMap = (() => {
   function addPicked() {
     if (!pick) return;
     const g = +$('pmAddArea').value, id = `${pick.code}|${pick.key}#${g}`;
-    const cur = Store.get(XKEY, []);
-    if (cur.includes(id)) return U.toast('이미 지도에 올라간 단지·평형입니다.');
-    Store.set(XKEY, [...cur, id]);
+    const cur = Store.get(DKEY, []);
+    if (cur.includes(id) || Store.get(XKEY, []).includes(id)) return U.toast('이미 지도에 올라간 단지·평형입니다.');
+    Store.set(DKEY, [...cur, id]);
     U.toast(`${pick.name} ${CONFIG.toPyeong(g)}평을 지도에 추가했습니다.`);
     pick = null; $('pmAddFind').value = ''; $('btnPmAdd').disabled = true;
     $('pmAddHint').textContent = '시세트래킹에 없는 단지도 골라서 지도에 올릴 수 있습니다.';
@@ -181,7 +202,7 @@ const PriceMap = (() => {
   }
   /** 추가한 단지는 접어 두고, 한 줄 요약(개수)만 보여 줍니다. 펼치면 목록 */
   function renderAdded() {
-    const ids = Store.get(XKEY, []), box = $('pmAddedBox');
+    const ids = Store.get(DKEY, []), box = $('pmAddedBox');
     box.hidden = !ids.length;
     $('pmAddedSum').textContent = `직접 추가한 단지 ${ids.length}개 (눌러서 보기·빼기)`;
     $('pmAdded').innerHTML = ids.map(id => { const q = Kit.parseId(id); return `<span style="border:1px solid var(--line);border-radius:12px;padding:1px 4px 1px 8px;font-size:12px;white-space:nowrap">${U.esc(q.name)} ${CONFIG.toPyeong(q.g)}평 <button class="mini" data-rm="${U.esc(id)}" title="지도에서 빼기">✕</button></span>`; }).join('');
@@ -194,7 +215,7 @@ const PriceMap = (() => {
     $('pmAddFind').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
     $('pmAdded').onclick = (e) => {
       const id = e.target.closest('button[data-rm]')?.dataset.rm; if (!id) return;
-      Store.set(XKEY, Store.get(XKEY, []).filter(x => x !== id));
+      Store.set(DKEY, Store.get(DKEY, []).filter(x => x !== id));
       fillFolders(); renderAdded(); draw();
     };
     renderAdded();
@@ -209,23 +230,41 @@ const PriceMap = (() => {
       if (t.dataset.mh != null) { toggleSet(HKEY, t.dataset.mh, !t.checked); renderList(); return refreshMap(); }
       if (t.dataset.pl != null) { setLabelHidden(t.dataset.pl, !t.checked); return refreshMap(); }
     };
-    $('pmListTable').onclick = (e) => { const id = e.target.closest('button[data-lm]')?.dataset.lm; if (id == null) return; toggleSet(LKEY, id, !setOf(LKEY).has(id)); draw(); };
+    $('pmListTable').onclick = (e) => { const id = e.target.closest('button[data-lm]')?.dataset.lm; if (id == null) return; const row = lastRows.find(r => r.id === id) || { id, ...Kit.parseId(id) }; toggleLand(row, !landSet().has(id)); draw(); };
     $('btnPmMapAllOn').onclick = () => { const s = setOf(HKEY); lastRows.forEach(r => s.delete(r.id)); Store.set(HKEY, [...s]); renderList(); refreshMap(); };
     $('btnPmMapAllOff').onclick = () => { const s = setOf(HKEY); lastRows.forEach(r => { if (r.pos) s.add(r.id); }); Store.set(HKEY, [...s]); renderList(); refreshMap(); };
     $('pmFolder').onchange = $('pmMonth').onchange = draw;
-    $('btnPmClearSent').onclick = () => { if (!confirm('직접 추가·전수조사에서 보낸 단지를 시세지도에서 모두 뺄까요? (원래 기록은 그대로입니다)')) return; Store.set(XKEY, []); fillFolders(); renderAdded(); draw(); };
+    $('btnPmClearSent').onclick = () => { if (!confirm('직접 추가·전수조사에서 보낸 단지를 시세지도에서 모두 뺄까요? (원래 기록은 그대로입니다)')) return; Store.set(XKEY, []); Store.set(DKEY, []); fillFolders(); renderAdded(); draw(); };
     // 저장함: 라벨 위치·모양·메모 라벨·보낸 단지·표시 설정을 통째로 (예: "2026-11 평촌 지도")
     Saves.register('map', { name: '시세지도', hint: '라벨 위치·크기·글씨체·모양, 직접 추가한 메모 라벨, 표시 설정(폴더·기준 달)을 저장합니다. 달마다 한 번씩 저장해 두면 그때의 지도를 다시 볼 수 있습니다.',
       note: () => `${$('pmFolder').value || '전체'} · ${$('pmMonth').selectedOptions[0]?.text || '최신 호가'} · ${$('pmCount').textContent}`,
       get: () => { const all = Store.get('apt.mapLabel.v1', {}), mine = {}; Object.keys(all).filter(k => k.startsWith('map:')).forEach(k => { mine[k] = all[k]; });
-        return { opts: Store.get(SKEY, {}), labels: mine, user: Store.get(UKEY, []), sent: Store.get(XKEY, []), lm: Store.get(LKEY, []), hid: Store.get(HKEY, []), chk: Store.get(MCKEY, []) }; },
+        return { opts: Store.get(SKEY, {}), labels: mine, user: Store.get(UKEY, []), sent: Store.get(XKEY, []), dir: Store.get(DKEY, []), size: Store.get(SIZE, {}), hid: Store.get(HKEY, []), chk: Store.get(MCKEY, []) }; },
       set: (d) => { const all = Store.get('apt.mapLabel.v1', {}); Object.keys(all).filter(k => k.startsWith('map:')).forEach(k => delete all[k]); Object.assign(all, d.labels || {});
-        Store.set('apt.mapLabel.v1', all); Store.set(SKEY, d.opts || {}); Store.set(UKEY, d.user || []); Store.set(XKEY, d.sent || []); Store.set(LKEY, d.lm || []); Store.set(HKEY, d.hid || []); Store.set(MCKEY, d.chk || []);
+        Store.set('apt.mapLabel.v1', all); Store.set(SKEY, d.opts || {}); Store.set(UKEY, d.user || []); Store.set(XKEY, d.sent || []); Store.set(DKEY, d.dir || []); Store.set(SIZE, d.size || {}); Store.set(HKEY, d.hid || []); Store.set(MCKEY, d.chk || []);
         sessionStorage.setItem('apt.openTab', 'map'); setTimeout(() => location.reload(), 400); } });
     $('pmShow').onchange = $('pmName').onchange = () => { saveOpts(); if (map) draw(); };
     $('btnPmRefresh').onclick = draw;
+    // 지도 크기: 가로(40~100%)·세로(300~900px) 슬라이더. 바꿀 때마다 지도와 라벨 위치를 다시 맞춤
+    $('pmMapW').oninput = () => setSize({ w: +$('pmMapW').value });
+    $('pmMapH').oninput = () => setSize({ h: +$('pmMapH').value });
+    $('btnPmSize').onclick = () => { Store.set(SIZE, {}); applySize(); };
+    applySize();
     inited = true;
   }
+  /** 지도 크기 저장값을 화면에 적용 (저장값이 없으면 CSS 기본 크기) */
+  function applySize() {
+    const s = Store.get(SIZE, {}), el = $('pmMap');
+    if (!el) return;
+    const w = s.w ?? 100;
+    el.style.width = w + '%'; el.style.margin = '0 auto';
+    el.style.height = s.h ? s.h + 'px' : '';
+    const h = Math.round(s.h || el.getBoundingClientRect().height || 500);
+    $('pmMapW').value = w; $('pmMapWV').textContent = w + '%';
+    $('pmMapH').value = Math.min(900, Math.max(300, h)); $('pmMapHV').textContent = h + 'px';
+    if (map) map.relayout();
+  }
+  function setSize(patch) { Store.set(SIZE, { ...Store.get(SIZE, {}), ...patch }); applySize(); }
   function open() { if (!inited) return; fillFolders(); renderAdded(); draw(); }
   /** 전수조사 탭에서 체크한 단지를 지도로 보냄. 새로 들어간 개수를 돌려줌 */
   function send(ids) { const cur = new Set(Store.get(XKEY, [])), before = cur.size; ids.forEach(id => cur.add(id)); Store.set(XKEY, [...cur]); return cur.size - before; }

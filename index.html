@@ -790,6 +790,10 @@
         <button id="btnPmRefresh">새로 그리기</button>
         <button id="btnPmClearSent" title="직접 추가한 단지와 전수조사에서 보낸 단지를 지도에서 모두 뺍니다" hidden>직접 추가·전수조사 단지 모두 빼기</button>
         <span class="grow"></span><span class="hint" id="pmCount" style="margin:0"></span></div>
+      <div class="bar" style="margin:4px 0 8px"><span class="hint" style="margin:0">지도 크기</span>
+        <label class="inline">가로 <input type="range" id="pmMapW" min="40" max="100" step="5" style="width:160px"> <b id="pmMapWV" style="min-width:44px">100%</b></label>
+        <label class="inline">세로 <input type="range" id="pmMapH" min="300" max="900" step="20" style="width:160px"> <b id="pmMapHV" style="min-width:52px"></b></label>
+        <button id="btnPmSize" title="지도 크기를 처음 상태로 되돌립니다">기본 크기</button></div>
       <p class="hint">시세트래킹에 담은 단지의 가격을 지도에 보여 줍니다. <span style="color:#4f9cff">●</span> 파랑 = 내가 적은 호가, <span style="color:#f5a742">●</span> 주황(·실) = 호가가 없어 최근 실거래로 대신한 값. 임장 보고서용으로 라벨 위치를 정리하려면 <b>라벨 편집 모드</b>를 켜고 끌어서 옮기세요.</p>
       <div id="pmCtl"></div>
       <div class="kmap tallmap" id="pmMap"><p class="empty" id="pmMapMsg"></p></div>

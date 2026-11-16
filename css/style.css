@@ -484,3 +484,6 @@ button.colf.on{background:#2563eb;color:#fff;border-color:#2563eb}
 .colpop .cflist label{display:flex;gap:6px;align-items:center;padding:2px 0;white-space:nowrap}
 .colpop .cflist small{color:#888;margin-left:auto}
 .colpop .cfend{display:flex;justify-content:flex-end;gap:4px;margin-top:8px;flex-wrap:wrap}
+
+/* 지도 편집·캡처 모드에서는 가로 크기 설정과 관계없이 전체 폭 */
+.ml-capturing .kmap { width: 100% !important; margin: 0 !important; }
