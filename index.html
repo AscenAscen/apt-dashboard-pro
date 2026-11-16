@@ -504,6 +504,12 @@
     </div>
     <p class="hint">단지명을 입력하면 아래에 결과가 나옵니다. 결과를 누르면 선택한 생활권의 <b>최근 매매 실거래가에 맞는 가격대 칸</b>에 자동으로 들어갑니다.</p>
     <div class="results" id="grpResults"></div>
+    <div class="filters" style="margin-top:10px">
+      <label class="findlab">➕ 단지 직접 추가 <input type="search" id="grpAddFind" placeholder="단지명 검색 후 고르기" autocomplete="off"></label>
+      <label>평형 <select id="grpAddArea"><option value="">단지를 먼저 고르세요</option></select></label>
+      <button id="btnGrpAddDirect" class="primary" disabled>넣을 생활권 칸에 추가</button>
+      <span class="hint" id="grpAddHint" style="margin:0">검색 결과에 없는 단지도 고를 수 있습니다. 최근 5년 매매 실거래가로 넣고, 거래가 없으면 가격을 직접 입력합니다.</span>
+    </div>
   </section>
   <section class="panel">
     <p class="hint">칸을 눌러 단지를 직접 적을 수 있습니다(한 줄에 한 단지). 생활권 이름은 머리칸을 눌러 수정, × 로 삭제합니다.
@@ -743,6 +749,15 @@
 <!-- ═══════════════ 시세지도 ═══════════════ -->
 <main id="tab-map" class="tab" hidden>
   <section class="panel empty" id="pmEmpty" hidden>시세트래킹에 담은 단지가 없습니다. 실거래 조회에서 단지를 담으면 이 지도에 가격 라벨로 나타납니다.</section>
+  <section class="panel">
+    <div class="filters">
+      <label class="findlab">➕ 단지 직접 추가 <input type="search" id="pmAddFind" placeholder="단지명 검색 후 고르기" autocomplete="off"></label>
+      <label>평형 <select id="pmAddArea"><option value="">단지를 먼저 고르세요</option></select></label>
+      <button id="btnPmAdd" class="primary" disabled>지도에 추가</button>
+      <span class="hint" id="pmAddHint" style="margin:0">시세트래킹에 없는 단지도 골라서 지도에 올릴 수 있습니다.</span>
+    </div>
+    <div id="pmAdded" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+  </section>
   <div id="pmBody">
     <section class="panel" id="pmPanel">
       <div class="bar"><strong>시세지도</strong>
@@ -751,7 +766,7 @@
         <label class="inline">글자 <select id="pmName"><option value="both">단지명 + 값</option><option value="val">값만</option><option value="name">단지명만</option></select></label>
         <label class="inline">기준 달 <select id="pmMonth"><option value="">최신 호가</option></select></label>
         <button id="btnPmRefresh">새로 그리기</button>
-        <button id="btnPmClearSent" title="전수조사에서 보낸 단지를 지도에서 모두 뺍니다" hidden>전수조사에서 보낸 단지 빼기</button>
+        <button id="btnPmClearSent" title="직접 추가한 단지와 전수조사에서 보낸 단지를 지도에서 모두 뺍니다" hidden>직접 추가·전수조사 단지 모두 빼기</button>
         <span class="grow"></span><span class="hint" id="pmCount" style="margin:0"></span></div>
       <p class="hint">시세트래킹에 담은 단지의 가격을 지도에 보여 줍니다. <span style="color:#4f9cff">●</span> 파랑 = 내가 적은 호가, <span style="color:#f5a742">●</span> 주황(·실) = 호가가 없어 최근 실거래로 대신한 값. 임장 보고서용으로 라벨 위치를 정리하려면 <b>라벨 편집 모드</b>를 켜고 끌어서 옮기세요.</p>
       <div id="pmCtl"></div>

@@ -7,8 +7,8 @@
    ───────────────────────────────────────────────────────── */
 const PriceMap = (() => {
   const $ = (id) => document.getElementById(id);
-  const SKEY = 'apt.pmOpts.v1', UKEY = 'apt.pmLabels.v1', XKEY = 'apt.pmExtra.v1', SENT = '(전수조사에서 보낸 단지)';
-  let baseItems = [];
+  const SKEY = 'apt.pmOpts.v1', UKEY = 'apt.pmLabels.v1', XKEY = 'apt.pmExtra.v1', SENT = '(직접 추가·전수조사 단지)';
+  let baseItems = [], pick = null;     // pick: 검색으로 고른 단지 (아직 추가 전)
   const userItems = () => Store.get(UKEY, []).map(u => ({ id: u.id, pos: { lat: u.lat, lng: u.lng }, text: u.text, color: u.color || '#8e8e93', rank: 0, user: true }));
   let map = null, ctrl = null, inited = false, seq = 0;
   let byId = new Map();
@@ -117,12 +117,47 @@ const PriceMap = (() => {
     if (!$('pmCard').innerHTML) card(ok[0]);
   }
 
+  /* ── 단지 직접 추가: 검색해서 고른 단지를 XKEY 목록(지도에 올라가는 추가 단지)에 넣습니다 ── */
+  async function pickComplex(x) {
+    pick = x;
+    const ar = await Finder.areas(x.code, x.key);
+    const list = ar.list.length ? ar.list : [{ g: 84, n: 0 }];
+    $('pmAddArea').innerHTML = list.map(a => `<option value="${a.g}" ${a.g === ar.best ? 'selected' : ''}>${a.g}㎡ (${CONFIG.toPyeong(a.g)}평)${a.n ? ` · ${a.n}건` : ''}</option>`).join('');
+    $('btnPmAdd').disabled = false;
+    $('pmAddHint').textContent = `${x.name} 선택됨. 평형을 고른 뒤 [지도에 추가]를 누르세요.`;
+  }
+  function addPicked() {
+    if (!pick) return;
+    const g = +$('pmAddArea').value, id = `${pick.code}|${pick.key}#${g}`;
+    const cur = Store.get(XKEY, []);
+    if (cur.includes(id)) return U.toast('이미 지도에 올라간 단지·평형입니다.');
+    Store.set(XKEY, [...cur, id]);
+    U.toast(`${pick.name} ${CONFIG.toPyeong(g)}평을 지도에 추가했습니다.`);
+    pick = null; $('pmAddFind').value = ''; $('btnPmAdd').disabled = true;
+    $('pmAddHint').textContent = '시세트래킹에 없는 단지도 골라서 지도에 올릴 수 있습니다.';
+    fillFolders(); renderAdded(); draw();
+  }
+  function renderAdded() {
+    const ids = Store.get(XKEY, []);
+    $('pmAdded').innerHTML = ids.map(id => { const q = Kit.parseId(id); return `<span class="chip" style="border:1px solid var(--line);border-radius:14px;padding:3px 8px;font-size:13px">${U.esc(q.name)} ${CONFIG.toPyeong(q.g)}평 <button class="mini" data-rm="${U.esc(id)}" title="지도에서 빼기">✕</button></span>`; }).join('')
+      || '<span class="hint" style="margin:0">직접 추가한 단지가 없습니다.</span>';
+  }
+
   function init() {
     const o = Store.get(SKEY, {});
+    Finder.attach($('pmAddFind'), pickComplex);
+    $('btnPmAdd').onclick = addPicked;
+    $('pmAddFind').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+    $('pmAdded').onclick = (e) => {
+      const id = e.target.closest('button[data-rm]')?.dataset.rm; if (!id) return;
+      Store.set(XKEY, Store.get(XKEY, []).filter(x => x !== id));
+      fillFolders(); renderAdded(); draw();
+    };
+    renderAdded();
     if (o.show) $('pmShow').value = o.show;
     if (o.name) $('pmName').value = o.name;
     $('pmFolder').onchange = $('pmMonth').onchange = draw;
-    $('btnPmClearSent').onclick = () => { if (!confirm('전수조사에서 보낸 단지를 시세지도에서 모두 뺄까요? (전수조사 기록은 그대로입니다)')) return; Store.set(XKEY, []); fillFolders(); draw(); };
+    $('btnPmClearSent').onclick = () => { if (!confirm('직접 추가·전수조사에서 보낸 단지를 시세지도에서 모두 뺄까요? (원래 기록은 그대로입니다)')) return; Store.set(XKEY, []); fillFolders(); renderAdded(); draw(); };
     // 저장함: 라벨 위치·모양·메모 라벨·보낸 단지·표시 설정을 통째로 (예: "2026-11 평촌 지도")
     Saves.register('map', { name: '시세지도', hint: '라벨 위치·크기·글씨체·모양, 직접 추가한 메모 라벨, 표시 설정(폴더·기준 달)을 저장합니다. 달마다 한 번씩 저장해 두면 그때의 지도를 다시 볼 수 있습니다.',
       note: () => `${$('pmFolder').value || '전체'} · ${$('pmMonth').selectedOptions[0]?.text || '최신 호가'} · ${$('pmCount').textContent}`,
@@ -135,7 +170,7 @@ const PriceMap = (() => {
     $('btnPmRefresh').onclick = draw;
     inited = true;
   }
-  function open() { if (!inited) return; fillFolders(); draw(); }
+  function open() { if (!inited) return; fillFolders(); renderAdded(); draw(); }
   /** 전수조사 탭에서 체크한 단지를 지도로 보냄. 새로 들어간 개수를 돌려줌 */
   function send(ids) { const cur = new Set(Store.get(XKEY, [])), before = cur.size; ids.forEach(id => cur.add(id)); Store.set(XKEY, [...cur]); return cur.size - before; }
   return { init, open, send };

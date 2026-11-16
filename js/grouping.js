@@ -182,6 +182,36 @@ const Grouping = (() => {
       const btn = e.target.closest('button[data-i]');
       if (btn) place(hits[+btn.dataset.i]);
     };
+    initDirect();
+  }
+
+  /* ── 단지 직접 추가: 전국에서 고른 단지를 생활권 칸에 넣기 (검색 기간과 상관없이) ── */
+  function initDirect() {
+    let pick = null;
+    Finder.attach($('grpAddFind'), async (x) => {
+      pick = x;
+      const ar = await Finder.areas(x.code, x.key);
+      const list = ar.list.length ? ar.list : [{ g: 84, n: 0 }];
+      $('grpAddArea').innerHTML = list.map(a => `<option value="${a.g}" ${a.g === ar.best ? 'selected' : ''}>${a.g}㎡ (${CONFIG.toPyeong(a.g)}평)${a.n ? ` · ${a.n}건` : ''}</option>`).join('');
+      $('btnGrpAddDirect').disabled = false;
+      $('grpAddHint').textContent = `${x.name} 선택됨. 평형을 고르고 [넣을 생활권 칸에 추가]를 누르세요.`;
+    });
+    $('btnGrpAddDirect').onclick = async () => {
+      if (!pick) return;
+      const g = +$('grpAddArea').value, y = new Date().getFullYear();
+      const tr = await Data.complexTrades(pick.code, pick.key, g, y - 5, y);
+      const last = tr.sale.filter(t => !t.direct).sort((a, b) => b.d - a.d)[0];
+      let price = last ? last.price : null;
+      if (price == null) {
+        const v = parseFloat(prompt(`${pick.name} ${CONFIG.toPyeong(g)}평: 최근 5년 매매 실거래가 없습니다.\n넣을 가격을 억 단위로 입력하세요 (예: 12.5)`) || '');
+        if (!(v > 0)) return;
+        price = v * 10000;
+      }
+      const x = { name: pick.name, g, price, dong: pick.dong };
+      if (place(x) === false) return;
+      pick = null; $('grpAddFind').value = ''; $('btnGrpAddDirect').disabled = true;
+      $('grpAddHint').textContent = '검색 결과에 없는 단지도 고를 수 있습니다. 최근 5년 매매 실거래가로 넣고, 거래가 없으면 가격을 직접 입력합니다.';
+    };
   }
 
   /** 한 지역의 단지·평형별 최근 매매 실거래 (최근 3년, 직거래 제외) */
@@ -218,8 +248,8 @@ const Grouping = (() => {
   function place(x) {
     const b = board();
     const z = b.zones.find(v => v.id === $('grpTargetZone').value);
-    if (!z) return U.toast('먼저 위에서 생활권을 추가하세요.');
-    if (!b.bands.length) return U.toast('가격대를 먼저 만들어 주세요.');
+    if (!z) { U.toast('먼저 위에서 생활권을 추가하세요.'); return false; }
+    if (!b.bands.length) { U.toast('가격대를 먼저 만들어 주세요.'); return false; }
     const band = put(z, `${x.name} ${CONFIG.toPyeong(x.g)}평`, x.price / 10000);
     save(); render();
     U.toast(`${x.name} → ${z.name} · ${label(band)} 칸에 넣었습니다.`);
