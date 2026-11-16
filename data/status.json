@@ -1,17 +1,17 @@
 {
- "updatedAt": "2026-11-16 20:58",
- "lastUpdate": "2026-11-16",
+ "updatedAt": "2026-11-17 00:44",
+ "lastUpdate": "2026-11-17",
  "progress": {
   "sale": {
-   "done": 10433,
+   "done": 10576,
    "total": 63001,
-   "priorityDone": 10433,
+   "priorityDone": 10576,
    "priorityTotal": 11205
   },
   "rent": {
-   "done": 8883,
+   "done": 9012,
    "total": 47941,
-   "priorityDone": 8883,
+   "priorityDone": 9012,
    "priorityTotal": 11205
   }
  },
@@ -20,25 +20,30 @@
    "sale": 450,
    "rent": 450
   },
-  "savedMonths": 800,
-  "failed": 0,
+  "savedMonths": 812,
+  "failed": 4,
   "stop": "",
   "closed": {
    "rent": "이번 실행 호출 한도(450) 도달",
    "sale": "이번 실행 호출 한도(450) 도달"
   },
   "months": {
-   "sale": 425,
-   "rent": 375
+   "sale": 413,
+   "rent": 399
   },
   "cooldowns": 0,
-  "minutes": 29,
+  "minutes": 34,
   "usedToday": {
-   "date": "2026-11-16",
-   "sale": 4050,
-   "rent": 4301
+   "date": "2026-11-17",
+   "sale": 450,
+   "rent": 450
   },
-  "warnings": []
+  "warnings": [
+   "rent 11170 202105 실패: URLError: <urlopen error timed out>",
+   "rent 11200 202105 실패: URLError: <urlopen error timed out>",
+   "rent 11215 202105 실패: URLError: <urlopen error timed out>",
+   "rent 11230 202105 실패: URLError: <urlopen error timed out>"
+  ]
  },
  "emptyRegions": [
   "인천광역시 중구(28110)",
