@@ -6,6 +6,7 @@ on:
   workflow_dispatch:         # Actions 화면에서 [Run workflow] 로 직접 실행
   push:
     branches: [main]         # 화면 파일을 고쳐 올리면 사이트만 다시 배포
+    paths-ignore: ['kb/**']  # kb 폴더(KB 엑셀)만 바뀌면 kb.yml 이 변환·배포를 맡음
 
 permissions:
   contents: write
@@ -48,6 +49,11 @@ jobs:
           MAX_MINUTES: ${{ vars.MAX_MINUTES }}               # 비워 두면 기본값 100
           RONE_API_KEY: ${{ secrets.RONE_API_KEY }}          # 한국부동산원 통계 키 (없으면 그 부분만 건너뜀)
         run: python scripts/collect.py
+
+      - name: 월간 요약 만들기 (신고가·급락·투자금 변화, 실패해도 계속 진행)
+        if: always()
+        continue-on-error: true
+        run: python scripts/monthly_summary.py
 
       - name: 바뀐 데이터 저장(커밋)
         if: always()
