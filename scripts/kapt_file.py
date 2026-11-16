@@ -76,12 +76,12 @@ def read_rows(path):
                         return None
                     idx = {'sido': col('시도', exact=True), 'sgg': col('시군구', exact=True), 'emd': col('읍면동', '법정동', '읍면', exact=True),
                            'ri': col('동리', '리', exact=True), 'name': col('단지명'), 'hh': col('세대수'), 'dongs': col('동수'), 'code': col('단지코드'),
-                           'addr': col('법정동주소', '지번주소', '주소')}
+                           'addr': col('법정동주소', '지번주소', '주소'), 'corr': col('복도유형', exact=True)}
                 continue
             g = lambda k: cells[idx[k]] if idx.get(k) is not None and idx[k] < len(cells) else ''
             if not g('name') or num(g('hh')) is None: continue
             yield {'sido': g('sido'), 'sgg': g('sgg'), 'emd': g('emd'), 'ri': g('ri'), 'name': g('name'), 'hh': num(g('hh')),
-                   'dongs': num(g('dongs')), 'code': g('code'), 'addr': g('addr')}
+                   'dongs': num(g('dongs')), 'code': g('code'), 'addr': g('addr'), 'corr': g('corr')}
         if head: return
 
 def jibuns(a):
@@ -153,7 +153,7 @@ def main():
         for k in pick:
             code = kc[k]
             seen[code][k].add(r['hh'])
-            hits[code][k] = [r['hh'], r['dongs'] or 0, r['code'] or '']
+            hits[code][k] = [r['hh'], r['dongs'] or 0, r['code'] or '', r['corr'] or '']
     matched = 0
     os.makedirs(OUTDIR, exist_ok=True)
     for code, m in hits.items():

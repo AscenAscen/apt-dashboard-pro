@@ -20,6 +20,9 @@ const Survey = (() => {
     year: { label: '연식', get: (r) => (r.buildYear ? String(r.buildYear) : '(없음)') },
     area: { label: '평형', get: (r) => `${r.g}㎡` },
     house: { label: '세대수', get: (r, c) => String(parseInt(c.rc.households, 10) || r.hh || '(모름)') },
+    struct: { label: '구조', get: (r, c) => c.rc.structure || Kit.autoInfo(r).structure || '(모름)' },
+    rooms: { label: '방', get: (r, c) => String(c.rc.rooms || Kit.autoInfo(r).rooms || '(모름)') },
+    baths: { label: '화', get: (r, c) => String(c.rc.baths || Kit.autoInfo(r).baths || '(모름)') },
     cand: { label: '후보', get: (r, c) => (c.rc.cand ? '후보' : '일반') },
   };
 
@@ -306,7 +309,7 @@ const Survey = (() => {
       const map = new Map();
       const get = (key, g) => {
         const id = `${code}|${key}#${g}`;
-        if (!map.has(id)) map.set(id, { id, code, sido: reg[1], sgg: reg[2], key, ...Data.parseKey(key), g, buildYear: idx.c[key] || null, hh: kp.m[key]?.[0] || null, sale: null, rent: null, peak: null, trough: null });
+        if (!map.has(id)) map.set(id, { id, code, sido: reg[1], sgg: reg[2], key, ...Data.parseKey(key), g, buildYear: idx.c[key] || null, hh: kp.m[key]?.[0] || null, corr: kp.m[key]?.[3] || null, sale: null, rent: null, peak: null, trough: null });
         return map.get(id);
       };
       Data.eachTrade(data.sale, null, (key, t) => {
@@ -495,7 +498,7 @@ const Survey = (() => {
     const fx = (label, cls = '') => `<th rowspan="2" class="${cls}">${label}</th>`;
     const cfb = (k) => `<button class="colf${colF[k] ? ' on' : ''}" data-cf="${k}" title="이 열의 값으로 거르기">▾</button>`;
     const head = `<thead><tr>${fx('<input type="checkbox" id="svAll" title="보이는 줄 전체 선택">', 'c')}${fx('후보' + cfb('cand'), 'c')}${fx('상태' + cfb('status'))}${fx('가격대')}${fx('시', 'l')}${fx('구', 'l')}${fx('동' + cfb('dong'), 'l')}${fx('생활권' + cfb('zone'), 'l info')}${fx('단지명', 'l name')}` +
-      `${fx('연식' + cfb('year'))}${fx('연차')}${fx('세대수' + cfb('house'))}${fx('평형' + cfb('area'))}${fx('구조', 'info')}${fx('방', 'info')}${fx('화', 'info')}${fx('링크')}${fx('전고점')}${fx('전고 대비 하락률')}${fx('전저점')}${fx('전저 대비 상승률')}${fx('호가-실거래')}` +
+      `${fx('연식' + cfb('year'))}${fx('연차')}${fx('세대수' + cfb('house'))}${fx('평형' + cfb('area'))}${fx('구조' + cfb('struct'), 'info')}${fx('방' + cfb('rooms'), 'info')}${fx('화' + cfb('baths'), 'info')}${fx('링크')}${fx('전고점')}${fx('전고 대비 하락률')}${fx('전저점')}${fx('전저 대비 상승률')}${fx('호가-실거래')}` +
       (m ? `<th colspan="10" class="grp c">${Tracking.ymLabel(m)} 기록</th>` : '<th class="grp c">먼저 위에서 [달 추가]를 눌러 기록할 달을 만드세요</th>') +
       fx('최근 매매 실거래') + fx('최근 전세 실거래') + fx('메모', 'l') + fx('지도', 'c') + '</tr><tr>' +
       (m ? G.map((n, i) => `<th class="${[0, 1, 3, 4].includes(i) ? 'in' : ''}${i === 0 ? ' gl' : ''}">${n}${i === 0 || i === 3 ? '(억)' : ''}</th>`).join('') : '<th></th>') + '</tr></thead>';
@@ -504,7 +507,8 @@ const Survey = (() => {
     const body = list.map((r, i) => {
       const c = r._c = compute(r), cells = calcCells(c, r), rc = c.rc;
       const cell = (k, extra = '') => `<td data-c="${k}" class="${cells[k][1]} ${extra}">${cells[k][0]}</td>`;
-      const inp = (f, ph = '', cls = '') => `<input class="${cls}" data-f="${f}" value="${U.esc(rc[f] || '')}" placeholder="${ph}">`;
+      const ai = Kit.autoInfo(r);   // 자동 값(세대수·구조는 K-apt, 방·화는 평형으로 추정) — 직접 적은 값이 있으면 그 값
+      const inp = (f, ph = '', cls = '') => { const own = rc[f] != null && String(rc[f]).trim() !== '', v = own ? rc[f] : (ai[f] || ''); return `<input class="${cls}${!own && v ? ' auto' : ''}" data-f="${f}" value="${U.esc(v)}" placeholder="${ph}" title="${!own && v ? (f === 'rooms' || f === 'baths' ? '평형·연식으로 추정한 값 — 고치면 직접 적은 값이 됩니다' : 'K-apt 자료로 자동 입력 — 고치면 직접 적은 값이 됩니다') : ''}">`; };
       const over = (f, v, auto) => `<td><input class="num${rc[f] != null ? ' edited' : ''}" data-o="${f}" inputmode="decimal" value="${eok(v)}" placeholder="자동" title="${auto ? `실거래 ${U.price(auto.price)} (${U.date(auto.d)}) · 눌러서 수정, 지우면 자동값` : '실거래 자료 없음 · 직접 입력'}"></td>`;
       const qin = (f, ph, isPrice, first) => `<td class="${first ? 'gl' : ''}"><input class="num" data-m="${m}" data-q="${f}" inputmode="decimal" value="${isPrice ? eok(c.q[f]) : (c.q[f] ?? '')}" placeholder="${ph}"></td>`;
       const link = rc.link || U.landLink(r.sgg, r.dong, r.name);
@@ -513,7 +517,7 @@ const Survey = (() => {
         `<td><select data-f="status" class="st">${Tracking.STATUSES.map(s => `<option ${s === (rc.status || '') ? 'selected' : ''} value="${s}">${s || '-'}</option>`).join('')}</select></td>` +
         `${cell('band')}<td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(r.dong)}</td><td class="l info">${inp('zone', '생활권')}</td>` +
         `<td class="l name"><a href="#" class="cxlink" data-cx="${U.esc(r.id)}" title="단지 한 장 요약">${U.esc(r.name)}</a>${c.isNew ? ' <span class="tag">새 거래</span>' : ''}</td>` +
-        `<td>${r.buildYear || '-'}</td><td>${r.buildYear ? CONFIG.toAge(r.buildYear) : '-'}</td><td>${inp('households', r.hh ? String(r.hh) : '직접 입력')}</td><td>${r.g}㎡<small>${U.esc(rc.pyeong || CONFIG.toPyeong(r.g) + '평')}</small></td><td class="info">${inp('structure', '계/복')}</td><td class="info">${inp('rooms')}</td><td class="info">${inp('baths')}</td>` +
+        `<td>${r.buildYear || '-'}</td><td>${r.buildYear ? CONFIG.toAge(r.buildYear) : '-'}</td><td>${inp('households', '직접 입력')}</td><td>${r.g}㎡<small>${U.esc(rc.pyeong || CONFIG.toPyeong(r.g) + '평')}</small></td><td class="info">${inp('structure', '계/복')}</td><td class="info">${inp('rooms')}</td><td class="info">${inp('baths')}</td>` +
         `<td><a class="btn mini" href="${U.esc(link)}" target="_blank" rel="noopener">열기</a></td>` +
         `${over('peakO', c.peak, r.peak)}${cell('drop')}${over('troughO', c.trough, r.trough)}${cell('rise')}${cell('ask')}` +
         (m ? qin('s', '예: 14.3', true, true) + qin('sn', '개') + cell('sd') + qin('r', '예: 7.5', true) + qin('rn', '개') + cell('rd') + cell('gap') + cell('gd') + cell('ratio') + cell('rtd') : '<td class="gl"></td>') +
@@ -538,7 +542,11 @@ const Survey = (() => {
       const t = e.target, tr = t.closest('tr');
       if (!tr || t.type === 'checkbox') return;
       const r = list[+tr.dataset.i], rc = Tracking.rec(r.id, true);
-      if (t.dataset.f) rc[t.dataset.f] = t.value.trim();
+      if (t.dataset.f) {
+        rc[t.dataset.f] = t.value.trim();
+        const av = Kit.autoInfo(r)[t.dataset.f] || '';               // 지우면 자동 값으로 돌아감
+        if (!rc[t.dataset.f] && av) { t.value = av; t.classList.add('auto'); } else t.classList.remove('auto');
+      }
       if (t.dataset.o) {
         const v = toMan(t.value), auto = (t.dataset.o === 'peakO' ? r.peak : r.trough)?.price ?? null;
         if (v == null || v === auto) { delete rc[t.dataset.o]; t.value = eok(auto); t.classList.remove('edited'); }
@@ -653,7 +661,7 @@ const Survey = (() => {
     const out = list.map(r => {
       const c = compute(r), rc = c.rc;
       return [c.band, si, gu, r.dong, rc.zone || '', r.name, r.buildYear || '', r.buildYear ? CONFIG.toAge(r.buildYear) : '', rc.households || r.hh || '', rc.pyeong || CONFIG.toPyeong(r.g) + '평',
-        rc.structure || '', rc.rooms || '', rc.baths || '', rc.link || U.landLink(r.sgg, r.dong, r.name), c.peak ?? '', r1(c.drop), c.trough ?? '', r1(c.rise),
+        rc.structure || Kit.autoInfo(r).structure, rc.rooms || Kit.autoInfo(r).rooms, rc.baths || Kit.autoInfo(r).baths, rc.link || U.landLink(r.sgg, r.dong, r.name), c.peak ?? '', r1(c.drop), c.trough ?? '', r1(c.rise),
         ...(m ? [c.q.s ?? '', c.q.sn ?? '', c.sd ?? '', c.q.r ?? '', c.q.rn ?? '', c.rd ?? '', c.gap ?? '', c.gd ?? '', r1(c.ratio), r1(c.rtd)] : []),
         c.askGap ?? '', r.sale?.price ?? '', U.date(r.sale?.d), r.rent?.price ?? '', U.date(r.rent?.d), c.quoted ? '호가' : (c.base ? '실거래' : ''), rc.status || '', rc.cand ? '후보' : '', rc.memo || ''];
     });

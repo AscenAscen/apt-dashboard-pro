@@ -101,15 +101,25 @@ const Tracking = (() => {
   function pinFolder(f) { const p = Store.get(PINKEY, []); Store.set(PINKEY, p.includes(f) ? p.filter(x => x !== f) : [...p, f]); fillSelects(); }
   function pickFolder(f) { curFolder = f; Store.set('apt.curFolder', f); checked.clear(); fillSelects(); render(); }
 
+  /** 한 단지의 빈 칸(세대수·구조·방·화)을 자동 값으로 채움 → 채운 칸 수. 자동으로 채운 칸은 it.af 에 표시 */
+  function autoFill(it, kp) {
+    const k = kp && kp.m ? kp.m[it.key] : null;
+    const a = Kit.autoInfo({ hh: k ? k[0] : null, corr: k ? k[3] : null, g: it.g, buildYear: it.buildYear });
+    let n = 0;
+    for (const f of ['households', 'structure', 'rooms', 'baths']) {
+      if (!String(it[f] || '').trim() && a[f]) { it[f] = a[f]; it.af = { ...(it.af || {}), [f]: 1 }; if (f === 'households') it.hhAuto = 1; n++; }
+    }
+    return n;
+  }
   /** 세대수 자동 채우기: K-apt 자료(data/kapt)로 비어 있는 칸만. 직접 적은 값은 건드리지 않음 → 채운 개수 */
   async function fillHH(list, quiet) {
     let n = 0;
     for (const code of new Set((list || items).map(it => it.code))) {
       const kp = await Data.kapt(code);
-      (list || items).filter(it => it.code === code && !String(it.households || '').trim() && kp.m[it.key]).forEach(it => { it.households = String(kp.m[it.key][0]); it.hhAuto = 1; n++; });
+      (list || items).filter(it => it.code === code).forEach(it => { n += autoFill(it, kp); });
     }
     if (n) { save(); render(); }
-    if (!quiet) U.toast(n ? `세대수 ${n}개를 자동으로 채웠습니다. (연한 글씨 = 자동, 고치면 직접 적은 값이 됩니다)` : '새로 채울 세대수가 없습니다. (자료에 없는 단지는 직접 적어 주세요)');
+    if (!quiet) U.toast(n ? `세대수·구조·방·화 ${n}칸을 자동으로 채웠습니다. (연한 글씨 = 자동, 방·화는 평형으로 추정한 값 · 고치면 직접 적은 값이 됩니다)` : '새로 채울 칸이 없습니다. (자료에 없는 단지는 직접 적어 주세요)');
     return n;
   }
 
@@ -343,7 +353,7 @@ const Tracking = (() => {
         if (popup) Data.refresh(code);                       // 버튼을 누를 때마다 최신 파일을 다시 받음
         const [data, kp] = await Promise.all([Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), nowY), Data.kapt(code)]);
         const mine = list.filter(it => it.code === code);
-        mine.forEach(it => { if (!it.households && kp.m[it.key]) { it.households = String(kp.m[it.key][0]); it.hhAuto = 1; } });   // 세대수 자동 채움 (비어 있을 때만)
+        mine.forEach(it => autoFill(it, kp));   // 세대수·구조·방·화 자동 채움 (비어 있을 때만)
         const keys = new Set(mine.map(it => it.key));
         const bucket = new Map(mine.map(it => [it.id, { sale: null, rent: null, peak: null, trough: null }]));
         Data.eachTrade(data.sale, k => keys.has(k), (key, t) => {
@@ -423,7 +433,7 @@ const Tracking = (() => {
 
   /** 입력 한 칸 저장 (표·카드 공통).  t = 입력 요소, it = 단지 */
   function applyInput(t, it) {
-    if (t.dataset.f) { it[t.dataset.f] = t.value.trim(); if (t.dataset.f === 'households') delete it.hhAuto; }
+    if (t.dataset.f) { it[t.dataset.f] = t.value.trim(); if (t.dataset.f === 'households') delete it.hhAuto; if (it.af) delete it.af[t.dataset.f]; }
     if (t.dataset.o) {                                     // 전고점·전저점 직접 수정 (지우면 자동값으로)
       const v = toMan(t.value), rl = real.get(it.id) || {};
       const auto = (t.dataset.o === 'peakO' ? rl.peak : rl.trough)?.price ?? null;
@@ -486,7 +496,7 @@ const Tracking = (() => {
       return `<tr data-i="${i}" class="${isNew(it) ? 'newtrade' : ''}"><td class="c"><input type="checkbox" data-chk="${i}" ${checked.has(it.id) ? 'checked' : ''}></td>` +
         `${cell('band')}<td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(it.dong)}</td><td class="l info">${inp(it, 'zone', '', '생활권')}</td>` +
         `<td class="l name" title="${U.esc(it.folders.join(', '))}"><a href="#" class="cxlink" data-cx="${U.esc(it.id)}" title="단지 한 장 요약">${U.esc(it.name)}</a>${isNew(it) ? ' <span class="tag">새 거래</span>' : ''}</td>` +
-        `<td>${it.buildYear || '-'}</td><td>${it.buildYear ? CONFIG.toAge(it.buildYear) : '-'}</td><td class="info">${inp(it, 'households', it.hhAuto ? 'auto' : '', '직접 입력')}</td><td>${it.g}㎡<small>${U.esc(pyeong(it))}</small></td><td class="info">${inp(it, 'structure', '', '계/복')}</td><td class="info">${inp(it, 'rooms')}</td><td class="info">${inp(it, 'baths')}</td>` +
+        `<td>${it.buildYear || '-'}</td><td>${it.buildYear ? CONFIG.toAge(it.buildYear) : '-'}</td><td class="info">${inp(it, 'households', it.hhAuto || it.af?.households ? 'auto' : '', '직접 입력')}</td><td>${it.g}㎡<small>${U.esc(pyeong(it))}</small></td><td class="info">${inp(it, 'structure', it.af?.structure ? 'auto' : '', '계/복')}</td><td class="info">${inp(it, 'rooms', it.af?.rooms ? 'auto' : '')}</td><td class="info">${inp(it, 'baths', it.af?.baths ? 'auto' : '')}</td>` +
         `<td class="info">${inp(it, 'link', 'wide', '직접 입력')} <a class="btn mini" href="${U.esc(link(it))}" target="_blank" rel="noopener">열기</a></td>` +
         `${over('peakO', c.peak, c.peakAuto)}${cell('drop')}${over('troughO', c.trough, c.troughAuto)}${cell('rise')}${cell('ask')}` +
         months.map((m, k) => qin(m, 's', '예: 14.3', true, true) + qin(m, 'sn', '개') + cell('sd' + k) + qin(m, 'r', '예: 7.5', true) + qin(m, 'rn', '개') + cell('rd' + k) + cell('gap' + k) + cell('gd' + k) + cell('ratio' + k) + cell('rtd' + k)).join('') +

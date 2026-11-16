@@ -14,6 +14,20 @@ const Kit = (() => {
     return regMap;
   }
   /** "41173|평촌동|932-6|꿈마을#84" → { code, key, g, dong, jibun, name } */
+  /** 자동으로 채울 단지 정보: 세대수·구조(K-apt 복도유형)·방·화(전용면적·연식으로 추정한 흔한 구성)
+      r: { hh, corr, g, buildYear } → { households, structure, rooms, baths } (모르면 '') */
+  function autoInfo(r) {
+    const g = +r.g || 0, y = +r.buildYear || 0, nw = !y || y >= 2000;
+    const c = String(r.corr || '');
+    const structure = /혼합/.test(c) ? '혼합' : /계단/.test(c) ? '계' : /복도/.test(c) ? '복' : '';
+    let rooms = '', baths = '';
+    if (g) {
+      if (g < 40) { rooms = 1; baths = 1; } else if (g < 50) { rooms = 2; baths = 1; }
+      else if (g < 67) { rooms = nw ? 3 : 2; baths = nw ? 2 : 1; } else if (g < 76) { rooms = 3; baths = nw ? 2 : 1; }
+      else if (g < 100) { rooms = 3; baths = 2; } else { rooms = 4; baths = 2; }
+    }
+    return { households: r.hh ? String(r.hh) : '', structure, rooms: rooms ? String(rooms) : '', baths: baths ? String(baths) : '' };
+  }
   function parseId(id) {
     const rest = id.slice(6), h = rest.lastIndexOf('#'), key = rest.slice(0, h);
     return { id, code: id.slice(0, 5), key, g: +rest.slice(h + 1), ...Data.parseKey(key) };
@@ -59,7 +73,7 @@ const Kit = (() => {
       return { ...p, sido: x.rec.sido || reg?.[1] || '', sgg: x.rec.sgg || reg?.[2] || '', rec: x.rec, tracked: x.tracked };
     });
   }
-  return { regions, parseId, quote, spark, provisional, badge, eok, ymText, lastMonths, records };
+  return { regions, autoInfo, parseId, quote, spark, provisional, badge, eok, ymText, lastMonths, records };
 })();
 
 /* ───────────── 단지 별칭 ───────────── */
@@ -152,7 +166,7 @@ const Real = (() => {
       const [data, idx, kp] = await Promise.all([Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), t.getFullYear()), Data.index(code), Data.kapt(code)]);
       const mine = need.filter(x => x.code === code), keys = new Set(mine.map(x => x.key));
       const b = new Map(mine.map(x => [x.id, { sale: null, rent: null, peak: null, trough: null, n30: 0, n90: 0, r90: 0, sum: Array(12).fill(0), cnt: Array(12).fill(0),
-        buildYear: idx.c[x.key] || null, hh: kp.m[x.key]?.[0] || null, dongs: kp.m[x.key]?.[1] || null }]));
+        buildYear: idx.c[x.key] || null, hh: kp.m[x.key]?.[0] || null, dongs: kp.m[x.key]?.[1] || null, corr: kp.m[x.key]?.[3] || null }]));
       Data.eachTrade(data.sale, k => keys.has(k), (key, tr) => {
         const x = b.get(`${code}|${key}#${tr.g}`);
         if (!x || tr.direct) return;
