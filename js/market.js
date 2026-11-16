@@ -46,11 +46,27 @@ const Market = (() => {
     $('mkScope').onchange = () => { Store.set('apt.mkScope', $('mkScope').value); render(); };
     $('mkKind').onclick = (e) => { const k = e.target.dataset.k; if (!k) return; kind = k; $('mkKind').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === k)); alerts(); };
     $('mkMetric').onchange = heat;
-    ['mkIdxRegion', 'mkIdxNames', 'mkIdxKind', 'mkIdxSpan', 'mkIdxBase', 'kbwShow', 'kbwNames'].forEach(id => { $(id).onchange = indexChart; });
+    ['mkIdxRegion', 'mkIdxNames', 'mkIdxKind', 'mkIdxSpan', 'mkIdxBase', 'kbwShow', 'kbwNames', 'kbwUnit'].forEach(id => { $(id).onchange = indexChart; });
     $('btnMkExcel').onclick = excel;
     $('mkAlert').onclick = (e) => { const tr = e.target.closest('tr[data-code]'); if (tr) { App.showTab('search'); Search.openRegion(tr.dataset.code); } };
     $('kbwFile').onchange = kbwRead;
-    $('btnKbwClear').onclick = () => { if (!confirm('올려 둔 KB 주간 자료를 지울까요?')) return; Store.remove(KBWKEY); kbwFill(); indexChart(); };
+    $('kbsScope').onchange = kbSignals;
+    $('btnKbwJson').onclick = () => {                                       // 브라우저 변환본 → 저장소에 올릴 data/kb_weekly.json (scripts/kb_weekly.py 결과와 같은 모양)
+      const kb = Store.get(KBWKEY, null); if (!kb) return;
+      const t = new Date(), p2 = (n) => String(n).padStart(2, '0');
+      const { local, at, ...rest } = kb, out = { ...rest, base: '2026.1.12=100', updated: `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())} ${p2(t.getHours())}:${p2(t.getMinutes())}` };
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: 'application/json' })); a.download = 'kb_weekly.json'; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      U.toast('kb_weekly.json 을 받았습니다. GitHub 저장소의 data 폴더에 올리면(덮어쓰기) 모든 기기에서 보입니다.');
+    };
+    $('kbsTable').onclick = (e) => {
+      const th = e.target.closest('th[data-sort]'); if (th) { const k = th.dataset.sort; kbsSort = kbsSort === k ? '-' + k : k; return kbSignals(); }
+      const tr = e.target.closest('tr[data-k]'); if (!tr) return;
+      const o = [...$('kbwNames').options].find(x => x.value === tr.dataset.k); if (!o) return;
+      [...$('kbwNames').options].forEach(x => { x.selected = x === o; }); $('kbwUnit').value = 'w'; indexChart();
+      $('mkIdxChart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    $('btnKbwClear').onclick = () => { if (!confirm('올려 둔 KB 주간 자료를 지울까요?')) return; Store.remove(KBWKEY); kbwFill().then(indexChart); };
     $('kbFile').onchange = kbRead;
     $('kbSheet').onchange = kbPickSheet;
     $('kbCol').onchange = () => { const kb = Store.get(KBKEY, null); if (kb) { kb.sel = $('kbCol').value; Store.set(KBKEY, kb); } indexChart(); };
@@ -61,7 +77,7 @@ const Market = (() => {
     if (!opened) {
       opened = true;
       [regions, sig, rone] = await Promise.all([Data.regions(), Data.signals(), Data.rone()]);
-      kbFill(); kbwFill();
+      kbFill(); await kbwFill();
     }
     render();
   }
@@ -175,6 +191,7 @@ const Market = (() => {
     const want = $('mkIdxKind').value, span = +$('mkIdxSpan').value, rebase = $('mkIdxBase').checked;
     const kinds = [['sale', '매매지수', '--accent'], ['rent', '전세지수', '--rent']].filter(k => want === 'both' || want === k[0]);
     const nowYm = new Date().getFullYear() * 100 + new Date().getMonth() + 1, fromYm = span ? (Math.floor(nowYm / 100) * 12 + nowYm % 100 - 1 - span) : 0;
+    const cutW = (arr) => { const a = arr.filter(([d]) => !span || Math.floor(d / 10000) * 12 + Math.floor(d / 100) % 100 - 1 >= fromYm); const b0 = a[0]?.[1]; return a.map(([d, v]) => ({ x: toX(Math.floor(d / 100), d % 100), y: rebase && b0 ? +(v / b0 * 100).toFixed(2) : v })); };
     const cut = (arr) => { const a = arr.filter(([ym]) => !span || Math.floor(ym / 100) * 12 + ym % 100 - 1 >= fromYm); const b0 = a[0]?.[1]; return a.map(([ym, v]) => ({ x: toX(ym), y: rebase && b0 ? +(v / b0 * 100).toFixed(2) : v })); };
     const picked = [...$('mkIdxNames').selectedOptions].map(o => o.value), PAL = ['#ff9500', '#af52de', '#5ac8fa', '#ff2d55', '#ffcc00', '#30d158', '#64d2ff', '#bf5af2'];
     let pi = 0;
@@ -190,18 +207,19 @@ const Market = (() => {
       if (rebase) notes.push('기간의 첫 달을 100으로 맞춰 견줍니다');
       if (!sets.length) notes.push(`R-ONE 에서 "${reg[2]}" 지역을 찾지 못했습니다. (R-ONE 은 시·구 단위 일부만 제공합니다)`);
     } else if (!rone) notes.push('R-ONE 자료가 아직 없습니다. 점검 화면(가이드·설정)에서 상태를 볼 수 있습니다.');
-    const kbw = Store.get(KBWKEY, null);
-    if (kbw && $('kbwShow').checked) {                                          // KB 주간 지수 (월 평균)
+    if (kbw && $('kbwShow').checked) {                                          // KB 지수 (주간 또는 월 평균)
+      const weekly = $('kbwUnit').value === 'w';
       const KP = ['#34c759', '#ffd60a', '#0a84ff', '#ff6482', '#bf5af2', '#ff9f0a'], names = [];
       if (reg) { const k = `${reg[1]} ${reg[2]}`; if (kbw.keys.includes(k)) names.push(k); }
       for (const o of $('kbwNames').selectedOptions) if (!names.includes(o.value)) names.push(o.value);
       let ki = 0;
       for (const n of names) for (const [k, name] of kinds) {
-        const arr = kbw[k]?.[n]; if (!arr) continue;
-        const pts = kbw.months.map((m, i) => [m, arr[i]]).filter(x => x[1] != null), c = KP[ki++ % KP.length];
-        sets.push({ label: `KB ${name} (${n})`, data: cut(pts), borderColor: c, backgroundColor: c, borderWidth: 2, pointRadius: 0, tension: 0.2, borderDash: [2, 3] });
+        const arr = (weekly ? kbw['w' + k] : kbw[k])?.[n]; if (!arr) continue;
+        const c = KP[ki++ % KP.length];
+        const pts = weekly ? cutW(kbw.weeks.map((d, i) => [d, arr[i]]).filter(x => x[1] != null)) : cut(kbw.months.map((m, i) => [m, arr[i]]).filter(x => x[1] != null));
+        sets.push({ label: `KB ${name}${weekly ? ' 주간' : ''} (${n})`, data: pts, borderColor: c, backgroundColor: c, borderWidth: 2, pointRadius: 0, tension: 0.2, borderDash: [2, 3] });
       }
-      notes.push(`KB 주간 자료: ${kbw.file} (${kbw.at} 올림, 기준 ${kbw.last})`);
+      notes.push(`KB 자료: ${kbw.file} (${kbw.local ? kbw.at + ' 이 브라우저에 올림' : '저장소 자동 변환 ' + kbw.updated}, 기준 ${ymdText(kbw.last)})` + (weekly ? ' · 주간은 최근 3년까지' : ''));
       if (reg && !kbw.keys.includes(`${reg[1]} ${reg[2]}`)) notes.push(`KB 에서 "${reg[2]}" 지역을 찾지 못했습니다 (위 KB 지역 목록에서 직접 고를 수 있습니다)`);
     }
     const kb = Store.get(KBKEY, null);
@@ -221,7 +239,7 @@ const Market = (() => {
   /* ── KB 엑셀: 날짜가 세로, 지역이 가로로 놓인 표를 읽음 ── */
   const isDate = (v) => v instanceof Date || (typeof v === 'number' && v > 30000 && v < 60000) || (typeof v === 'string' && /^\s*(19|20)\d{2}\s*[.\-\/년]\s*\d{1,2}/.test(v));
   function toYmd(v) {
-    if (v instanceof Date) return v.getFullYear() * 10000 + (v.getMonth() + 1) * 100 + v.getDate();
+    if (v instanceof Date) { const t = new Date(v.getTime() + 12 * 3600e3); return t.getFullYear() * 10000 + (t.getMonth() + 1) * 100 + t.getDate(); }   // 엑셀 날짜가 전날 23:59 로 읽히는 문제 보정
     if (typeof v === 'number') { const d = new Date(Math.round((v - 25569) * 864e5)); return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate(); }
     const m = String(v).match(/((?:19|20)\d{2})\D+(\d{1,2})(?:\D+(\d{1,2}))?/);
     return m ? +m[1] * 10000 + +m[2] * 100 + (+m[3] || 15) : 0;
@@ -300,30 +318,44 @@ const Market = (() => {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
     const r0 = rows.findIndex((r, i) => i > 0 && r && isDate(r[0]));
     if (r0 < 2) return null;
-    const keys = kbwKeys(rows[1] || rows[r0 - 1]), byM = new Map();     // 월 → 열별 [합, 개수]
+    const keys = kbwKeys(rows[1] || rows[r0 - 1]), weekly = new Map();   // 날짜 → 열별 값
     for (const r of rows.slice(r0)) {
       if (!r || !isDate(r[0])) continue;
-      const m = Math.floor(toYmd(r[0]) / 100); if (!m) continue;
-      let a = byM.get(m); if (!a) byM.set(m, a = []);
-      for (let c = 1; c < keys.length; c++) if (keys[c] && typeof r[c] === 'number') { const x = a[c] || (a[c] = [0, 0]); x[0] += r[c]; x[1]++; }
+      const d = toYmd(r[0]); if (!d) continue;
+      const v = []; for (let c = 1; c < keys.length; c++) if (keys[c] && typeof r[c] === 'number') v[c] = r[c];
+      weekly.set(d, v);
     }
-    return { keys, byM };
+    return { keys, weekly };
   }
+  /** 엑셀 → { weeks, months, sale/rent(월 평균), wsale/wrent(주간), keys, last } — scripts/kb_weekly.py 와 같은 모양 */
   function kbwParse(wb, file) {
     const S = kbwSheet(wb, /매매.*지수/), R = kbwSheet(wb, /전세.*지수/);
     if (!S && !R) return null;
-    const MAXM = 150;                                                      // 최근 12.5년까지만 저장 (용량)
-    const months = [...new Set([...(S?.byM.keys() || []), ...(R?.byM.keys() || [])])].sort((a, b) => a - b).slice(-MAXM);
-    const out = { file, at: (() => { const t = new Date(); return `${t.getMonth() + 1}/${t.getDate()}`; })(), months, last: months[months.length - 1], sale: {}, rent: {}, keys: [] };
-    for (const [k, X] of [['sale', S], ['rent', R]]) if (X) X.keys.forEach((key, c) => {
-      if (!key) return;
-      const arr = months.map(m => { const x = X.byM.get(m)?.[c]; return x ? +(x[0] / x[1]).toFixed(2) : null; });
-      if (arr.filter(v => v != null).length < 3) return;
-      if (out[k][key]) return;                                              // 같은 이름이 또 나오면 처음 것을 유지
-      out[k][key] = arr; if (!out.keys.includes(key)) out.keys.push(key);
-    });
+    const days = [...new Set([...(S?.weekly.keys() || []), ...(R?.weekly.keys() || [])])].sort((a, b) => a - b);
+    const weeks = days.slice(-156), months = [...new Set(days.map(d => Math.floor(d / 100)))].slice(-150);
+    const t = new Date();
+    const out = { file, at: `${t.getMonth() + 1}/${t.getDate()}`, local: true, last: days[days.length - 1], weeks, months, sale: {}, rent: {}, wsale: {}, wrent: {}, keys: [] };
+    for (const [k, X] of [['sale', S], ['rent', R]]) if (X) {
+      const byM = new Map(); for (const [d, v] of X.weekly) { const m = Math.floor(d / 100); if (!byM.has(m)) byM.set(m, []); byM.get(m).push(v); }
+      X.keys.forEach((key, c) => {
+        if (!key || out[k][key]) return;                                    // 같은 이름이 또 나오면 처음 것을 유지
+        const mon = months.map(m => { const a = (byM.get(m) || []).map(v => v[c]).filter(x => x != null); return a.length ? +(a.reduce((p, q) => p + q, 0) / a.length).toFixed(2) : null; });
+        if (mon.filter(v => v != null).length < 3) return;
+        out[k][key] = mon; out['w' + k][key] = weeks.map(d => { const x = X.weekly.get(d)?.[c]; return x == null ? null : +x.toFixed(2); });
+        if (!out.keys.includes(key)) out.keys.push(key);
+      });
+    }
     return out;
   }
+  /** 쓸 KB 자료: 저장소 자동 변환본(data/kb_weekly.json)과 이 브라우저에 올린 것 중 더 최근 것 */
+  let kbServer;
+  async function kbData() {
+    if (kbServer === undefined) kbServer = (Data.kbWeekly ? await Data.kbWeekly() : null) || null;
+    const loc = Store.get(KBWKEY, null), okLoc = loc && loc.weeks ? loc : null;          // 예전(월 평균만) 형식은 무시
+    if (okLoc && (!kbServer || okLoc.last > kbServer.last)) return okLoc;
+    return kbServer || okLoc;
+  }
+  let kbw = null;                                                           // 지금 쓰는 KB 자료 (차트·신호표가 같이 씀)
   function kbwRead(e) {
     const file = e.target.files[0]; if (!file) return;
     const fr = new FileReader();
@@ -332,21 +364,60 @@ const Market = (() => {
         const wb = XLSX.read(fr.result, { type: 'array', cellDates: true }), kb = kbwParse(wb, file.name);
         if (!kb) return U.toast('"3.매매지수" / "4.전세지수" 시트를 찾지 못했습니다. KB 주간 시계열 파일이 맞는지 확인해 주세요.');
         if (!Store.set(KBWKEY, kb)) return;
-        kbwFill(); indexChart();
+        kbwFill().then(indexChart);
         U.toast(`KB 주간 자료 ${kb.keys.length}개 지역을 월 평균으로 저장했습니다. (기준 ${kb.last})`);
       } catch (err) { console.error(err); U.toast('엑셀 파일을 읽지 못했습니다: ' + (err.message || err)); }
     };
     fr.readAsArrayBuffer(file); e.target.value = '';
   }
-  function kbwFill() {
-    const kb = Store.get(KBWKEY, null), keep = new Set([...$('kbwNames').selectedOptions].map(o => o.value));
+  const ymdText = (d) => d ? `${String(d).slice(0, 4)}.${String(d).slice(4, 6)}.${String(d).slice(6, 8)}` : '';
+  async function kbwFill() {
+    kbw = await kbData();
+    const kb = kbw, keep = new Set([...$('kbwNames').selectedOptions].map(o => o.value));
     $('kbwNames').innerHTML = kb ? kb.keys.map(n => `<option value="${U.esc(n)}" ${keep.has(n) ? 'selected' : ''}>${U.esc(n)}</option>`).join('') : '';
-    $('btnKbwClear').hidden = !kb;
+    $('btnKbwClear').hidden = $('btnKbwJson').hidden = !Store.get(KBWKEY, null);
     if (kb) {
+      kbSignals();
       const have = new Set(kb.keys), miss = regions.filter(r => !have.has(`${r[1]} ${r[2]}`)).length;
-      $('kbwNote').textContent = `${kb.file} · 지역 ${kb.keys.length}개 · 월 평균 ${kb.months.length}개월 (기준 ${kb.last}) · 이 대시보드 지역 중 KB 에서 못 찾은 곳 ${miss}곳 (KB 는 주요 시·구만 제공해 군 단위는 없습니다). KB 지수는 2026.1.12 = 100 기준이라 R-ONE 과 견줄 때는 [첫 달 = 100] 을 켜세요.`;
+      $('kbwNote').textContent = `${kb.local ? '이 브라우저에 올린 자료' : '저장소 자동 변환 자료(' + kb.updated + ')'} · ${kb.file} · 지역 ${kb.keys.length}개 · 주간 ${kb.weeks.length}주 · 월 평균 ${kb.months.length}개월 (기준 ${ymdText(kb.last)}) · 이 대시보드 지역 중 KB 에서 못 찾은 곳 ${miss}곳 (KB 는 주요 시·구만 제공해 군 단위는 없습니다). KB 지수는 2026.1.12 = 100 기준이라 R-ONE 과 견줄 때는 [첫 달 = 100] 을 켜세요.`;
     }
   }
+
+  /** 지역 하나의 주간 신호: 이번 주·4주·12주 변동률(%), 연속 상승/하락 주 수 */
+  function kbStat(kb, key) {
+    const one = (arr) => {
+      if (!arr) return null;
+      const a = arr.filter(v => v != null); if (a.length < 13) return null;
+      const n = a.length, ch = (k) => +((a[n - 1] / a[n - 1 - k] - 1) * 100).toFixed(2);
+      let streak = 0; for (let i = n - 1; i > 0; i--) { const d = a[i] - a[i - 1]; if (d > 0 && streak >= 0) streak++; else if (d < 0 && streak <= 0) streak--; else break; }
+      return { w1: ch(1), w4: ch(4), w12: ch(12), streak, v: a[n - 1] };
+    };
+    return { s: one(kb.wsale[key]), r: one(kb.wrent[key]) };
+  }
+  let kbsSort = '-s.w4';
+  function kbSignals() {
+    const kb = kbw, sc = $('kbsScope');
+    if (!kb) { $('kbsTable').innerHTML = '<tbody><tr><td class="hint" style="padding:16px">KB 자료가 아직 없습니다. 위에서 엑셀을 올리거나 저장소 kb 폴더에 올려 주세요.</td></tr></tbody>'; $('kbsAsOf').textContent = ''; return; }
+    const sidos = [...new Set(kb.keys.map(k => k.split(' ')[0]))], cur = sc.value || Store.get('apt.kbsScope', '서울특별시');
+    if (sc.options.length !== sidos.length + 2) sc.innerHTML = '<option value="*">전국 (시·도만)</option><option value="">전체 지역</option>' + sidos.map(x => `<option>${U.esc(x)}</option>`).join('');
+    sc.value = [...sc.options].some(o => o.value === cur) ? cur : '서울특별시'; Store.set('apt.kbsScope', sc.value);
+    const keys = kb.keys.filter(k => sc.value === '*' ? !k.includes(' ') : !sc.value || k === sc.value || k.startsWith(sc.value + ' '));
+    const rows = keys.map(k => ({ k, ...kbStat(kb, k) })).filter(r => r.s || r.r);
+    rows.forEach(r => { r.gap = r.s && r.r ? +(r.r.w4 - r.s.w4).toFixed(2) : null; });
+    const get = (r, p) => p === 'gap' ? r.gap : p === 'k' ? null : p.split('.').reduce((o, x) => o?.[x], r);
+    const desc = kbsSort.startsWith('-'), key = kbsSort.replace('-', '');
+    rows.sort((a, b) => { if (key === 'k') return a.k.localeCompare(b.k, 'ko') * (desc ? -1 : 1); const x = get(a, key), y = get(b, key); if (x == null) return 1; if (y == null) return -1; return desc ? y - x : x - y; });
+    const pct = (v) => v == null ? '<td class="none">·</td>' : `<td class="r ${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${v > 0 ? '+' : ''}${v.toFixed(2)}%</td>`;
+    const stk = (v) => v == null ? '<td class="none">·</td>' : `<td class="r ${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${v > 0 ? v + '주 연속 ▲' : v < 0 ? -v + '주 연속 ▼' : '보합'}</td>`;
+    const ar = (k) => key === k ? (desc ? ' ▼' : ' ▲') : '';
+    const th = (k, t, tip) => `<th data-sort="${k}" style="cursor:pointer" title="${tip || '눌러서 정렬'}">${t}${ar(k)}</th>`;
+    $('kbsTable').innerHTML = `<thead><tr><th rowspan="2" data-sort="k" style="cursor:pointer">지역${ar('k')}</th><th colspan="4">매매지수</th><th colspan="4">전세지수</th>${th('gap', '전세 강세', '최근 4주 전세 변동률 − 매매 변동률. 플러스면 전세가 더 빨리 올라 투자금이 줄어드는 쪽').replace('<th', '<th rowspan="2"')}</tr><tr>` +
+      ['s', 'r'].map(x => th(x + '.w1', '이번 주') + th(x + '.w4', '4주') + th(x + '.w12', '12주') + th(x + '.streak', '연속')).join('') + '</tr></thead><tbody>' +
+      rows.map(r => `<tr data-k="${U.esc(r.k)}" style="cursor:pointer" title="눌러서 아래 차트에 주간으로 그리기"><td class="l">${U.esc(r.k)}</td>${pct(r.s?.w1)}${pct(r.s?.w4)}${pct(r.s?.w12)}${stk(r.s?.streak)}${pct(r.r?.w1)}${pct(r.r?.w4)}${pct(r.r?.w12)}${stk(r.r?.streak)}${pct(r.gap)}</tr>`).join('') + '</tbody>';
+    $('kbsAsOf').textContent = `기준 ${ymdText(kb.last)} · ${rows.length}개 지역`;
+  }
+  /** 다른 탭(투자금)에서 쓰는: "시도 시군구" → KB 주간 신호 */
+  async function kbStatOf(sido, sgg) { const kb = kbw || (kbw = await kbData()); return kb && kb.keys.includes(`${sido} ${sgg}`) ? { ...kbStat(kb, `${sido} ${sgg}`), last: kb.last } : null; }
 
   /** 다른 탭(리포트)에서 쓰는: 지역코드 → 온도 점수 */
   async function tempOf(code) {
@@ -354,5 +425,5 @@ const Market = (() => {
     const x = sig?.regions[code];
     return x ? { ...temp(x), full: x.full } : null;
   }
-  return { init, open, tempOf };
+  return { init, open, tempOf, kbStatOf };
 })();

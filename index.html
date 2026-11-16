@@ -728,13 +728,17 @@
       <div class="tablewrap"><table id="mkHeat" class="heat"></table></div>
     </section>
     <section class="panel" id="kbPanel">
-      <div class="bar"><strong>KB 시세 올리기</strong> <span class="hint" style="margin:0">— KB 주간 시계열 엑셀을 올리면 이 브라우저에만 저장됩니다 (다른 기기에서는 다시 올려야 합니다)</span></div>
+      <div class="bar"><strong>KB 주간 시계열</strong> <span class="hint" style="margin:0">— 엑셀을 올린 뒤 [저장소용 파일 받기]로 받은 kb_weekly.json 을 저장소 <b>data</b> 폴더에 올리면 모든 기기에서 보입니다</span></div>
       <div class="filters">
-        <label>KB 주간 시계열 엑셀 <input type="file" id="kbwFile" accept=".xlsx,.xls"></label>
-        <button id="btnKbwClear" class="danger" hidden>주간 자료 지우기</button>
+        <label>이 브라우저에서만 바로 올리기 <input type="file" id="kbwFile" accept=".xlsx,.xls"></label>
+        <button id="btnKbwJson" hidden title="저장소 data 폴더에 올릴 작은 파일(kb_weekly.json)을 내려받습니다">⬇ 저장소용 파일(kb_weekly.json) 받기</button>
+        <button id="btnKbwClear" class="danger" hidden>이 브라우저에 올린 자료 지우기</button>
         <label>KB 지역 직접 고르기 (Ctrl·⌘ 로 여러 개) <select id="kbwNames" multiple size="4" style="min-width:240px"></select></label>
       </div>
-      <p class="hint" id="kbwNote">파일의 "3.매매지수", "4.전세지수" 시트를 읽어 월 평균 지수로 바꿔 저장합니다. 가격지수 흐름의 지역을 고르면 같은 지역의 KB 지수가 함께 그려집니다. KB 지수는 2026.1.12 = 100 기준이라 R-ONE 과 견줄 때는 [첫 달 = 100] 을 켜세요.</p>
+      <p class="hint" id="kbwNote">KB 자료가 아직 없습니다. KB 부동산에서 받은 "주간시계열" 엑셀을 저장소 kb 폴더에 올려 주세요.</p>
+      <div class="bar" style="margin-top:6px"><strong>KB 주간 신호</strong><label class="inline">범위 <select id="kbsScope"></select></label><span class="hint" id="kbsAsOf" style="margin:0"></span></div>
+      <p class="hint">변동률은 KB 지수 기준(%). <b>연속</b> = 지수가 몇 주째 오르거나(▲) 내리는지(▼). <b>전세 강세</b> = 최근 4주 전세 변동률 − 매매 변동률 (플러스면 전세가 더 빨리 올라 투자금이 줄어드는 쪽). 줄을 누르면 아래 차트에 주간으로 그립니다.</p>
+      <div class="tablewrap short"><table id="kbsTable" class="data"></table></div>
       <details class="panel" style="margin:6px 0 0"><summary>다른 KB 엑셀(날짜가 세로·지역이 가로인 시트) 직접 고르기</summary>
         <div class="filters">
           <label>KB 엑셀 올리기 <input type="file" id="kbFile" accept=".xlsx,.xls,.csv"></label>
@@ -752,7 +756,8 @@
         <label>기간 <select id="mkIdxSpan"><option value="12">최근 1년</option><option value="36" selected>최근 3년</option><option value="60">최근 5년</option><option value="120">최근 10년</option><option value="0">전체</option></select></label>
         <label class="inline" style="align-self:flex-end"><input type="checkbox" id="mkIdxBase"> 첫 달 = 100 으로 맞춰 견주기</label>
         <label>견줄 지역 직접 고르기 (Ctrl·⌘ 로 여러 개) <select id="mkIdxNames" multiple size="4" style="min-width:220px"></select></label>
-        <label class="inline" style="align-self:flex-end"><input type="checkbox" id="kbwShow" checked> KB 주간 지수(월 평균)도 함께 그리기</label>
+        <label class="inline" style="align-self:flex-end"><input type="checkbox" id="kbwShow" checked> KB 지수도 함께 그리기</label>
+        <label>KB 단위 <select id="kbwUnit"><option value="m">월 평균</option><option value="w">주간 (최근 3년)</option></select></label>
       </div>
       <p class="hint" id="mkIdxNote"></p>
       <div class="chartbox"><canvas id="mkIdxChart"></canvas></div>

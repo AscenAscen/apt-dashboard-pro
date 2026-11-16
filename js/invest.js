@@ -63,10 +63,14 @@ const Invest = (() => {
     const q = [...list];
     await Promise.all(Array.from({ length: 6 }, async () => { while (q.length) { const r = q.shift(); try { await step(r); } catch (e) { console.error(e); done++; } } }));
     if (my !== seq) return;
+    if (typeof Market !== 'undefined' && Market.kbStatOf) for (const r of many) {      // KB 주간 신호 붙이기 (KB 에 있는 지역만)
+      const k = await Market.kbStatOf(r.sido, r.sgg);
+      r.kb = k ? { s4: k.s?.w4 ?? null, r4: k.r?.w4 ?? null, gap: k.s && k.r ? +(k.r.w4 - k.s.w4).toFixed(2) : null } : { s4: null, r4: null, gap: null };
+    }
     manyTitle = `${scope || '전국'} · ${mons > 1 ? `${lab(fromYm)}~${lab(m)} (${mons}개월)` : lab(m)}`;
     renderMany();
   }
-  const getK = (r, k) => { const [sz, f] = k.replace('-', '').split('.'); return f ? r[sz][f] : r[sz]; };
+  const getK = (r, k) => { const [sz, f] = k.replace('-', '').split('.'); return f ? r[sz]?.[f] ?? null : r[sz]; };
   function renderMany() {
     if (!many.length) { $('ivmOut').innerHTML = '<p class="empty">자료가 있는 지역이 없습니다.</p>'; return; }
     const desc = sortBy.startsWith('-'), key = sortBy.replace('-', '');
@@ -78,17 +82,20 @@ const Invest = (() => {
     });
     const order = SIZES.slice().reverse(), arrow = (k) => (key === k ? (desc ? ' ▼' : ' ▲') : '');
     const th = (k, t) => `<th data-sort="${k}" style="cursor:pointer" title="눌러서 정렬">${t}${arrow(k)}</th>`;
-    const head = `<thead><tr><th rowspan="2" data-sort="name" style="cursor:pointer">지역${arrow('name')}</th>` + order.map(s => `<th colspan="3">전용 ${s.k}㎡</th>`).join('') + '</tr><tr>' +
-      order.map(s => th(s.k + '.sale', '평균 매매가') + th(s.k + '.rent', '평균 전세가') + th(s.k + '.inv', '투자금')).join('') + '</tr></thead>';
-    const body = rows.map(r => `<tr data-code="${r.code}" style="cursor:pointer" title="눌러서 이 지역 월별 보기"><td class="l">${$('ivmScope').value ? '' : U.esc(r.sido) + ' '}${U.esc(r.sgg)}</td>${order.map(s => cell(r[s.k], true)).join('')}</tr>`).join('');
+    const hasKb = many.some(r => r.kb && (r.kb.s4 != null || r.kb.r4 != null));
+    const pct = (v) => v == null ? '<td class="none">·</td>' : `<td class="r ${v > 0 ? 'up' : v < 0 ? 'down' : ''}">${v > 0 ? '+' : ''}${v.toFixed(2)}%</td>`;
+    const head = `<thead><tr><th rowspan="2" data-sort="name" style="cursor:pointer">지역${arrow('name')}</th>` + order.map(s => `<th colspan="3">전용 ${s.k}㎡</th>`).join('') + (hasKb ? '<th colspan="3" title="KB 주간 지수 최근 4주 변동률">KB 최근 4주</th>' : '') + '</tr><tr>' +
+      order.map(s => th(s.k + '.sale', '평균 매매가') + th(s.k + '.rent', '평균 전세가') + th(s.k + '.inv', '투자금')).join('') +
+      (hasKb ? th('kb.s4', '매매') + th('kb.r4', '전세') + th('kb.gap', '전세 강세') : '') + '</tr></thead>';
+    const body = rows.map(r => `<tr data-code="${r.code}" style="cursor:pointer" title="눌러서 이 지역 월별 보기"><td class="l">${$('ivmScope').value ? '' : U.esc(r.sido) + ' '}${U.esc(r.sgg)}</td>${order.map(s => cell(r[s.k], true)).join('')}${hasKb ? pct(r.kb?.s4) + pct(r.kb?.r4) + pct(r.kb?.gap) : ''}</tr>`).join('');
     const none = many.filter(r => SIZES.every(s => !r[s.k].ns && !r[s.k].nr)).length;
-    $('ivmOut').innerHTML = `<div class="bar"><strong>${U.esc(manyTitle)}</strong><span class="hint" style="margin:0">— ${many.length}개 지역${none ? ` (거래 없음 ${none}곳)` : ''} · 머리글을 누르면 정렬, 줄을 누르면 아래에 그 지역 월별 표</span></div><div class="tablewrap"><table class="data" id="ivmTable">${head}<tbody>${body}</tbody></table></div>`;
+    $('ivmOut').innerHTML = `<div class="bar"><strong>${U.esc(manyTitle)}</strong><span class="hint" style="margin:0">— ${many.length}개 지역${none ? ` (거래 없음 ${none}곳)` : ''} · 머리글을 누르면 정렬, 줄을 누르면 아래에 그 지역 월별 표${hasKb ? ' · KB 전세 강세가 플러스면 전세가 더 빨리 올라 투자금이 줄어드는 지역 (KB 에 없는 군 단위는 ·)' : ''}</span></div><div class="tablewrap"><table class="data" id="ivmTable">${head}<tbody>${body}</tbody></table></div>`;
   }
   function excelMany() {
     if (!many.length) return U.toast('먼저 [한눈에 보기]를 눌러 주세요.');
     const order = SIZES.slice().reverse(), rd = (v) => v == null ? '' : Math.round(v);
-    const out = [['시/도', '시/군/구', ...order.flatMap(s => [`${s.k}㎡ 평균 매매가(만원)`, `${s.k}㎡ 매매 건수`, `${s.k}㎡ 평균 전세가(만원)`, `${s.k}㎡ 전세 건수`, `${s.k}㎡ 투자금(만원)`])]];
-    for (const r of many) out.push([r.sido, r.sgg, ...order.flatMap(s => { const c = r[s.k]; return [rd(c.sale), c.ns, rd(c.rent), c.nr, rd(c.inv)]; })]);
+    const out = [['시/도', '시/군/구', ...order.flatMap(s => [`${s.k}㎡ 평균 매매가(만원)`, `${s.k}㎡ 매매 건수`, `${s.k}㎡ 평균 전세가(만원)`, `${s.k}㎡ 전세 건수`, `${s.k}㎡ 투자금(만원)`]), 'KB 매매 4주(%)', 'KB 전세 4주(%)', 'KB 전세 강세(%p)']];
+    for (const r of many) out.push([r.sido, r.sgg, ...order.flatMap(s => { const c = r[s.k]; return [rd(c.sale), c.ns, rd(c.rent), c.nr, rd(c.inv)]; }), r.kb?.s4 ?? '', r.kb?.r4 ?? '', r.kb?.gap ?? '']);
     U.download(`투자금_지역별_${manyTitle.replace(/[\s·~()]+/g, '_')}_${U.stamp()}`, [{ name: '지역별 투자금', rows: out }], 'xlsx');
   }
 
