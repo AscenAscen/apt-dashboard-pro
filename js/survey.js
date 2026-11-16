@@ -512,7 +512,7 @@ const Survey = (() => {
         `<td class="c"><button class="mini cand${rc.cand ? ' on' : ''}" data-cand="${i}" title="후보로 표시">${rc.cand ? '★' : '☆'}</button></td>` +
         `<td><select data-f="status" class="st">${Tracking.STATUSES.map(s => `<option ${s === (rc.status || '') ? 'selected' : ''} value="${s}">${s || '-'}</option>`).join('')}</select></td>` +
         `${cell('band')}<td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(r.dong)}</td><td class="l info">${inp('zone', '생활권')}</td>` +
-        `<td class="l name">${U.esc(r.name)}${c.isNew ? ' <span class="tag">새 거래</span>' : ''}</td>` +
+        `<td class="l name"><a href="#" class="cxlink" data-cx="${U.esc(r.id)}" title="단지 한 장 요약">${U.esc(r.name)}</a>${c.isNew ? ' <span class="tag">새 거래</span>' : ''}</td>` +
         `<td>${r.buildYear || '-'}</td><td>${r.buildYear ? CONFIG.toAge(r.buildYear) : '-'}</td><td>${inp('households', r.hh ? String(r.hh) : '직접 입력')}</td><td>${r.g}㎡<small>${U.esc(rc.pyeong || CONFIG.toPyeong(r.g) + '평')}</small></td><td class="info">${inp('structure', '계/복')}</td><td class="info">${inp('rooms')}</td><td class="info">${inp('baths')}</td>` +
         `<td><a class="btn mini" href="${U.esc(link)}" target="_blank" rel="noopener">열기</a></td>` +
         `${over('peakO', c.peak, r.peak)}${cell('drop')}${over('troughO', c.trough, r.trough)}${cell('rise')}${cell('ask')}` +

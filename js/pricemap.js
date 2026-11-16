@@ -132,7 +132,7 @@ const PriceMap = (() => {
         <label>매매 <input id="ppS" inputmode="decimal" value="${inEok(q.s)}" placeholder="예: 7.5"></label>
         <label>전세 <input id="ppR" inputmode="decimal" value="${inEok(q.r)}" placeholder="예: 4.2"></label>
         <button class="primary" data-pp="save" data-id="${U.esc(r.id)}">저장</button></div>
-      <div class="bar"><button data-pp="table" data-id="${U.esc(r.id)}">시세트래킹 표에서 보기</button><button data-pp="hide" data-id="${U.esc(r.id)}">지도에서 숨기기</button>${inMap ? `<button data-pp="out" data-id="${U.esc(r.id)}">${MAPF} 폴더에서 빼기</button>` : ''}</div>`;
+      <div class="bar"><button data-cx="${U.esc(r.id)}">단지 요약</button><button data-pp="table" data-id="${U.esc(r.id)}">시세트래킹 표에서 보기</button><button data-pp="hide" data-id="${U.esc(r.id)}">지도에서 숨기기</button>${inMap ? `<button data-pp="out" data-id="${U.esc(r.id)}">${MAPF} 폴더에서 빼기</button>` : ''}</div>`;
     box.hidden = false;
     setTimeout(() => { const s = $('ppS'); if (s && !s.value) s.focus(); }, 30);
   }

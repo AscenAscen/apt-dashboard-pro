@@ -113,6 +113,9 @@ const Tracking = (() => {
     return n;
   }
 
+  /** 다른 화면(단지 요약)에서 한 칸 고치기: 메모·생활권·세대수 등 */
+  function setField(id, f, v) { const it = items.find(x => x.id === id); if (!it) return false; it[f] = v; if (f === 'households') delete it.hhAuto; save(); render(); return true; }
+
   /** 다른 탭(시세지도)에서 호가 적기: patch = { s, r } (만원, null 이면 지움) */
   function setQuote(id, ym, patch) {
     const it = items.find(x => x.id === id); if (!it) return false;
@@ -482,7 +485,7 @@ const Tracking = (() => {
       const qin = (m, f, ph, isPrice, first) => { const v = (it.quotes[m] || {})[f]; return `<td class="${first ? 'gl' : ''}"><input class="num" data-m="${m}" data-q="${f}" inputmode="decimal" value="${isPrice ? eok(v) : (v ?? '')}" placeholder="${ph}"></td>`; };
       return `<tr data-i="${i}" class="${isNew(it) ? 'newtrade' : ''}"><td class="c"><input type="checkbox" data-chk="${i}" ${checked.has(it.id) ? 'checked' : ''}></td>` +
         `${cell('band')}<td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(it.dong)}</td><td class="l info">${inp(it, 'zone', '', '생활권')}</td>` +
-        `<td class="l name" title="${U.esc(it.folders.join(', '))}">${U.esc(it.name)}${isNew(it) ? ' <span class="tag">새 거래</span>' : ''}</td>` +
+        `<td class="l name" title="${U.esc(it.folders.join(', '))}"><a href="#" class="cxlink" data-cx="${U.esc(it.id)}" title="단지 한 장 요약">${U.esc(it.name)}</a>${isNew(it) ? ' <span class="tag">새 거래</span>' : ''}</td>` +
         `<td>${it.buildYear || '-'}</td><td>${it.buildYear ? CONFIG.toAge(it.buildYear) : '-'}</td><td class="info">${inp(it, 'households', it.hhAuto ? 'auto' : '', '직접 입력')}</td><td>${it.g}㎡<small>${U.esc(pyeong(it))}</small></td><td class="info">${inp(it, 'structure', '', '계/복')}</td><td class="info">${inp(it, 'rooms')}</td><td class="info">${inp(it, 'baths')}</td>` +
         `<td class="info">${inp(it, 'link', 'wide', '직접 입력')} <a class="btn mini" href="${U.esc(link(it))}" target="_blank" rel="noopener">열기</a></td>` +
         `${over('peakO', c.peak, c.peakAuto)}${cell('drop')}${over('troughO', c.trough, c.troughAuto)}${cell('rise')}${cell('ask')}` +
@@ -530,7 +533,7 @@ const Tracking = (() => {
       const c = compute(it), q = it.quotes[m0] || {}, p = it.quotes[p0] || {}, g = c.groups[0];
       const qin = (f, ph, isPrice) => `<input class="num" data-m="${m0}" data-q="${f}" inputmode="decimal" value="${isPrice ? eok(q[f]) : (q[f] ?? '')}" placeholder="${ph}">`;
       return `<div class="tcard${isNew(it) ? ' newtrade' : ''}" data-i="${i}">
-        <div class="thead"><label><input type="checkbox" data-chk="${i}" ${checked.has(it.id) ? 'checked' : ''}> <b>${U.esc(it.name)}</b> ${it.g}㎡ <small>${U.esc(pyeong(it))}</small></label>
+        <div class="thead"><label><input type="checkbox" data-chk="${i}" ${checked.has(it.id) ? 'checked' : ''}> <b>${U.esc(it.name)}</b> ${it.g}㎡ <small>${U.esc(pyeong(it))}</small></label> <a href="#" class="cxlink mini" data-cx="${U.esc(it.id)}" title="단지 한 장 요약">요약</a>
 </div>
         <div class="tsub">${U.esc(it.sgg)} ${U.esc(it.dong)}${it.buildYear ? ` · ${it.buildYear}년` : ''}${p0 ? ` · 지난 기록 매매 ${p.s != null ? eok(p.s) + '억' : '-'} / 전세 ${p.r != null ? eok(p.r) + '억' : '-'}` : ''}</div>
         <div class="tgrid"><label>매매(억) ${qin('s', '예: 14.3', true)}</label><label>매물 수 ${qin('sn', '개')}</label><label>전세(억) ${qin('r', '예: 7.5', true)}</label><label>매물 수 ${qin('rn', '개')}</label></div>
@@ -712,5 +715,5 @@ const Tracking = (() => {
   }
 
   const ext = () => ({ get items() { return items; }, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, folderList: () => folders, setFolders: (f) => { folders = f; Store.set(FKEY, folders); if (!folders.includes(curFolder)) { curFolder = ''; Store.set('apt.curFolder', ''); } fillSelects(); render(); } });
-  return { ext, init, add, fillHH, setQuote, removeFrom, focus, renameFolder, deleteFolder, moveFolder, pinFolder, pickFolder, folderList: () => folders, folderCount: (f) => items.filter(it => it.folders.includes(f)).length, curFolder: () => curFolder, checkedIds: () => [...checked], all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
+  return { ext, init, add, fillHH, setField, setQuote, removeFrom, focus, renameFolder, deleteFolder, moveFolder, pinFolder, pickFolder, folderList: () => folders, folderCount: (f) => items.filter(it => it.folders.includes(f)).length, curFolder: () => curFolder, checkedIds: () => [...checked], all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
 })();

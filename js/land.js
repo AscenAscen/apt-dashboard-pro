@@ -90,7 +90,7 @@ const Land = (() => {
   function table(list) {
     $('ldTable').innerHTML = '<thead><tr><th>등급</th><th class="l">지역</th><th class="l">단지</th><th>평형</th><th>지금 가격</th><th>최근 실거래</th><th>전고점</th><th>전고 대비</th><th>12개월 실거래</th><th>세대수</th><th class="c">관리</th></tr></thead><tbody>' +
       list.map(l => { const x = info(l); return `<tr data-id="${U.esc(l.id)}"><td><select class="st" data-grade>${CONFIG.GRADES.map(g => `<option value="${g.k}" ${g.k === l.grade ? 'selected' : ''}>${g.k}</option>`).join('')}</select></td>` +
-        `<td class="l">${U.esc(l.sgg)} ${U.esc(l.dong)}</td><td class="l"><b style="color:${grade(l.grade).color}">●</b> ${U.esc(l.name)}</td><td>${l.g}㎡<small>${CONFIG.toPyeong(l.g)}평</small></td>` +
+        `<td class="l">${U.esc(l.sgg)} ${U.esc(l.dong)}</td><td class="l"><b style="color:${grade(l.grade).color}">●</b> <a href="#" class="cxlink" data-cx="${U.esc(l.id)}">${U.esc(l.name)}</a></td><td>${l.g}㎡<small>${CONFIG.toPyeong(l.g)}평</small></td>` +
         `<td class="sale">${x.p ? U.price(x.p.v) + (x.p.quoted ? '' : ' <span class="star">실</span>') : '-'}</td><td>${x.rl.sale ? `${U.price(x.rl.sale.price)}<small>${U.date(x.rl.sale.d)}${Kit.badge(x.rl.sale.d)}</small>` : '-'}</td>` +
         `<td>${x.rl.peak ? `${U.price(x.rl.peak.price)}<small>${U.date(x.rl.peak.d)}</small>` : '-'}</td><td class="${U.cls(x.drop)}">${U.pct(x.drop)}</td><td>${Kit.spark(x.rl.mon || [])}</td><td>${x.rl.hh ? x.rl.hh.toLocaleString() : '-'}</td>` +
         `<td class="c"><button class="mini" data-track>${Tracking.has(l.id) ? '★' : '트래킹 담기'}</button> <button class="mini danger" data-del>빼기</button></td></tr>`; }).join('') + '</tbody>';

@@ -120,7 +120,7 @@ const App = (() => {
     $('mapModal').onclick = (e) => { if (e.target.id === 'mapModal') closeMap(); };
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); ['realModal', 'codeModal', 'pasteModal'].forEach(id => { $(id).hidden = true; }); document.body.classList.remove('imjang-mode'); } });
     Guide.init();
-    Tracking.init(); if (typeof TrkPlus !== "undefined") TrkPlus.init(); if (typeof Sync !== "undefined") Sync.init();
+    Tracking.init(); if (typeof TrkPlus !== "undefined") TrkPlus.init(); if (typeof Sync !== "undefined") Sync.init(); if (typeof CxView !== "undefined") CxView.init();
     QLog.check();              // 지금 상태를 기준으로 삼아, 이후에 고친 호가만 이력에 남김
     Vault.init();
     Grouping.init();

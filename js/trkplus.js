@@ -134,6 +134,7 @@ const TrkPlus = (() => {
     $('btnTpBulk').onclick = () => { $('tpBulk').hidden = !$('tpBulk').hidden; };
     $('btnTpApply').onclick = apply;
     $('btnTpCheck').onclick = check;
+    $('btnTpSim').onclick = () => { const id = T.items.find(it => T.checked.has(it.id))?.id; if (!id) return U.toast('먼저 표에서 단지를 체크하세요.'); CxView.open(id, { sim: true }); };
     $('btnTpHH').onclick = async () => { const b = $('btnTpHH'); b.disabled = true; try { await Tracking.fillHH(); } finally { b.disabled = false; } };
     $('btnTpHist').onclick = hist;
     $('btnTpGap').onclick = () => { $('trkShow').value = 'gap'; T.checked.clear(); T.render(); drawer(false); };

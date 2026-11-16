@@ -471,7 +471,7 @@ const Search = (() => {
       $('recentPanel').hidden = false;
       $('recentTitle').textContent = `${reg[1]} ${reg[2]}${dong ? ' ' + dong : ''} — 가장 최근 ${recentKind === 'sale' ? '매매' : '전세'} 실거래 (${recentRows.length}건 / 최근 2년 ${out.length.toLocaleString()}건)`;
       $('recentTable').innerHTML = `<thead><tr><th>계약일</th><th class="l">동</th><th class="l">단지</th><th>전용㎡</th><th>평</th><th>층</th><th>${recentKind === 'sale' ? '매매가' : '전세 보증금'}</th><th>구분</th></tr></thead><tbody>` +
-        (recentRows.length ? recentRows.map((r, i) => `<tr data-i="${i}" style="cursor:pointer"><td>${U.date(r.t.d)}${Kit.badge(r.t.d)}</td><td class="l">${U.esc(r.dong)}</td><td class="l"><b>${U.esc(r.name)}</b></td><td>${r.t.area ?? r.t.g}</td><td>${CONFIG.toPyeong(r.t.g)}</td><td>${r.t.floor ?? ''}</td><td class="${recentKind}">${U.price(r.t.price)}</td><td>${r.t.direct ? '직거래' : ''}</td></tr>`).join('')
+        (recentRows.length ? recentRows.map((r, i) => `<tr data-i="${i}" style="cursor:pointer"><td>${U.date(r.t.d)}${Kit.badge(r.t.d)}</td><td class="l">${U.esc(r.dong)}</td><td class="l"><a href="#" class="cxlink" data-cx="${U.esc(`${r.code}|${r.key}#${r.t.g}`)}"><b>${U.esc(r.name)}</b></a></td><td>${r.t.area ?? r.t.g}</td><td>${CONFIG.toPyeong(r.t.g)}</td><td>${r.t.floor ?? ''}</td><td class="${recentKind}">${U.price(r.t.price)}</td><td>${r.t.direct ? '직거래' : ''}</td></tr>`).join('')
           : '<tr><td colspan="8" style="color:var(--sub);padding:18px">최근 2년 안에 수집된 거래가 없습니다. 수집이 아직 이 지역까지 오지 않았을 수 있습니다.</td></tr>') + '</tbody>';
       $('recentPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } finally { btn.disabled = false; }

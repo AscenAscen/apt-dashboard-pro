@@ -94,8 +94,24 @@ def _get(url, tries=2):
             if code in (401, 403):
                 raise Stop("인증키가 이 API 에 승인되지 않았습니다(HTTP %s). 포털에서 활용신청 상태를 확인하세요." % code)
             last = e
+            if code == 400:                        # 요청 형식 오류는 다시 해도 같으므로 바로 넘김
+                break
             time.sleep(1 + i * 2)
-    raise RuntimeError("%s: %s" % (type(last).__name__, last))
+    raise RuntimeError(_why(last))
+
+
+def _why(e):
+    """오류를 사람이 읽을 수 있게: 'HTTP 400 · 응답: <앞부분>' (응답 본문을 같이 남겨 원인을 찾기 쉽게)"""
+    code = getattr(e, "code", None)
+    body = ""
+    try:
+        if hasattr(e, "read"):
+            body = e.read().decode("utf-8", errors="replace")
+    except Exception:
+        pass
+    body = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", body)).strip()[:160]   # XML 태그는 빼고 글자만
+    head = ("HTTP %s" % code) if code else type(e).__name__
+    return head + (" · 응답: " + body if body else (" · " + str(e) if not code else ""))
 
 
 # ═════════════════════════ 1) 단지 정보 ═════════════════════════
@@ -165,7 +181,7 @@ class Kapt:
         """되는 주소를 찾아 기억해 두고 호출"""
         saved = self.state.get(kind + "Url")
         order = ([saved] if saved in urls else []) + [u for u in urls if u != saved]
-        last = None
+        errs = []
         for url in order:
             q = "&".join("%s=%s" % (k, urllib.parse.quote(str(v), safe="")) for k, v in params.items())
             self.calls += 1
@@ -174,7 +190,9 @@ class Kapt:
             except Stop:
                 raise
             except Exception as e:
-                last = e
+                short = "/".join(url.split("/")[-2:])
+                errs.append("%s → %s" % (short, e))
+                print("[단지정보] %s 실패: %s" % (short, e))
                 if saved == url:
                     raise                           # 원래 되던 주소면 일시 오류로 보고 다른 주소는 찾지 않음
                 continue
@@ -183,14 +201,14 @@ class Kapt:
                 print("[단지정보] %s 주소 확인: %s" % ("목록" if kind == "list" else "기본정보", url))
             time.sleep(DELAY_SEC)
             return out
-        raise RuntimeError("쓸 수 있는 주소를 찾지 못했습니다 (%s)" % last)
+        raise RuntimeError("쓸 수 있는 주소를 찾지 못했습니다 — " + " | ".join(errs))
 
     def list(self, code):
         out, page = [], 1
         while True:
-            items, total = self._call("list", KAPT_LIST_URLS, {"sigunguCode": code, "pageNo": page, "numOfRows": 1000})
+            items, total = self._call("list", KAPT_LIST_URLS, {"sigunguCode": code, "pageNo": page, "numOfRows": 100})
             out += items
-            if not items or len(out) >= total or page >= 20:
+            if not items or len(out) >= total or page >= 200:
                 return out
             page += 1
 
@@ -306,7 +324,7 @@ def run_kapt(regions, state, deadline, today, status):
                     raw[kc] = [name, dong, jibun, _int(info.get("kaptdaCnt")), _int(info.get("kaptDongCnt"))]
                 if complete:
                     done[code] = today.isoformat()
-            m = match(raw, idx.keys())
+            m = {**(cur.get("m") or {}), **match(raw, idx.keys())}   # K-apt 엑셀(kapt_file.py)로 채운 값도 남김
             if m != cur.get("m") or raw != cur.get("raw"):
                 write_json(path, {"m": m, "raw": raw, "n": len(m), "total": len(idx)})
             if stop:

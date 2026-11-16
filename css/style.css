@@ -555,3 +555,28 @@ tr.flash td { animation: flashrow 2.4s ease; }
 #tpFolders button.on { background: var(--accent); border-color: var(--accent); }
 #tpFolders a { color: var(--text); text-decoration: none; font-weight: 600; }
 #trkTable input.auto, #trkCards input.auto { color: var(--sub); font-style: italic; }
+
+/* ── 단지 한 장 요약 ── */
+a.cxlink, .cxlink { color: inherit; text-decoration: underline dotted rgba(128,128,128,.6); text-underline-offset: 3px; cursor: pointer; }
+a.cxlink:hover, .cxlink:hover { color: var(--accent); }
+a.cxlink.mini { font-size: 12px; margin-left: 6px; }
+#cxModal { align-items: flex-start; overflow: auto; }
+.cxbox { width: min(1100px, 100%); max-height: none; margin: 10px auto; }
+.cxtop { display: flex; gap: 6px; align-items: center; position: sticky; top: 0; }
+.cxhead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.cxhead h3 { margin: 0; font-size: 1.35em; }
+.cxbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+.cxbtns a.btn { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); text-decoration: none; }
+.cxareas { margin: 10px 0; }
+.cxstats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin: 6px 0 12px; }
+.cxstat { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.cxstat span { font-size: .82em; color: var(--sub); } .cxstat b { font-size: 1.15em; } .cxstat small { color: var(--sub); font-size: .78em; }
+.cxchart { height: 300px; margin-bottom: 12px; }
+.cxcols { display: grid; grid-template-columns: 1.2fr 1fr; gap: 14px; }
+.cxcols h4, .cxsim h4 { margin: 4px 0 6px; }
+.cxmemo { display: flex; flex-direction: column; gap: 4px; } .cxmemo textarea { width: 100%; box-sizing: border-box; }
+.cxsim { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.cxsimctl label.inline { display: inline-flex; flex-direction: row; align-items: center; gap: 3px; }
+.cxsimctl { align-items: center; }
+tr.dim td { opacity: .55; }
+@media (max-width: 760px) { #cxModal { padding: 0; } .cxbox { border-radius: 0; margin: 0; min-height: 100vh; } .cxcols { grid-template-columns: 1fr; } .cxchart { height: 230px; } }

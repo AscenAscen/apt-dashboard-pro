@@ -340,6 +340,7 @@
         <button id="btnTpBulk">✎ 일괄 편집</button>
         <button id="btnTrkTrades" class="primary" title="체크한 단지의 매매·전세 실거래를 표 아래에서 기간 골라 봅니다">실거래 조회</button>
         <button id="btnTpHist">호가 이력</button>
+        <button id="btnTpSim" title="체크한 첫 단지와 가격·평형·연식·세대수가 비슷한 단지를 찾습니다">비슷한 단지 찾기</button>
         <button id="btnTrkSame" title="최신 달이 비어 있는 단지에 바로 앞 기록을 그대로 넣습니다">지난 기록과 같음</button>
         <span class="sep"></span>
         <label>폴더 <select id="trkMoveTo"></select></label><button id="btnTrkAddTo" title="지금 폴더에도 두고 이 폴더에도 담습니다">이 폴더에도 담기</button><button id="btnTrkMove">이 폴더로 옮기기</button><button id="btnTrkOut">지금 폴더에서 빼기</button>
@@ -1109,7 +1110,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;
