@@ -580,3 +580,5 @@ a.cxlink.mini { font-size: 12px; margin-left: 6px; }
 .cxsimctl { align-items: center; }
 tr.dim td { opacity: .55; }
 @media (max-width: 760px) { #cxModal { padding: 0; } .cxbox { border-radius: 0; margin: 0; min-height: 100vh; } .cxcols { grid-template-columns: 1fr; } .cxchart { height: 230px; } }
+.trkinfo { margin: 0 0 8px; } .trkinfo label { flex-direction: row; align-items: center; gap: 4px; }
+span.est { color: var(--sub); }

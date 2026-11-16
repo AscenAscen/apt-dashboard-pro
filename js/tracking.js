@@ -146,7 +146,7 @@ const Tracking = (() => {
   function focus(id) {
     const it = items.find(x => x.id === id); if (!it) return;
     if (curFolder && !it.folders.includes(curFolder)) { curFolder = ''; Store.set('apt.curFolder', ''); }
-    ['trkRegion', 'trkBand', 'trkShow'].forEach(k => { $(k).value = ''; });
+    ['trkRegion', 'trkBand', 'trkShow', 'trkHH', 'trkPy', 'trkSt', 'trkRm', 'trkBa'].forEach(k => { if ($(k)) $(k).value = ''; });
     fillSelects(); render();
     const i = visible().indexOf(it), tr = document.querySelector(`#trkTable tr[data-i="${i}"]`) || document.querySelector(`#trkCards [data-i="${i}"]`);
     if (tr) { tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); tr.classList.add('flash'); setTimeout(() => tr.classList.remove('flash'), 2500); }
@@ -234,7 +234,7 @@ const Tracking = (() => {
       if (!addMonth(ym)) return U.toast(`${ymLabel(ym)} 칸은 이미 있습니다.`);
       render(); U.toast(`${ymLabel(ym)} 시세 칸을 추가했습니다. 매매·전세 가격을 적어 주세요.`);
     };
-    ['trkRegion', 'trkBand', 'trkShow', 'trkSort'].forEach(id => { $(id).onchange = () => { checked.clear(); render(); }; });
+    ['trkRegion', 'trkBand', 'trkShow', 'trkSort', 'trkHH', 'trkPy', 'trkSt', 'trkRm', 'trkBa'].forEach(id => { if ($(id)) $(id).onchange = () => { checked.clear(); render(); }; });
     $('trkFolders').onchange = (e) => { if (e.target.matches('select.fmore') && e.target.value) pickFolder(e.target.value); };
     $('trkFolders').onclick = (e) => {
       const pin = e.target.closest('[data-pin]');
@@ -313,12 +313,34 @@ const Tracking = (() => {
     const bl = [...bands.keys()].sort((a, b) => (parseFloat(a) || 0) - (parseFloat(b) || 0));
     $('trkBand').innerHTML = '<option value="">전체</option>' + bl.map(b => `<option value="${b}">${b} (${bands.get(b)})</option>`).join('');
     $('trkBand').value = bands.has(curB) ? curB : '';
+    fillInfoFilters(inF);
   }
 
+  /* ── 단지 조건 필터: 세대수·평형·구조·방·화 ── */
+  const HHB = [['', '전체'], ['s', '300세대 미만'], ['m', '300~499'], ['l', '500~999'], ['x', '1,000세대 이상'], ['?', '모름']];
+  const hhOf = (it) => { const h = parseInt(it.households, 10); return isNaN(h) ? '?' : h < 300 ? 's' : h < 500 ? 'm' : h < 1000 ? 'l' : 'x'; };
+  const pyOf = (it) => CONFIG.toPyeong(it.g) + '평';
+  const nOf = (v) => { const n = parseInt(v, 10); return isNaN(n) ? '?' : n >= 4 ? '4' : String(n); };
+  function infoOk(it) {
+    const v = (id) => ($(id) ? $(id).value : '');
+    const hh = v('trkHH'), py = v('trkPy'), st = v('trkSt'), rm = v('trkRm'), ba = v('trkBa');
+    return (!hh || hhOf(it) === hh) && (!py || pyOf(it) === py) && (!st || (String(it.structure || '').trim() || '?') === st) &&
+      (!rm || nOf(it.rooms) === rm) && (!ba || nOf(it.baths) === ba);
+  }
+  function fillInfoFilters(pool) {
+    const keep = (id, html) => { const el = $(id); if (!el) return; const c = el.value; el.innerHTML = html; if ([...el.options].some(o => o.value === c)) el.value = c; };
+    const cnt = (fn) => { const m = new Map(); pool.forEach(it => { const k = fn(it); m.set(k, (m.get(k) || 0) + 1); }); return m; };
+    const hh = cnt(hhOf), py = cnt(pyOf), st = cnt(it => String(it.structure || '').trim() || '?'), rm = cnt(it => nOf(it.rooms)), ba = cnt(it => nOf(it.baths));
+    keep('trkHH', HHB.map(([k, t]) => (!k || hh.get(k)) ? `<option value="${k}">${t}${k ? ` (${hh.get(k)})` : ''}</option>` : '').join(''));
+    keep('trkPy', '<option value="">전체</option>' + [...py.keys()].sort((a, b) => parseFloat(a) - parseFloat(b)).map(k => `<option value="${k}">${k} (${py.get(k)})</option>`).join(''));
+    keep('trkSt', '<option value="">전체</option>' + [...st.keys()].sort().map(k => `<option value="${k}">${k === '?' ? '모름' : k} (${st.get(k)})</option>`).join(''));
+    const nums = (m, unit) => '<option value="">전체</option>' + [...m.keys()].sort().map(k => `<option value="${k}">${k === '?' ? '모름' : k === '4' ? `4${unit} 이상` : k + unit} (${m.get(k)})</option>`).join('');
+    keep('trkRm', nums(rm, '개')); keep('trkBa', nums(ba, '개'));
+  }
   const inScope = () => {
     const reg = $('trkRegion').value, band = $('trkBand').value;
     return items.filter(it => (!curFolder || it.folders.includes(curFolder)) &&
-      (!reg || (reg.startsWith('z:') ? CONFIG.zoneOf(it.sido) === reg.slice(2) : `${it.sido} ${it.sgg}` === reg)) && (!band || compute(it).band === band));
+      (!reg || (reg.startsWith('z:') ? CONFIG.zoneOf(it.sido) === reg.slice(2) : `${it.sido} ${it.sgg}` === reg)) && (!band || compute(it).band === band) && infoOk(it));
   };
   const isNew = (it) => { const rl = real.get(it.id); return !!rl && ((rl.sale && it.seenSale && rl.sale.d > it.seenSale) || (rl.rent && it.seenRent && rl.rent.d > it.seenRent)); };
 
@@ -486,6 +508,9 @@ const Tracking = (() => {
       fx('메모', 'l') + fx('지도', 'c') + '</tr><tr>' +
       months.map(() => GROUP.map((n, i) => `<th class="${[0, 1, 3, 4].includes(i) ? 'in' : ''}${i === 0 ? ' gl' : ''}">${n}${i === 0 || i === 3 ? '(억)' : ''}</th>`).join('')).join('') + '</tr></thead>';
 
+    const fixed = (it, f) => { const v = String(it[f] || '').trim(); if (!v) return '<span class="hint" style="margin:0">-</span>';
+      const est = (f === 'rooms' || f === 'baths') && it.af?.[f];
+      return `<span${est ? ' class="est" title="전용면적·연식으로 추정한 흔한 구성"' : ''}>${U.esc(f === 'households' && !isNaN(+v) ? (+v).toLocaleString() : v)}</span>`; };
     const inp = (it, f, cls = '', ph = '') => `<input class="${cls}" data-f="${f}" value="${U.esc(it[f] || '')}" placeholder="${ph}">`;
     const body = list.map((it, i) => {
       const c = compute(it), cells = calcCells(c);
@@ -496,7 +521,7 @@ const Tracking = (() => {
       return `<tr data-i="${i}" class="${isNew(it) ? 'newtrade' : ''}"><td class="c"><input type="checkbox" data-chk="${i}" ${checked.has(it.id) ? 'checked' : ''}></td>` +
         `${cell('band')}<td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(it.dong)}</td><td class="l info">${inp(it, 'zone', '', '생활권')}</td>` +
         `<td class="l name" title="${U.esc(it.folders.join(', '))}"><a href="#" class="cxlink" data-cx="${U.esc(it.id)}" title="단지 한 장 요약">${U.esc(it.name)}</a>${isNew(it) ? ' <span class="tag">새 거래</span>' : ''}</td>` +
-        `<td>${it.buildYear || '-'}</td><td>${it.buildYear ? CONFIG.toAge(it.buildYear) : '-'}</td><td class="info">${inp(it, 'households', it.hhAuto || it.af?.households ? 'auto' : '', '직접 입력')}</td><td>${it.g}㎡<small>${U.esc(pyeong(it))}</small></td><td class="info">${inp(it, 'structure', it.af?.structure ? 'auto' : '', '계/복')}</td><td class="info">${inp(it, 'rooms', it.af?.rooms ? 'auto' : '')}</td><td class="info">${inp(it, 'baths', it.af?.baths ? 'auto' : '')}</td>` +
+        `<td>${it.buildYear || '-'}</td><td>${it.buildYear ? CONFIG.toAge(it.buildYear) : '-'}</td><td class="info">${fixed(it, 'households')}</td><td>${it.g}㎡<small>${U.esc(pyeong(it))}</small></td><td class="info">${fixed(it, 'structure')}</td><td class="info">${fixed(it, 'rooms')}</td><td class="info">${fixed(it, 'baths')}</td>` +
         `<td class="info">${inp(it, 'link', 'wide', '직접 입력')} <a class="btn mini" href="${U.esc(link(it))}" target="_blank" rel="noopener">열기</a></td>` +
         `${over('peakO', c.peak, c.peakAuto)}${cell('drop')}${over('troughO', c.trough, c.troughAuto)}${cell('rise')}${cell('ask')}` +
         months.map((m, k) => qin(m, 's', '예: 14.3', true, true) + qin(m, 'sn', '개') + cell('sd' + k) + qin(m, 'r', '예: 7.5', true) + qin(m, 'rn', '개') + cell('rd' + k) + cell('gap' + k) + cell('gd' + k) + cell('ratio' + k) + cell('rtd' + k)).join('') +
@@ -663,7 +688,10 @@ const Tracking = (() => {
   }
 
   /** 탭을 열 때: 표를 그리고, 전고점·전저점·새 거래 확인을 위해 실거래를 조용히 읽음 */
-  function open() { fillSelects(); render(); if (inScope().some(it => !real.has(it.id))) load(false); }
+  function open() {
+    fillSelects(); render(); if (inScope().some(it => !real.has(it.id))) load(false);
+    if (items.some(it => ['households', 'structure', 'rooms', 'baths'].some(f => !String(it[f] || '').trim()))) fillHH(null, true).then(n => { if (n) fillSelects(); });   // 고정 정보 빈칸은 자동으로
+  }
 
   /** 다른 탭(그래프)에서 쓰는: 이 단지에 적어 둔 가격 기록 [{ym, s, r}] */
   function quotesOf(id) {

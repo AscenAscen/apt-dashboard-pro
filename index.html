@@ -327,6 +327,12 @@
       <span class="grow"></span>
       <button id="btnTrkDrawer" title="점검 · 동기화 · 폴더 · 백업 · 내려받기">🧰 도구</button>
     </div>
+    <div class="filters trkinfo"><span class="hint" style="margin:0">단지 조건</span>
+      <label>세대수 <select id="trkHH"><option value="">전체</option></select></label>
+      <label>평형 <select id="trkPy"><option value="">전체</option></select></label>
+      <label>구조 <select id="trkSt"><option value="">전체</option></select></label>
+      <label>방 <select id="trkRm"><option value="">전체</option></select></label>
+      <label>화 <select id="trkBa"><option value="">전체</option></select></label></div>
     <div class="bar">
       <button id="btnTrkInfo">단지 정보 펼치기</button>
       <button id="btnTrkCard">카드로 입력</button>
@@ -372,8 +378,7 @@
     <div class="drawhead"><strong>🧰 도구</strong><span class="grow"></span><button id="btnTrkDrawerClose">닫기 ✕</button></div>
     <div class="drawsec"><h4>점검</h4>
       <button id="btnTpCheck">전수조사 중복·누락 점검</button>
-      <button id="btnTpGap">호가-실거래 10%↑ 단지만 보기</button>
-      <button id="btnTpHH" title="K-apt 자료로 비어 있는 세대수만 채웁니다. 직접 적은 값은 그대로 둡니다">세대수·구조·방·화 한 번에 채우기</button></div>
+      <button id="btnTpGap">호가-실거래 10%↑ 단지만 보기</button></div>
     <div class="drawsec" id="trkPlus"><h4>기기 동기화 (PC ↔ 휴대폰)</h4></div>
     <div class="drawsec" id="trkManage"><h4>폴더 관리</h4>
       <button id="btnFolderNew">＋ 새 폴더</button><button id="btnFolderClean" title="단지가 하나도 없는 폴더를 한꺼번에 지웁니다 (기본 폴더는 남김)">빈 폴더 한 번에 정리</button>

@@ -508,6 +508,11 @@ const Survey = (() => {
       const c = r._c = compute(r), cells = calcCells(c, r), rc = c.rc;
       const cell = (k, extra = '') => `<td data-c="${k}" class="${cells[k][1]} ${extra}">${cells[k][0]}</td>`;
       const ai = Kit.autoInfo(r);   // 자동 값(세대수·구조는 K-apt, 방·화는 평형으로 추정) — 직접 적은 값이 있으면 그 값
+      const fixed = (f) => {                                    // 고정 정보(세대수·구조·방·화): 직접 적어 둔 값 > 자동 값, 고칠 칸 없이 글자로
+        const own = rc[f] != null && String(rc[f]).trim() !== '', v = own ? String(rc[f]).trim() : (ai[f] || '');
+        if (!v) return '<span class="hint" style="margin:0">-</span>';
+        const est = !own && (f === 'rooms' || f === 'baths');
+        return `<span${est ? ' class="est" title="전용면적·연식으로 추정한 흔한 구성"' : ''}>${U.esc(f === 'households' && !isNaN(+v) ? (+v).toLocaleString() : v)}</span>`; };
       const inp = (f, ph = '', cls = '') => { const own = rc[f] != null && String(rc[f]).trim() !== '', v = own ? rc[f] : (ai[f] || ''); return `<input class="${cls}${!own && v ? ' auto' : ''}" data-f="${f}" value="${U.esc(v)}" placeholder="${ph}" title="${!own && v ? (f === 'rooms' || f === 'baths' ? '평형·연식으로 추정한 값 — 고치면 직접 적은 값이 됩니다' : 'K-apt 자료로 자동 입력 — 고치면 직접 적은 값이 됩니다') : ''}">`; };
       const over = (f, v, auto) => `<td><input class="num${rc[f] != null ? ' edited' : ''}" data-o="${f}" inputmode="decimal" value="${eok(v)}" placeholder="자동" title="${auto ? `실거래 ${U.price(auto.price)} (${U.date(auto.d)}) · 눌러서 수정, 지우면 자동값` : '실거래 자료 없음 · 직접 입력'}"></td>`;
       const qin = (f, ph, isPrice, first) => `<td class="${first ? 'gl' : ''}"><input class="num" data-m="${m}" data-q="${f}" inputmode="decimal" value="${isPrice ? eok(c.q[f]) : (c.q[f] ?? '')}" placeholder="${ph}"></td>`;
@@ -517,7 +522,7 @@ const Survey = (() => {
         `<td><select data-f="status" class="st">${Tracking.STATUSES.map(s => `<option ${s === (rc.status || '') ? 'selected' : ''} value="${s}">${s || '-'}</option>`).join('')}</select></td>` +
         `${cell('band')}<td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(r.dong)}</td><td class="l info">${inp('zone', '생활권')}</td>` +
         `<td class="l name"><a href="#" class="cxlink" data-cx="${U.esc(r.id)}" title="단지 한 장 요약">${U.esc(r.name)}</a>${c.isNew ? ' <span class="tag">새 거래</span>' : ''}</td>` +
-        `<td>${r.buildYear || '-'}</td><td>${r.buildYear ? CONFIG.toAge(r.buildYear) : '-'}</td><td>${inp('households', '직접 입력')}</td><td>${r.g}㎡<small>${U.esc(rc.pyeong || CONFIG.toPyeong(r.g) + '평')}</small></td><td class="info">${inp('structure', '계/복')}</td><td class="info">${inp('rooms')}</td><td class="info">${inp('baths')}</td>` +
+        `<td>${r.buildYear || '-'}</td><td>${r.buildYear ? CONFIG.toAge(r.buildYear) : '-'}</td><td>${fixed('households')}</td><td>${r.g}㎡<small>${U.esc(rc.pyeong || CONFIG.toPyeong(r.g) + '평')}</small></td><td class="info">${fixed('structure')}</td><td class="info">${fixed('rooms')}</td><td class="info">${fixed('baths')}</td>` +
         `<td><a class="btn mini" href="${U.esc(link)}" target="_blank" rel="noopener">열기</a></td>` +
         `${over('peakO', c.peak, r.peak)}${cell('drop')}${over('troughO', c.trough, r.trough)}${cell('rise')}${cell('ask')}` +
         (m ? qin('s', '예: 14.3', true, true) + qin('sn', '개') + cell('sd') + qin('r', '예: 7.5', true) + qin('rn', '개') + cell('rd') + cell('gap') + cell('gd') + cell('ratio') + cell('rtd') : '<td class="gl"></td>') +
