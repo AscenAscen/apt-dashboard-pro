@@ -6,7 +6,7 @@
    ───────────────────────────────────────────────────────── */
 const Market = (() => {
   const $ = (id) => document.getElementById(id);
-  const KBKEY = 'apt.kb.v1';
+  const KBKEY = 'apt.kb.v1', KBWKEY = 'apt.kbw.v1';
   const SHORT = { 서울특별시: '서울', 부산광역시: '부산', 대구광역시: '대구', 인천광역시: '인천', 광주광역시: '광주', 대전광역시: '대전', 울산광역시: '울산', 세종특별자치시: '세종',
     경기도: '경기', 강원특별자치도: '강원', 강원도: '강원', 충청북도: '충북', 충청남도: '충남', 전북특별자치도: '전북', 전라북도: '전북', 전라남도: '전남', 경상북도: '경북', 경상남도: '경남', 제주특별자치도: '제주' };
   const SCOPES = [['pin', '📌 핀한 지역'], ['seoul', '서울'], ['gg', '경기·인천'], ['metro', '광역시·세종'], ['etc', '그 외 지역'], ['all', '전체']];
@@ -46,9 +46,11 @@ const Market = (() => {
     $('mkScope').onchange = () => { Store.set('apt.mkScope', $('mkScope').value); render(); };
     $('mkKind').onclick = (e) => { const k = e.target.dataset.k; if (!k) return; kind = k; $('mkKind').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === k)); alerts(); };
     $('mkMetric').onchange = heat;
-    ['mkIdxRegion', 'mkIdxNames', 'mkIdxKind', 'mkIdxSpan', 'mkIdxBase'].forEach(id => { $(id).onchange = indexChart; });
+    ['mkIdxRegion', 'mkIdxNames', 'mkIdxKind', 'mkIdxSpan', 'mkIdxBase', 'kbwShow', 'kbwNames'].forEach(id => { $(id).onchange = indexChart; });
     $('btnMkExcel').onclick = excel;
     $('mkAlert').onclick = (e) => { const tr = e.target.closest('tr[data-code]'); if (tr) { App.showTab('search'); Search.openRegion(tr.dataset.code); } };
+    $('kbwFile').onchange = kbwRead;
+    $('btnKbwClear').onclick = () => { if (!confirm('올려 둔 KB 주간 자료를 지울까요?')) return; Store.remove(KBWKEY); kbwFill(); indexChart(); };
     $('kbFile').onchange = kbRead;
     $('kbSheet').onchange = kbPickSheet;
     $('kbCol').onchange = () => { const kb = Store.get(KBKEY, null); if (kb) { kb.sel = $('kbCol').value; Store.set(KBKEY, kb); } indexChart(); };
@@ -59,7 +61,7 @@ const Market = (() => {
     if (!opened) {
       opened = true;
       [regions, sig, rone] = await Promise.all([Data.regions(), Data.signals(), Data.rone()]);
-      kbFill();
+      kbFill(); kbwFill();
     }
     render();
   }
@@ -188,6 +190,20 @@ const Market = (() => {
       if (rebase) notes.push('기간의 첫 달을 100으로 맞춰 견줍니다');
       if (!sets.length) notes.push(`R-ONE 에서 "${reg[2]}" 지역을 찾지 못했습니다. (R-ONE 은 시·구 단위 일부만 제공합니다)`);
     } else if (!rone) notes.push('R-ONE 자료가 아직 없습니다. 점검 화면(가이드·설정)에서 상태를 볼 수 있습니다.');
+    const kbw = Store.get(KBWKEY, null);
+    if (kbw && $('kbwShow').checked) {                                          // KB 주간 지수 (월 평균)
+      const KP = ['#34c759', '#ffd60a', '#0a84ff', '#ff6482', '#bf5af2', '#ff9f0a'], names = [];
+      if (reg) { const k = `${reg[1]} ${reg[2]}`; if (kbw.keys.includes(k)) names.push(k); }
+      for (const o of $('kbwNames').selectedOptions) if (!names.includes(o.value)) names.push(o.value);
+      let ki = 0;
+      for (const n of names) for (const [k, name] of kinds) {
+        const arr = kbw[k]?.[n]; if (!arr) continue;
+        const pts = kbw.months.map((m, i) => [m, arr[i]]).filter(x => x[1] != null), c = KP[ki++ % KP.length];
+        sets.push({ label: `KB ${name} (${n})`, data: cut(pts), borderColor: c, backgroundColor: c, borderWidth: 2, pointRadius: 0, tension: 0.2, borderDash: [2, 3] });
+      }
+      notes.push(`KB 주간 자료: ${kbw.file} (${kbw.at} 올림, 기준 ${kbw.last})`);
+      if (reg && !kbw.keys.includes(`${reg[1]} ${reg[2]}`)) notes.push(`KB 에서 "${reg[2]}" 지역을 찾지 못했습니다 (위 KB 지역 목록에서 직접 고를 수 있습니다)`);
+    }
     const kb = Store.get(KBKEY, null);
     if (kb && kb.sel && kb.cols[kb.sel]) {
       sets.push({ label: `KB ${kb.sheet} · ${kb.sel}`, data: kb.cols[kb.sel].map(([d, v]) => ({ x: toX(Math.floor(d / 100), d % 100), y: v })), borderColor: col('--c3') || '#34c759', backgroundColor: col('--c3') || '#34c759', borderWidth: 2, pointRadius: 0, tension: 0.2, borderDash: [5, 3] });
@@ -255,6 +271,81 @@ const Market = (() => {
     $('kbCol').innerHTML = kb ? Object.keys(kb.cols).map(n => `<option>${U.esc(n)}</option>`).join('') : '';
     if (kb) { $('kbCol').value = kb.sel; if (!kbBook) $('kbSheet').innerHTML = `<option>${U.esc(kb.sheet)}</option>`; }
     $('btnKbClear').hidden = !kb;
+  }
+
+  /* ── KB 주간 시계열 (3.매매지수 · 4.전세지수): 날짜 세로 · 지역 가로 → 월 평균 지수 ── */
+  const KB_SIDO = { 서울특별시: '서울특별시', 부산광역시: '부산광역시', 대구광역시: '대구광역시', 인천광역시: '인천광역시', '(구)광주광역시': '광주광역시', 대전광역시: '대전광역시', 울산광역시: '울산광역시',
+    세종특별자치시: '세종특별자치시', 경기도: '경기도', 강원특별자치도: '강원특별자치도', 충청북도: '충청북도', 충청남도: '충청남도', 전북특별자치도: '전북특별자치도', '(구)전라남도': '전라남도',
+    경상북도: '경상북도', 경상남도: '경상남도', 제주특별자치도: '제주특별자치도' };
+  /** 헤더(구분 줄)로 열마다 "시도 [시] 구" 이름을 만듦. 중구·동구·서구처럼 이름이 겹쳐도 시도·시 단위로 구분됨. 묶음 열(전국·6개광역시 등)은 null */
+  function kbwKeys(head) {
+    const out = []; let sido = '', city = '';
+    const names = head.map(h => (h == null ? '' : String(h).replace(/\s+/g, ' ').trim()));
+    for (let c = 0; c < names.length; c++) {
+      const n = names[c]; let key = null;
+      if (c === 0 || !n) { out.push(null); continue; }
+      if (KB_SIDO[n]) { sido = KB_SIDO[n]; city = ''; key = sido; }
+      else if (/^(전국|강북14개구|강남11개구|\d개광역시|수도권|기타지방|제주도|전남광주통합특별시)$/.test(n)) key = null;
+      else if (!sido) key = null;
+      else if (/시$/.test(n) && /구$/.test(names[c + 1] || '') && !/(남구|북구|동구|서구|중구)$/.test(n)) { city = n; key = `${sido} ${n}`; }
+      else if (/시$|군$/.test(n)) { city = ''; key = `${sido} ${n}`; }
+      else key = `${sido} ${city ? city + ' ' : ''}${n}`;
+      out.push(key);
+    }
+    return out;
+  }
+  function kbwSheet(wb, re) {
+    const name = wb.SheetNames.find(n => re.test(n) && !/증감/.test(n));
+    if (!name) return null;
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
+    const r0 = rows.findIndex((r, i) => i > 0 && r && isDate(r[0]));
+    if (r0 < 2) return null;
+    const keys = kbwKeys(rows[1] || rows[r0 - 1]), byM = new Map();     // 월 → 열별 [합, 개수]
+    for (const r of rows.slice(r0)) {
+      if (!r || !isDate(r[0])) continue;
+      const m = Math.floor(toYmd(r[0]) / 100); if (!m) continue;
+      let a = byM.get(m); if (!a) byM.set(m, a = []);
+      for (let c = 1; c < keys.length; c++) if (keys[c] && typeof r[c] === 'number') { const x = a[c] || (a[c] = [0, 0]); x[0] += r[c]; x[1]++; }
+    }
+    return { keys, byM };
+  }
+  function kbwParse(wb, file) {
+    const S = kbwSheet(wb, /매매.*지수/), R = kbwSheet(wb, /전세.*지수/);
+    if (!S && !R) return null;
+    const MAXM = 150;                                                      // 최근 12.5년까지만 저장 (용량)
+    const months = [...new Set([...(S?.byM.keys() || []), ...(R?.byM.keys() || [])])].sort((a, b) => a - b).slice(-MAXM);
+    const out = { file, at: (() => { const t = new Date(); return `${t.getMonth() + 1}/${t.getDate()}`; })(), months, last: months[months.length - 1], sale: {}, rent: {}, keys: [] };
+    for (const [k, X] of [['sale', S], ['rent', R]]) if (X) X.keys.forEach((key, c) => {
+      if (!key) return;
+      const arr = months.map(m => { const x = X.byM.get(m)?.[c]; return x ? +(x[0] / x[1]).toFixed(2) : null; });
+      if (arr.filter(v => v != null).length < 3) return;
+      if (out[k][key]) return;                                              // 같은 이름이 또 나오면 처음 것을 유지
+      out[k][key] = arr; if (!out.keys.includes(key)) out.keys.push(key);
+    });
+    return out;
+  }
+  function kbwRead(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      try {
+        const wb = XLSX.read(fr.result, { type: 'array', cellDates: true }), kb = kbwParse(wb, file.name);
+        if (!kb) return U.toast('"3.매매지수" / "4.전세지수" 시트를 찾지 못했습니다. KB 주간 시계열 파일이 맞는지 확인해 주세요.');
+        if (!Store.set(KBWKEY, kb)) return;
+        kbwFill(); indexChart();
+        U.toast(`KB 주간 자료 ${kb.keys.length}개 지역을 월 평균으로 저장했습니다. (기준 ${kb.last})`);
+      } catch (err) { console.error(err); U.toast('엑셀 파일을 읽지 못했습니다: ' + (err.message || err)); }
+    };
+    fr.readAsArrayBuffer(file); e.target.value = '';
+  }
+  function kbwFill() {
+    const kb = Store.get(KBWKEY, null), keep = new Set([...$('kbwNames').selectedOptions].map(o => o.value));
+    $('kbwNames').innerHTML = kb ? kb.keys.map(n => `<option value="${U.esc(n)}" ${keep.has(n) ? 'selected' : ''}>${U.esc(n)}</option>`).join('') : '';
+    $('btnKbwClear').hidden = !kb;
+    if (kb) {
+      const have = new Set(kb.keys), miss = regions.filter(r => !have.has(`${r[1]} ${r[2]}`)).length;
+      $('kbwNote').textContent = `${kb.file} · 지역 ${kb.keys.length}개 · 월 평균 ${kb.months.length}개월 (기준 ${kb.last}) · 이 대시보드 지역 중 KB 에서 못 찾은 곳 ${miss}곳 (KB 는 주요 시·구만 제공해 군 단위는 없습니다). KB 지수는 2026.1.12 = 100 기준이라 R-ONE 과 견줄 때는 [첫 달 = 100] 을 켜세요.`;
+    }
   }
 
   /** 다른 탭(리포트)에서 쓰는: 지역코드 → 온도 점수 */

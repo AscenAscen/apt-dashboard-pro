@@ -487,3 +487,11 @@ button.colf.on{background:#2563eb;color:#fff;border-color:#2563eb}
 
 /* 지도 편집·캡처 모드에서는 가로 크기 설정과 관계없이 전체 폭 */
 .ml-capturing .kmap { width: 100% !important; margin: 0 !important; }
+
+/* 자동 묶기 편집: 단지 줄의 버튼·고정 표시·크기 */
+table.pivot tbody td, table.pivot tbody th { height: var(--pvh, auto); }
+.pv { cursor: grab; } .pv .pvact { float: right; opacity: .25; } .pv:hover .pvact { opacity: 1; }
+.pv .pvact button { padding: 0 5px; margin-left: 2px; font-size: 12px; min-width: 0; background: none; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.pv .pin { font-size: 11px; }
+table.pivot td.pvover { outline: 2px dashed var(--accent); outline-offset: -2px; }
+#pvPop label { display: flex; flex-direction: column; gap: 2px; margin: 4px 0; font-size: 12px; } #pvPop input, #pvPop select { width: 100%; }

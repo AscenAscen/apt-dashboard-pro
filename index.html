@@ -29,6 +29,7 @@
     <button data-tab="map">시세지도</button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
+    <button data-tab="invest">투자금</button>
     <button data-tab="market">시장 신호</button>
     <button data-tab="my">내 분석</button>
     <button data-tab="land">랜드마크</button>
@@ -543,7 +544,26 @@
       <label>칸에 보일 값 <select id="pvShow"><option value="price">매매가</option><option value="ratio">전세가율</option><option value="gap">갭 (매-전)</option></select></label>
       <button id="btnPvExcel">엑셀 다운로드</button>
     </div>
+    <div class="filters">
+      <label class="findlab">🔎 단지 직접 추가 <input type="search" id="pvAddFind" placeholder="단지명 (시세·실거래가 없어도 됨)" autocomplete="off"></label>
+      <label>평형 <select id="pvAddArea"></select></label>
+      <label>가격 (억, 비우면 최근 실거래) <input type="number" id="pvAddPrice" step="0.1" min="0" style="width:90px"></label>
+      <label>세로칸 <select id="pvAddRow"></select></label>
+      <label>가로칸 <select id="pvAddCol"></select></label>
+      <button id="btnPvAdd" disabled>표에 추가</button>
+    </div>
+    <div class="filters">
+      <button id="btnPvAddRow">＋ 세로칸 추가</button><button id="btnPvAddCol">＋ 가로칸 추가</button>
+      <label class="inline">칸 너비 <input type="range" id="pvW" min="110" max="420" step="10" style="width:130px"> <b id="pvWV" style="min-width:48px"></b></label>
+      <label class="inline">칸 높이 <input type="range" id="pvH" min="0" max="400" step="20" style="width:130px"> <b id="pvHV" style="min-width:40px"></b></label>
+      <button id="btnPvSize">기본 크기</button>
+      <button id="btnPvUnfix" title="직접 고친 가격·칸을 모두 자동 값으로">📌 고정 풀기</button>
+      <button id="btnPvRestore">뺀 단지 되살리기</button>
+      <span class="hint" id="pvInfo" style="margin:0"></span>
+    </div>
+    <p class="hint">단지를 <b>끌어서</b> 다른 칸에 놓거나 <b>✎</b> 로 가격·칸을 고칠 수 있습니다. 고친 값은 📌 고정되어 자동 값이 바뀌어도 유지됩니다. <b>✕</b> 는 이 표에서만 뺍니다(시세트래킹 원본은 그대로).</p>
     <div class="tablewrap"><table id="pvTable" class="grid pivot"></table></div>
+    <div id="pvPop" class="colpop" hidden style="width:250px"></div>
   </section>
 </main>
 
@@ -653,6 +673,19 @@
 </main>
 
 <!-- 지도 창 -->
+<!-- ═══════════════ 투자금 (월별 전용 84·59 평균 매매·전세·투자금) ═══════════════ -->
+<main id="tab-invest" class="tab" hidden>
+  <section class="panel filters">
+    <label>시/도 <select id="ivSido"></select></label>
+    <label>시/군/구 <select id="ivSgg"></select></label>
+    <label>기간 <select id="ivYears"><option value="1">최근 1년</option><option value="2">최근 2년</option><option value="3" selected>최근 3년</option><option value="5">최근 5년</option></select></label>
+    <button id="btnIv" class="primary">조회</button>
+    <button id="btnIvExcel">엑셀 다운로드</button>
+    <span class="hint" style="margin:0">투자금 = 전용 평균 매매가 − 평균 전세가 (취득세·중개료·대출 제외). 직거래는 뺍니다.</span>
+  </section>
+  <section class="panel" id="ivOut"><p class="hint">지역을 고르고 [조회]를 누르세요.</p></section>
+</main>
+
 <!-- ═══════════════ 시장 신호 (신고가·급락, 온도 점수, 히트맵, 가격지수) ═══════════════ -->
 <main id="tab-market" class="tab" hidden>
   <div class="pinbar chips" hidden></div>
@@ -684,18 +717,32 @@
       <p class="hint" id="mkHeatNote"></p>
       <div class="tablewrap"><table id="mkHeat" class="heat"></table></div>
     </section>
+    <section class="panel" id="kbPanel">
+      <div class="bar"><strong>KB 시세 올리기</strong> <span class="hint" style="margin:0">— KB 주간 시계열 엑셀을 올리면 이 브라우저에만 저장됩니다 (다른 기기에서는 다시 올려야 합니다)</span></div>
+      <div class="filters">
+        <label>KB 주간 시계열 엑셀 <input type="file" id="kbwFile" accept=".xlsx,.xls"></label>
+        <button id="btnKbwClear" class="danger" hidden>주간 자료 지우기</button>
+        <label>KB 지역 직접 고르기 (Ctrl·⌘ 로 여러 개) <select id="kbwNames" multiple size="4" style="min-width:240px"></select></label>
+      </div>
+      <p class="hint" id="kbwNote">파일의 "3.매매지수", "4.전세지수" 시트를 읽어 월 평균 지수로 바꿔 저장합니다. 가격지수 흐름의 지역을 고르면 같은 지역의 KB 지수가 함께 그려집니다. KB 지수는 2026.1.12 = 100 기준이라 R-ONE 과 견줄 때는 [첫 달 = 100] 을 켜세요.</p>
+      <details class="panel" style="margin:6px 0 0"><summary>다른 KB 엑셀(날짜가 세로·지역이 가로인 시트) 직접 고르기</summary>
+        <div class="filters">
+          <label>KB 엑셀 올리기 <input type="file" id="kbFile" accept=".xlsx,.xls,.csv"></label>
+          <label>KB 시트 <select id="kbSheet"></select></label>
+          <label>KB 지역(열) <select id="kbCol"></select></label>
+          <button id="btnKbClear" class="danger">KB 자료 지우기</button>
+        </div>
+      </details>
+    </section>
     <section class="panel">
-      <div class="bar"><strong>가격지수 흐름</strong> <span class="hint" style="margin:0">— 한국부동산원(R-ONE) 아파트 가격지수, KB 시세(직접 올린 엑셀)</span></div>
+      <div class="bar"><strong>가격지수 흐름</strong> <span class="hint" style="margin:0">— 한국부동산원(R-ONE) 아파트 가격지수 + KB 시세(위에서 올린 엑셀)</span></div>
       <div class="filters">
         <label>지역 <select id="mkIdxRegion"></select></label>
         <label>매매/전세 <select id="mkIdxKind"><option value="both">매매 + 전세</option><option value="sale">매매지수만</option><option value="rent">전세지수만</option></select></label>
         <label>기간 <select id="mkIdxSpan"><option value="12">최근 1년</option><option value="36" selected>최근 3년</option><option value="60">최근 5년</option><option value="120">최근 10년</option><option value="0">전체</option></select></label>
         <label class="inline" style="align-self:flex-end"><input type="checkbox" id="mkIdxBase"> 첫 달 = 100 으로 맞춰 견주기</label>
         <label>견줄 지역 직접 고르기 (Ctrl·⌘ 로 여러 개) <select id="mkIdxNames" multiple size="4" style="min-width:220px"></select></label>
-        <label>KB 엑셀 올리기 <input type="file" id="kbFile" accept=".xlsx,.xls,.csv"></label>
-        <label>KB 시트 <select id="kbSheet"></select></label>
-        <label>KB 지역(열) <select id="kbCol"></select></label>
-        <button id="btnKbClear" class="danger">KB 자료 지우기</button>
+        <label class="inline" style="align-self:flex-end"><input type="checkbox" id="kbwShow" checked> KB 주간 지수(월 평균)도 함께 그리기</label>
       </div>
       <p class="hint" id="mkIdxNote"></p>
       <div class="chartbox"><canvas id="mkIdxChart"></canvas></div>
@@ -1015,7 +1062,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

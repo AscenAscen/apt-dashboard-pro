@@ -13,6 +13,7 @@ const App = (() => {
     if (name === 'eval') Eval.open();
     if (name === 'survey') Survey.open();
     if (name === 'market') Market.open();
+    if (name === 'invest') Invest.open();
     if (name === 'my') My.open();
     if (name === 'land') Land.open();
     if (name === 'imjang') Imjang.open();
