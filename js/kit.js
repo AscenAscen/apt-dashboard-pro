@@ -234,17 +234,21 @@ const Finder = (() => {
     box.addEventListener('click', (e) => { const b = e.target.closest('button[data-i]'); if (b) pick(+b.dataset.i); });
     input.addEventListener('blur', () => setTimeout(() => { box.hidden = true; }, 150));
   }
-  /** 단지의 평형 목록 (최근 5년 거래 기준, 없으면 20년) */
+  /** 단지의 평형 목록. 개수는 최근 5년 기준(없으면 20년), 5년 전에만 거래가 있던 평형도 빠뜨리지 않고 넣음 */
   async function areas(code, key) {
     const y = new Date().getFullYear();
-    let tr = await Data.complexTrades(code, key, null, y - 5, y);
-    if (!tr.sale.length && !tr.rent.length) tr = await Data.complexTrades(code, key, null, y - 20, y);
-    const cnt = new Map();
-    [...tr.sale, ...tr.rent].forEach(t => cnt.set(t.g, (cnt.get(t.g) || 0) + 1));
-    const all = [...cnt.entries()].map(([g, n]) => ({ g, n })).sort((a, b) => a.g - b.g);
-    const lastSale = (g) => tr.sale.filter(t => t.g === g && !t.direct).sort((a, b) => b.d - a.d)[0] || null;
-    return { list: all, best: [...all].sort((a, b) => b.n - a.n)[0]?.g ?? null, lastSale,
-      html: all.map(a => `<option value="${a.g}">${a.g}㎡ (${CONFIG.toPyeong(a.g)}평) · ${a.n}건</option>`).join('') };
+    const recent = await Data.complexTrades(code, key, null, y - 5, y);
+    const long = await Data.complexTrades(code, key, null, y - 20, y);
+    const tr = recent.sale.length || recent.rent.length ? recent : long;
+    const countOf = (t) => { const m = new Map(); [...t.sale, ...t.rent].forEach(x => m.set(x.g, (m.get(x.g) || 0) + 1)); return m; };
+    const cnt = countOf(tr), longCnt = countOf(long), old = new Set();
+    for (const [g, n] of longCnt) if (!cnt.has(g)) { cnt.set(g, n); old.add(g); }   // 5년 전 거래만 있는 평형
+    const all = [...cnt.entries()].map(([g, n]) => ({ g, n, old: old.has(g) })).sort((a, b) => a.g - b.g);
+    const lastSale = (g) => long.sale.filter(t => t.g === g && !t.direct).sort((a, b) => b.d - a.d)[0] || null;
+    const fresh = all.filter(a => !a.old);
+    const best = [...(fresh.length ? fresh : all)].sort((a, b) => b.n - a.n)[0]?.g ?? null;
+    return { list: all, best, lastSale,
+      html: all.map(a => `<option value="${a.g}">${a.g}㎡ (${CONFIG.toPyeong(a.g)}평) · ${a.n}건${a.old ? ' · 5년 이전 거래' : ''}</option>`).join('') };
   }
   return { attach, areas, find, load };
 })();
