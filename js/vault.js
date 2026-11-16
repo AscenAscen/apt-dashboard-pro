@@ -10,7 +10,7 @@ const Vault = (() => {
   const $ = (id) => document.getElementById(id);
   const BK = 'apt.lastBackup', REMIND_DAYS = 14;
   // 함께 옮기는 그 밖의 저장 항목 (시세그룹핑 표, 입지 메모, 조사 이름·메모, 대중교통 메모)
-  const EXTRA = ['apt.grouping.v1', 'apt.loc.v1', 'apt.surveyMeta.v1', 'apt.alias.v1', 'apt.pins.v1', 'apt.land.v1', 'apt.landMonths.v1', 'apt.imjang.v1', 'apt.my.v1', 'apt.tabs.v1', 'apt.hubs.v1', 'apt.mapLabel.v1', 'apt.cmpPrice.v1', 'apt.eval.v1', 'apt.stations.v1', 'apt.cmpStations.v1', 'apt.saveFolders.v1', 'apt.sizes.v1', 'apt.tabZoom.v1', 'apt.pmLabels.v1', 'apt.pmExtra.v1', 'apt.evalTables.v1', 'apt.pmOpts.v1'];
+  const EXTRA = ['apt.grouping.v1', 'apt.loc.v1', 'apt.surveyMeta.v1', 'apt.alias.v1', 'apt.pins.v1', 'apt.land.v1', 'apt.landMonths.v1', 'apt.imjang.v1', 'apt.my.v1', 'apt.tabs.v1', 'apt.hubs.v1', 'apt.mapLabel.v1', 'apt.cmpPrice.v1', 'apt.eval.v1', 'apt.stations.v1', 'apt.cmpStations.v1', 'apt.saveFolders.v1', 'apt.sizes.v1', 'apt.tabZoom.v1', 'apt.pmLabels.v1', 'apt.pmExtra.v1', 'apt.evalTables.v1', 'apt.pmOpts.v1', 'apt.pmDirect.v1', 'apt.pmHidden.v1', 'apt.pmChecked.v1', 'apt.pmSize.v1', 'apt.pvEdit.v1', 'apt.trkChecked.v1', 'apt.pmAreas.v1'];
   let locked = Store.get('apt.lock', false);
 
   /* ── 묶기 / 풀기 ── */
@@ -59,6 +59,55 @@ const Vault = (() => {
     }
     if (t.startsWith('APT1:')) return JSON.parse(new TextDecoder().decode(unb64(t.slice(5))));
     throw new Error('코드가 아닙니다.');
+  }
+
+  /* ── 전체 백업: 이 브라우저의 apt.* 저장값 전부 + 저장함. 새 기능의 저장값도 빠짐없이 들어감 ── */
+  const FULL_SKIP = new Set(['apt.lastBackup', 'apt.lock', 'apt.saves.fallback', 'apt.sync.v1']);   // apt.sync.v1 = 동기화 토큰(이 기기에만)
+  async function packFull() {
+    const store = {};
+    Store.keys().filter(k => !FULL_SKIP.has(k)).forEach(k => { const v = Store.get(k, undefined); if (v !== undefined) store[k] = v; });
+    let saves = null; try { saves = await Saves.exportAll(); } catch (e) { console.error(e); }
+    return { type: 'apt-full', v: 1, savedAt: new Date().toISOString(), count: Object.keys(store).length, store, saves };
+  }
+  const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
+  /** 합치기: 같은 id 의 항목은 가져온 값, 목록은 합집합, 칸이 있는 표는 칸 단위로 */
+  function mergeVal(key, cur, inc) {
+    if (key === 'apt.grouping.v1' && isObj(cur) && isObj(inc) && Array.isArray(cur.boards) && Array.isArray(inc.boards)) {
+      const names = new Set(cur.boards.map(b => b.name)); return { ...cur, boards: [...cur.boards, ...inc.boards.filter(b => !names.has(b.name))] };
+    }
+    if (Array.isArray(cur) && Array.isArray(inc)) {
+      if (cur.concat(inc).every(x => isObj(x) && x.id != null)) { const m = new Map(cur.map(x => [x.id, x])); inc.forEach(x => m.set(x.id, x)); return [...m.values()]; }
+      const seen = new Set(cur.map(x => JSON.stringify(x))); return [...cur, ...inc.filter(x => !seen.has(JSON.stringify(x)))];
+    }
+    if (isObj(cur) && isObj(inc)) { const o = { ...cur }; for (const k of Object.keys(inc)) o[k] = isObj(o[k]) && isObj(inc[k]) ? { ...o[k], ...inc[k] } : inc[k]; return o; }
+    return inc;
+  }
+  /** 복원. merge=true 면 지금 기록과 합치고, false 면 지금 기록을 지우고 백업으로 바꿈. 끝나면 화면을 새로 고침 */
+  async function applyFull(obj, merge) {
+    if (!obj || obj.type !== 'apt-full' || !isObj(obj.store)) throw new Error('전체 백업 파일이 아닙니다.');
+    if (!merge) Store.keys().filter(k => !FULL_SKIP.has(k)).forEach(k => Store.remove(k));
+    for (const k of Object.keys(obj.store)) { const cur = merge ? Store.get(k, null) : null; Store.set(k, cur != null ? mergeVal(k, cur, obj.store[k]) : obj.store[k]); }
+    if (obj.saves) await Saves.importAll(obj.saves, merge);
+    return Object.keys(obj.store).length;
+  }
+  async function fullBackup() {
+    const o = await packFull();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(o)], { type: 'application/json' }));
+    a.download = `실거래대시보드_전체백업_${U.stamp()}.json`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000); touch();
+    U.toast(`전체 백업을 저장했습니다. (저장 항목 ${o.count}개${o.saves?.items?.length ? ` · 저장함 ${o.saves.items.length}개` : ''})`);
+  }
+  async function fullRestore(e) {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    try {
+      const obj = JSON.parse(await file.text());
+      if (obj.type !== 'apt-full') throw new Error('x');
+      const has = Store.keys().some(k => !FULL_SKIP.has(k));
+      const merge = has ? askMerge() : false;
+      const n = await applyFull(obj, merge);
+      U.toast(`전체 백업을 불러왔습니다. (저장 항목 ${n}개) 화면을 새로 고칩니다.`);
+      setTimeout(() => location.reload(), 900);
+    } catch (err) { console.error(err); U.toast('전체 백업 파일을 읽을 수 없습니다. [전체 백업 저장]으로 만든 파일이 맞는지 확인하세요.'); }
   }
 
   /* ── 마지막 백업 시점 ── */
@@ -153,13 +202,16 @@ const Vault = (() => {
       if (act === 'in') b.onclick = () => openModal('in', '');
       if (act === 'file') b.onclick = backupFile;
       if (act === 'restore') b.onclick = () => $('vaultFile').click();
+      if (act === 'full') b.onclick = fullBackup;
+      if (act === 'fullrestore') b.onclick = () => $('vaultFullFile').click();
     });
     $('vaultFile').onchange = restoreFile;
+    $('vaultFullFile').onchange = fullRestore;
     $('codeClose').onclick = () => { $('codeModal').hidden = true; };
     $('codeCopy').onclick = async () => { $('codeText').select(); try { await navigator.clipboard.writeText($('codeText').value); U.toast('복사했습니다.'); } catch (e) { document.execCommand('copy'); } };
     $('codeApply').onclick = applyCode;
     showInfo();
   }
 
-  return { init, sure, remindText, copyCode, touch, isLocked: () => locked };
+  return { init, sure, remindText, copyCode, touch, packFull, applyFull, isLocked: () => locked };
 })();

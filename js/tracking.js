@@ -71,6 +71,18 @@ const Tracking = (() => {
   function init() {
     // 전국 단지 검색 → 평형 고르기 → 지금 보는 폴더에 추가
     let found = null;
+    let foundAr = null;                            // 고른 단지의 평형 자료 (실거래가 있는 평형)
+    /** 고른 평형 값. 직접 입력이면 실거래 평형과 1.5㎡ 이내로 맞추고, 없으면 입력값 그대로 */
+    const curArea = () => {
+      const v = $('trkFindArea').value;
+      if (v !== '__custom') return +v || null;
+      const typed = parseFloat($('trkFindCustom').value);
+      if (!(typed > 0)) return null;
+      const near = (foundAr?.list || []).reduce((best, a) => (Math.abs(a.g - typed) <= 1.5 && (!best || Math.abs(a.g - typed) < Math.abs(best.g - typed)) ? a : best), null);
+      return near ? near.g : typed;
+    };
+    const syncCustom = () => { $('trkFindCustom').hidden = $('trkFindArea').value !== '__custom'; };
+    $('trkFindArea').onchange = syncCustom;
     let staged = [];                              // 여러 개 골라 담을 대기 목록 [{id, name, g, rec}]
     const renderStaged = () => {
       $('trkStaged').innerHTML = staged.map((s, i) => `<span class="tag">${U.esc(s.name)} ${s.g}㎡ <button class="mini" data-unstage="${i}" title="대기 목록에서 빼기">✕</button></span>`).join('') || '<span class="hint" style="margin:0">아직 없음</span>';
@@ -78,7 +90,7 @@ const Tracking = (() => {
       $('btnTrkStageAll').textContent = `대기 ${staged.length}개 한꺼번에 추가`;
     };
     $('btnTrkStage').onclick = async () => {
-      const g = +$('trkFindArea').value;
+      const g = curArea();
       if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');
       const id = `${found.code}|${found.key}#${g}`;
       if (staged.some(s => s.id === id)) return U.toast('이미 대기 목록에 있습니다.');
@@ -97,12 +109,14 @@ const Tracking = (() => {
     $('btnTrkSelAll').onclick = () => { visible().forEach(it => checked.add(it.id)); autoReal(); render(); };
     $('btnTrkSelNone').onclick = () => { checked.clear(); render(); };
     Finder.attach($('trkFind'), async (x) => {
-      found = x; $('trkFindArea').innerHTML = '<option>불러오는 중…</option>';
+      found = x; foundAr = null; $('trkFindArea').innerHTML = '<option>불러오는 중…</option>';
       const a = await Finder.areas(x.code, x.key);
       if (found !== x) return;
       found.areas = a;
-      $('trkFindArea').innerHTML = a.html || '<option value="">거래 자료 없음</option>';
-      if (a.best != null) $('trkFindArea').value = a.best;
+      foundAr = a;
+      $('trkFindArea').innerHTML = (a.html || '') + '<option value="__custom">직접 입력 (㎡)</option>';
+      $('trkFindArea').value = a.best != null ? a.best : '__custom';   // 실거래 평형이 없으면 직접 입력으로
+      syncCustom();
     });
     // 실거래 조회 패널: 체크한 단지(없으면 지금 보이는 단지)를 아래에서 기간 골라 보기
     $('btnTrkTrades').onclick = () => {
@@ -114,13 +128,13 @@ const Tracking = (() => {
     };
     $('btnTrkGoTrades').onclick = () => $('tpTrack').scrollIntoView({ behavior: 'smooth', block: 'start' });
     $('btnTrkFindTrades').onclick = () => {            // 담지 않고 바로 실거래 보기
-      const g = +$('trkFindArea').value;
+      const g = curArea();
       if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');
       TradePanel.get('tpTrack', { collapsible: true }).open([{ id: `${found.code}|${found.key}#${g}`, code: found.code, sido: found.sido, sgg: found.sgg, dong: found.dong, jibun: found.jibun, key: found.key, name: found.name, g }], `${found.name} 실거래`);
       $('btnTrkGoTrades').hidden = false;
     };
     $('btnTrkFindAdd').onclick = async () => {
-      const g = +$('trkFindArea').value;
+      const g = curArea();
       if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');
       const idx = await Data.index(found.code), last = found.areas?.lastSale(g);
       add([{ id: `${found.code}|${found.key}#${g}`, code: found.code, sido: found.sido, sgg: found.sgg, dong: found.dong, jibun: found.jibun, key: found.key, name: found.name, g,
@@ -224,9 +238,10 @@ const Tracking = (() => {
     if (show === 'down') list = list.filter(it => c.get(it.id).groups[0]?.sd < 0);
     if (show === 'rentup') list = list.filter(it => c.get(it.id).groups[0]?.rd > 0);
     if (show === 'new') list = list.filter(isNew);
+    if (show === 'gap') list = list.filter(it => { const x = gapPct(c.get(it.id)); return x != null && Math.abs(x) >= GAPLIM; });
     const num = (v, none) => (v == null || isNaN(v) ? none : v);
     const key = { price: (it) => -num(c.get(it.id).base, -1), up: (it) => -num(c.get(it.id).groups[0]?.sd, -1e12), down: (it) => num(c.get(it.id).groups[0]?.sd, 1e12),
-      diff: (it) => -num(c.get(it.id).askGap, -1e12), name: () => 0 }[sort];
+      diff: (it) => -num(c.get(it.id).askGap, -1e12), gappct: (it) => -num(Math.abs(gapPct(c.get(it.id)) ?? NaN), -1), name: () => 0 }[sort];
     if (key) list = [...list].sort((a, b) => key(a) - key(b) || a.name.localeCompare(b.name, 'ko') || a.g - b.g);
     return list;
   }
@@ -285,6 +300,9 @@ const Tracking = (() => {
     $('realModal').hidden = false;
   }
 
+  const GAPLIM = 10;   // 호가가 최근 실거래와 이 % 이상 벌어지면 강조
+  const gapPct = (c) => (c.askGap != null && c.realSale ? c.askGap / c.realSale.price * 100 : null);
+
   /** 한 단지의 계산값 (금액 단위: 만원) */
   function compute(it) {
     const rl = real.get(it.id) || {};
@@ -309,7 +327,7 @@ const Tracking = (() => {
   function calcCells(c) {
     const d = (v) => [U.diff(v), U.cls(v)];
     const out = { band: [c.band || '-', ''], drop: [U.pct(c.drop), U.cls(c.drop)], rise: [U.pct(c.rise), U.cls(c.rise)],
-      ask: [c.askGap == null ? '-' : `${U.diff(c.askGap)}<small>${c.realSale ? U.pct(c.askGap / c.realSale.price * 100) : ''}</small>`, U.cls(c.askGap)] };
+      ask: [c.askGap == null ? '-' : `${U.diff(c.askGap)}<small>${c.realSale ? U.pct(c.askGap / c.realSale.price * 100) : ''}</small>`, U.cls(c.askGap) + (gapPct(c) != null && Math.abs(gapPct(c)) >= GAPLIM ? ' gapbig' : '')] };
     c.groups.forEach((g, k) => {
       out['sd' + k] = d(g.sd); out['rd' + k] = d(g.rd);
       out['gap' + k] = [g.gap == null ? '-' : U.price(g.gap), '']; out['gd' + k] = d(g.gd);
@@ -613,5 +631,6 @@ const Tracking = (() => {
     return items.length;
   }
 
-  return { init, add, all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
+  const ext = () => ({ items, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, setStatusFilter: (v) => { $('trkStatus').value = v; checked.clear(); render(); } });
+  return { ext, init, add, all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
 })();

@@ -112,10 +112,11 @@ const Data = (() => {
   const kapt = (code) => getJson(`kapt/${code}.json`, { m: {} }).then(k => (k && k.m ? k : { m: {} }));
   const signals = () => getJson('signals.json', null);      // 시장 신호 (신고가·급락·월별 거래량)
   const rone = () => getJson('rone.json', null);
+  const monthly = () => getJson('monthly_summary.json', null);   // 월간 요약 (scripts/monthly_summary.py)
   const kbWeekly = () => getJson('kb_weekly.json', null);    // KB 주간 시계열 (kb/ 폴더 엑셀을 자동 변환)            // 한국부동산원 가격지수
   const extraStatus = () => getJson('extra_status.json', null);
 
-  return { regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary, kapt, signals, rone, kbWeekly, extraStatus, names };
+  return { regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, names };
 })();
 
 /* ───────────── 공통 도구 ───────────── */
@@ -244,5 +245,7 @@ const Store = (() => {
     async put(rec) { if (!db) { const a = get('apt.saves.fallback', []).filter(x => x.id !== rec.id); a.push(rec); return set('apt.saves.fallback', a); } return req(db.transaction('saves', 'readwrite').objectStore('saves').put(rec)); },
     async del(id) { if (!db) return set('apt.saves.fallback', get('apt.saves.fallback', []).filter(x => x.id !== id)); return req(db.transaction('saves', 'readwrite').objectStore('saves').delete(id)); },
   };
-  return { ready, get, set, remove, usage, saves };
+  /** 저장된 이름 목록 (apt. 로 시작하는 것만) */
+  const keys = () => [...cache.keys()].filter(k => String(k).startsWith('apt.'));
+  return { ready, get, set, remove, usage, saves, keys };
 })();

@@ -163,11 +163,14 @@ const PriceMap = (() => {
     const cnt = new Map(); ok.forEach(r => cnt.set(`${r.code}|${r.key}`, (cnt.get(`${r.code}|${r.key}`) || 0) + 1));
     const items = ok.map(r => {
       const t = textOf(r, cnt.get(`${r.code}|${r.key}`) > 1);
-      return { id: r.id, pos: r.pos, text: t.text, color: t.real ? '#f5a742' : '#4f9cff', rank: 0 };
+      const ICONS = { '관심': '⭐', '임장 예정': '🗓', '임장 완료': '✅', '매수 후보': '🔥', '제외': '✖' };
+      return { id: r.id, pos: r.pos, text: t.text, color: t.real ? '#f5a742' : '#4f9cff', rank: 0,
+        icon: ICONS[(r.rec && r.rec.status) || ''] || '', badge: r.drop != null && r.drop <= -5 ? `▼${Math.abs(r.drop).toFixed(0)}%` : '' };
     });
     map.relayout();
     baseItems = items;
     lastRows = rows;
+    if (typeof PmArea !== 'undefined') PmArea.attach(map, () => lastRows);
     renderList();
     refreshMap();
     const hidNow = setOf(HKEY), shownRows = ok.filter(r => !hidNow.has(r.id));

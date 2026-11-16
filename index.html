@@ -285,6 +285,7 @@
       <details class="manage" style="margin-top:12px"><summary>백업 · 기기 사이 옮기기</summary>
         <div class="mrow"><span class="mlabel">기기 사이 옮기기 · 백업</span>
           <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
+          <button data-vault="full" class="primary" title="이 브라우저에 적어 둔 모든 값(시세트래킹·호가·그룹핑·지도 설정·KB·저장함 …)을 파일 하나로 저장합니다">🛡 전체 백업 저장</button><button data-vault="fullrestore">전체 백업 불러오기</button>
           <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
           <span class="bkinfo"></span></div>
       </details>
@@ -319,13 +320,13 @@
       <label>보기
         <select id="trkShow">
           <option value="">전체</option><option value="empty">최신 달 아직 안 적은 단지</option><option value="down">매매 호가 내린 단지</option>
-          <option value="rentup">전세 호가 오른 단지</option><option value="new">새 실거래 있는 단지</option>
+          <option value="rentup">전세 호가 오른 단지</option><option value="new">새 실거래 있는 단지</option><option value="gap">호가-실거래 차이 10% 이상</option>
         </select>
       </label>
       <label>정렬
         <select id="trkSort">
           <option value="">담은 순</option><option value="price">매매 호가 높은 순</option><option value="up">전월 대비 상승 큰 순</option>
-          <option value="down">전월 대비 하락 큰 순</option><option value="diff">호가-실거래 차이 큰 순</option><option value="name">단지명순</option>
+          <option value="down">전월 대비 하락 큰 순</option><option value="diff">호가-실거래 차이 큰 순</option><option value="gappct">호가-실거래 차이(%) 큰 순</option><option value="name">단지명순</option>
         </select>
       </label>
     </div>
@@ -338,6 +339,7 @@
         <button class="danger" id="btnTrkDelete">선택 삭제</button></div>
       <div class="mrow"><span class="mlabel">기기 사이 옮기기 · 백업</span>
           <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
+          <button data-vault="full" class="primary" title="이 브라우저에 적어 둔 모든 값(시세트래킹·호가·그룹핑·지도 설정·KB·저장함 …)을 파일 하나로 저장합니다">🛡 전체 백업 저장</button><button data-vault="fullrestore">전체 백업 불러오기</button>
           <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
           <span class="bkinfo"></span></div>
       <div class="mrow"><span class="mlabel">내려받기</span>
@@ -542,7 +544,8 @@
       <label>세로 기준 <select id="pvRow"></select></label>
       <label>가로 기준 <select id="pvCol"></select></label>
       <label>칸에 보일 값 <select id="pvShow"><option value="price">매매가</option><option value="ratio">전세가율</option><option value="gap">갭 (매-전)</option></select></label>
-      <button id="btnPvExcel">엑셀 다운로드</button>
+      <label title="과거 가격과 견주어 칸 안에 변화를 표시합니다">시점 비교 <select id="pvCmp"><option value="0">비교 안 함</option><option value="3">3개월 전과 비교</option><option value="6">6개월 전과 비교</option><option value="12">1년 전과 비교</option></select></label>
+      <button id="btnPvExcel">엑셀 다운로드</button><button id="btnPvPng" title="지금 보이는 표를 그림 파일로 저장">그림(PNG) 저장</button><button id="btnPvPdf" title="인쇄 창이 열리면 대상을 PDF로 저장 으로 고르세요">PDF 저장</button>
     </div>
     <div class="filters">
       <label class="findlab">🔎 단지 직접 추가 <input type="search" id="pvAddFind" placeholder="단지명 (시세·실거래가 없어도 됨)" autocomplete="off"></label>
@@ -693,6 +696,7 @@
     <span class="hint" style="margin:0">거래가 적은 지역은 [최근 3개월 합산]이 더 안정적입니다. 전국은 불러오는 데 시간이 걸립니다.</span>
   </section>
   <section class="panel" id="ivmOut"><p class="hint">범위와 기준 월을 고르고 [한눈에 보기]를 누르세요.</p></section>
+  <section class="panel"><div class="filters"><b>📅 월간 요약</b> <label>월 <select id="msMonth"></select></label><button id="btnMsExcel">엑셀 다운로드</button><span class="hint" style="margin:0">신고가·급락 거래, 지역별 84·59㎡ 평균 매매가·투자금 변화 (자동 수집 때 함께 만들어집니다)</span></div><div id="msOut"><p class="hint">불러오는 중…</p></div></section>
   <section class="panel" id="ivOut"><p class="hint">한 지역의 월별 흐름: 위에서 지역을 고르고 [조회]를 누르세요.</p></section>
 </main>
 
@@ -857,6 +861,8 @@
         <label class="inline">세로 <input type="range" id="pmMapH" min="300" max="900" step="20" style="width:160px"> <b id="pmMapHV" style="min-width:52px"></b></label>
         <button id="btnPmSize" title="지도 크기를 처음 상태로 되돌립니다">기본 크기</button></div>
       <p class="hint">시세트래킹에 담은 단지의 가격을 지도에 보여 줍니다. <span style="color:#4f9cff">●</span> 파랑 = 내가 적은 호가, <span style="color:#f5a742">●</span> 주황(·실) = 호가가 없어 최근 실거래로 대신한 값. 임장 보고서용으로 라벨 위치를 정리하려면 <b>라벨 편집 모드</b>를 켜고 끌어서 옮기세요.</p>
+      <div class="bar" style="margin:4px 0 8px"><span class="hint" style="margin:0">영역으로 묶기</span><button id="btnPaDraw" title="지도에서 점을 눌러 다각형을 그리면 안에 든 단지가 한 묶음이 됩니다">▦ 영역 그리기</button><button id="btnPaDone" class="primary" hidden>그리기 완료</button><button id="btnPaCancel" hidden>취소</button><span class="hint" id="paHint" style="margin:0"></span></div>
+      <div class="tablewrap short" id="paList"></div>
       <div id="pmCtl"></div>
       <div class="kmap tallmap" id="pmMap"><p class="empty" id="pmMapMsg"></p></div>
       <div class="cards" id="pmCard" style="margin-top:10px"></div>
@@ -988,7 +994,8 @@
     <div class="filters">
       <button id="btnXlAll" title="보이는 탭을 차례로 열어, 화면의 표를 한 엑셀 파일(탭별 시트)에 담습니다">📥 전체 내보내기 (엑셀 한 파일)</button>
       <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
-      <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
+      <button data-vault="full" class="primary" title="이 브라우저에 적어 둔 모든 값(시세트래킹·호가·그룹핑·지도 설정·KB·저장함 …)을 파일 하나로 저장합니다">🛡 전체 백업 저장</button><button data-vault="fullrestore">전체 백업 불러오기</button>
+          <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
       <span class="bkinfo"></span></div>
   </section>
   <section class="panel">
@@ -1057,6 +1064,7 @@
   </div>
 </div>
 <input type="file" id="vaultFile" accept=".json" hidden>
+<input type="file" id="vaultFullFile" accept=".json" hidden>
 <div id="toast" hidden></div>
 
 <!-- 비밀번호 화면 (js/config.js 의 PASSWORD_HASH 가 비어 있으면 나타나지 않음) -->
@@ -1077,7 +1085,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

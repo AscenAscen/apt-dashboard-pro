@@ -34,6 +34,14 @@ const Guide = (() => {
         k.error ? U.esc(k.error) : `지역 ${k.regionsDone ?? 0}/${k.regionsTotal ?? 0} 완료 · 세대수 연결 ${(k.matched ?? 0).toLocaleString()}/${(k.complexes ?? 0).toLocaleString()}단지` + (k.stop ? ` · ${U.esc(k.stop)}` : '') + (k.warnings?.length ? `<br><small>${k.warnings.slice(0, 3).map(U.esc).join('<br>')}</small>` : ''));
       add(r.error ? (/없어 건너뜀/.test(r.error) ? 'warn' : 'bad') : 'ok', 'R-ONE 통계', r.error ? U.esc(r.error) : `기준 ${U.esc(r.asOf || '-')} · ` + ['sale', 'rent'].map(x => (r.tables?.[x] ? `${x === 'sale' ? '매매' : '전세'}지수 ${r.tables[x].regions}개 지역 (${U.esc(r.tables[x].name || r.tables[x].id)})` : `${x === 'sale' ? '매매' : '전세'}지수 없음`)).join(' · '));
     }
+    const kbS = await Data.kbWeekly(), kbL = Store.get('apt.kbw.v1', null), ymd = (d) => d ? `${String(d).slice(0, 4)}-${String(d).slice(4, 6)}-${String(d).slice(6, 8)}` : '';
+    if (!kbS && !kbL) add('warn', 'KB 주간 시계열', '아직 없습니다. 시장 신호 탭에서 KB 주간 엑셀을 올린 뒤 [저장소용 파일 받기]로 받은 kb_weekly.json 을 저장소 data 폴더에 올려 주세요.');
+    else {
+      const use = kbL && kbL.weeks && (!kbS || kbL.last > kbS.last) ? kbL : kbS, d = (() => { const s = String(use.last); return Math.floor((Date.now() - new Date(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8)).getTime()) / 864e5); })();
+      add(d > 14 ? 'warn' : 'ok', 'KB 주간 시계열', `기준 ${ymd(use.last)} · 지역 ${use.keys.length}개 · ${use === kbL ? '이 브라우저에 올린 자료' : '저장소 자료'}${d > 14 ? ` — <b>${d}일 전</b> 자료입니다. 새 주간 엑셀을 올려 주세요.` : ''}${use === kbL && !(kbS && kbS.last >= kbL.last) ? ' (다른 기기에서도 보려면 저장소용 파일을 올려 주세요)' : ''}`);
+    }
+    const nm = await Data.names();
+    add(nm ? 'ok' : 'warn', '전국 단지 이름 목록', nm ? `기준 ${U.esc(nm.asOf || '-')} · ${(nm.n || 0).toLocaleString()}단지` : '없음 — 전국 단지 검색이 제한됩니다.');
     add(CONFIG.KAKAO_JS_KEY ? 'ok' : 'warn', '카카오 지도 키', CONFIG.KAKAO_JS_KEY ? '설정됨 (지도가 안 보이면 카카오디벨로퍼스의 사이트 도메인 등록을 확인)' : 'js/config.js 에 KAKAO_JS_KEY 가 비어 있습니다.');
     const use = Store.usage(), bytes = use.bytes;
     const recs = Tracking.allRecords(), bk = Store.get('apt.lastBackup', 0), bd = bk ? Math.floor((Date.now() - bk) / 864e5) : null;

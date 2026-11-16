@@ -159,6 +159,6 @@ const Invest = (() => {
     for (const r of rows) out.push([lab(r.m), ...order.flatMap(s => { const c = r[s.k]; const rd = (v) => v == null ? '' : Math.round(v); return [rd(c.sale), c.ns, rd(c.rent), c.nr, rd(c.inv)]; })]);
     U.download(`투자금_${title.replace(/\s/g, '_')}_${U.stamp()}`, [{ name: '투자금', rows: out }], 'xlsx');
   }
-  const open = () => init();
+  const open = () => { init(); if (typeof Monthly !== 'undefined') Monthly.open(); };
   return { open, calc, run, runMany };
 })();

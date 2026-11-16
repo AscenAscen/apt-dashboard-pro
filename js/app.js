@@ -120,7 +120,7 @@ const App = (() => {
     $('mapModal').onclick = (e) => { if (e.target.id === 'mapModal') closeMap(); };
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); ['realModal', 'codeModal', 'pasteModal'].forEach(id => { $(id).hidden = true; }); document.body.classList.remove('imjang-mode'); } });
     Guide.init();
-    Tracking.init();
+    Tracking.init(); if (typeof TrkPlus !== "undefined") TrkPlus.init(); if (typeof Sync !== "undefined") Sync.init();
     QLog.check();              // 지금 상태를 기준으로 삼아, 이후에 고친 호가만 이력에 남김
     Vault.init();
     Grouping.init();
@@ -129,7 +129,7 @@ const App = (() => {
     Compare.init();
     Infra.init();
     Home.init();
-    Market.init(); Imjang.init(); PriceMap.init(); Eval.init();
+    Market.init(); Imjang.init(); PriceMap.init(); if (typeof PmArea !== "undefined") PmArea.init(); Eval.init();
     await Search.init();
     await Promise.all([My.init(), Land.init()]);
     Settings.init();           // 탭 순서·보이기, 업무지구 — 다른 탭이 모두 준비된 뒤에 적용해야 첫 화면이 바뀌어도 안전합니다

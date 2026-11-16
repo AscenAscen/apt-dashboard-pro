@@ -7,7 +7,10 @@
    ───────────────────────────────────────────────────────── */
 const MapLabel = (() => {
   const KEY = 'apt.mapLabel.v1';
-  const DEF = { s: 1, f: 12, ff: '', ds: '' };
+  const DEF = { s: 1, f: 12, ff: '', ds: '', ic: 0, bd: 0 };
+  // 라벨 프리셋 — 크기·글자·모양·아이콘을 한 번에 바꿈
+  const PRESETS = [{ k: '', name: '(프리셋 고르기)' }, { k: 'report', name: '보고서용 (깔끔·중간 크기)', v: { s: 1.1, f: 14, ds: '', ff: 'pretendard', ic: 0, bd: 1 } },
+    { k: 'field', name: '임장용 (크고 진하게·상태 아이콘)', v: { s: 1.3, f: 17, ds: 'fill', ff: '', ic: 1, bd: 1 } }, { k: 'simple', name: '간단히 (작은 글자만)', v: { s: 0.8, f: 11, ds: 'text', ff: '', ic: 0, bd: 0 } }];
   // 글씨체 (무료 글꼴. 고르는 순간에만 인터넷에서 내려받습니다) — 줄을 추가하면 목록에 나옵니다
   const FONTS = [
     { k: '', name: '기본 글씨', fam: 'system-ui, sans-serif' },
@@ -107,6 +110,9 @@ const MapLabel = (() => {
       <label class="inline">글자 크기 <input type="range" min="8" max="28" step="1" data-ml="font"> <b data-ml-v="font"></b></label>
       <label class="inline">글씨체 <select data-ml="ff">${FONTS.map(f => `<option value="${f.k}">${f.name}</option>`).join('')}</select></label>
       <label class="inline">라벨 모양 <select data-ml="ds">${DESIGNS.map(d => `<option value="${d.k}">${d.name}</option>`).join('')}</select></label>
+      <label class="inline">프리셋 <select data-ml="preset">${PRESETS.map(p => `<option value="${p.k}">${p.name}</option>`).join('')}</select></label>
+      <label class="inline"><input type="checkbox" data-ml="ic"> 상태 아이콘</label>
+      <label class="inline"><input type="checkbox" data-ml="bd"> 하락률 뱃지</label>
       ${o.onAdd ? '<button data-ml="add" title="누른 뒤 지도의 원하는 곳을 한 번 누르면 메모 라벨이 생깁니다">＋ 라벨 추가</button>' : ''}
       <button data-ml="unhide" title="숨긴 라벨을 모두 다시 보이게 합니다">숨긴 라벨 보이기</button>
       <button data-ml="reset" title="손으로 옮긴 라벨을 모두 자동 배치로 되돌립니다">위치 초기화</button>
@@ -132,7 +138,7 @@ const MapLabel = (() => {
       const g = G();
       q('scale').value = Math.round(g.s * 100); v('scale').textContent = Math.round(g.s * 100) + '%';
       q('font').value = g.f; v('font').textContent = g.f + 'px';
-      q('ff').value = g.ff || ''; q('ds').value = g.ds || '';
+      q('ff').value = g.ff || ''; q('ds').value = g.ds || ''; q('ic').checked = !!g.ic; q('bd').checked = !!g.bd; q('preset').value = '';
       q('edit').checked = edit; v('hint').hidden = !edit;
       if (q('add')) q('add').classList.toggle('on', adding);
       const pop = ctl.querySelector('.mlpop'), r = sel && rows.get(sel);
@@ -171,7 +177,8 @@ const MapLabel = (() => {
       row.el.style.fontSize = e.f + 'px'; row.el.style.transform = `scale(${e.s})`;
       row.el.style.fontFamily = useFont(g.ff || '');
       row.el.className = 'mllabel' + (g.ds ? ' ds-' + g.ds : '');
-      row.el.textContent = i.t || row.item.text;
+      row.el.textContent = (g.ic && row.item.icon && !i.t ? row.item.icon + ' ' : '') + (i.t || row.item.text);
+      if (g.bd && row.item.badge && !i.t) { const b = document.createElement('span'); b.className = 'mlbadge'; b.textContent = row.item.badge; row.el.appendChild(b); }
       row.el.style.borderLeftColor = row.el.style.borderColor = ''; row.el.style.background = row.el.style.color = '';
       if (g.ds === 'fill') { row.el.style.background = col; row.el.style.borderColor = col; }
       else if (g.ds === 'line' || g.ds === 'pill') row.el.style.borderColor = col;
@@ -304,6 +311,8 @@ const MapLabel = (() => {
     });
     ctl.addEventListener('change', (e) => {
       const k = e.target.dataset.ml;
+      if (k === 'preset') { const pr = PRESETS.find(x => x.k === e.target.value); if (pr && pr.v) { setG(pr.v); for (const r of rows.values()) style(r); syncCtl(); queue(); setTimeout(relayout, 900); } return; }
+      if (k === 'ic' || k === 'bd') { setG({ [k]: e.target.checked ? 1 : 0 }); for (const r of rows.values()) style(r); queue(); return; }
       if (k === 'ff' || k === 'ds') { setG({ [k]: e.target.value }); for (const r of rows.values()) style(r); queue();
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(relayout, 60)); setTimeout(relayout, 900); }
     });

@@ -248,9 +248,11 @@ const My = (() => {
       const opt = DIMS.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('');
       const sv = Store.get(SKEY, {}).pivot || { row: 'band', col: 'sgg', show: 'price' };
       $('pvRow').innerHTML = $('pvCol').innerHTML = opt; $('pvRow').value = sv.row; $('pvCol').value = sv.col; $('pvShow').value = sv.show;
-      ['pvFolder', 'pvRow', 'pvCol', 'pvShow'].forEach(id => { $(id).onchange = pivot; });
+      ['pvFolder', 'pvRow', 'pvCol', 'pvShow', 'pvCmp'].forEach(id => { $(id).onchange = pivot; });
       pvWire();
       $('btnPvExcel').onclick = () => { if (!pvGrid) return; U.download(`자동묶기_${U.stamp()}`, [{ name: '자동 묶기', rows: [['', ...pvGrid.cols], ...pvGrid.rows.map(rk => [rk, ...pvGrid.cols.map(ck => (pvGrid.cell.get(rk + '\t' + ck) || []).map(r => `${r.name} ${CONFIG.toPyeong(r.g)}평 ${pvText(r)}`).join('\n'))])] }]); };
+      $('btnPvPng').onclick = async () => { const t = $('pvTable'); if (!t.rows.length) return U.toast('먼저 표를 만들어 주세요.'); const r = await Snap.png(t, '자동묶기'); U.toast(`그림으로 저장했습니다 (${r.w}×${r.h}).`); };
+      $('btnPvPdf').onclick = () => { const t = $('pvTable'); if (!t.rows.length) return U.toast('먼저 표를 만들어 주세요.'); Snap.pdf(t, '자동 묶기'); };
     }
     const folders = Tracking.exportAll().folders || [], cur = $('pvFolder').value;
     $('pvFolder').innerHTML = '<option value="">전체</option>' + folders.map(f => `<option>${U.esc(f)}</option>`).join('');
@@ -276,7 +278,7 @@ const My = (() => {
     pvGrid.R = R[0]; pvGrid.C = C[0];
     const w = st.w || 150, ext = (d, k) => (st.labels[d[0]] || []).includes(k) ? `<button class="mini" data-pvdel="${d[0]}" data-v="${U.esc(k)}" title="이 빈 칸 삭제">×</button>` : '';
     const emptyOf = (d, k, isRow) => !pvRows.some(r => (pvVal(d, r) ?? '(값 없음)') === k);
-    const item = (r) => `<div class="pv" draggable="true" data-id="${U.esc(r.id)}"><b>${U.esc(r.name)}</b> ${CONFIG.toPyeong(r.g)}평 <span class="sale">${pvText(r)}</span>${r.sFixed || r.dFixed ? ' <span class="pin" title="직접 고친 값(고정) — 자동 값이 바뀌어도 유지됩니다">📌</span>' : ''}${r.manual ? ' <span class="pin" title="직접 추가한 단지">＋</span>' : ''}<span class="pvact"><button type="button" data-pv="edit" title="가격·칸 고치기">✎</button><button type="button" data-pv="del" title="이 표에서만 빼기 (시세트래킹은 그대로)">✕</button></span></div>`;
+    const item = (r) => `<div class="pv" draggable="true" data-id="${U.esc(r.id)}"><b>${U.esc(r.name)}</b> ${CONFIG.toPyeong(r.g)}평 <span class="sale">${pvText(r)}</span>${pvCmpTag(r)}${r.sFixed || r.dFixed ? ' <span class="pin" title="직접 고친 값(고정) — 자동 값이 바뀌어도 유지됩니다">📌</span>' : ''}${r.manual ? ' <span class="pin" title="직접 추가한 단지">＋</span>' : ''}<span class="pvact"><button type="button" data-pv="edit" title="가격·칸 고치기">✎</button><button type="button" data-pv="del" title="이 표에서만 빼기 (시세트래킹은 그대로)">✕</button></span></div>`;
     $('pvTable').style.minWidth = (120 + pvGrid.cols.length * w) + 'px';
     $('pvTable').style.setProperty('--pvh', st.h ? st.h + 'px' : 'auto');
     $('pvTable').innerHTML = `<thead><tr><th style="width:120px">${R[1]} ＼ ${C[1]}</th>` + pvGrid.cols.map(c => `<th style="width:${w}px">${U.esc(c)}${emptyOf(C, c) ? ext(C, c) : ''}</th>`).join('') + '</tr></thead><tbody>' +
@@ -392,6 +394,20 @@ const My = (() => {
     $('pvAddRow').innerHTML = '<option value="">(자동)</option>' + pvOpts(pvGrid.rows); $('pvAddCol').innerHTML = '<option value="">(자동)</option>' + pvOpts(pvGrid.cols);
     if (pvGrid.rows.includes(rv)) $('pvAddRow').value = rv; if (pvGrid.cols.includes(cv)) $('pvAddCol').value = cv;
   }
+  /** n개월 전 매매가: 그 달(또는 그 이전 가장 가까운 달)에 적은 호가 → 없으면 그 달 실거래 평균 */
+  function pvPast(r, n) {
+    const t = new Date(), d = new Date(t.getFullYear(), t.getMonth() - n, 1), ym = d.getFullYear() * 100 + d.getMonth() + 1;
+    const qs = (r.rec && r.rec.quotes) || {}, ms = Object.keys(qs).map(Number).filter(m => m <= ym && qs[m] && qs[m].s != null).sort((a, b) => b - a);
+    if (ms.length && ym - ms[0] < 100) return qs[ms[0]].s;
+    const mon = r.rl && r.rl.mon, i = 11 - n;
+    return mon && i >= 0 && mon[i] != null ? Math.round(mon[i]) : null;
+  }
+  const pvCmpTag = (r) => {
+    const n = +($('pvCmp') && $('pvCmp').value || 0); if (!n || r.s == null) return '';
+    const p = pvPast(r, n); if (p == null) return ` <small class="pvcmp">${n}개월 전 자료 없음</small>`;
+    const d = r.s - p, moved = CONFIG.priceBand(p) !== CONFIG.priceBand(r.s);
+    return ` <small class="pvcmp ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d === 0 ? '변동 없음' : (d > 0 ? '▲' : '▼') + Kit.eok(Math.abs(d))} (${n}개월 전 ${Kit.eok(p)})${moved ? ' ↗칸 이동' : ''}</small>`;
+  };
   const pvText = (r) => { const m = $('pvShow').value; return m === 'ratio' ? (r.ratio == null ? '-' : r.ratio.toFixed(0) + '%') : m === 'gap' ? (r.gap == null ? '-' : Kit.eok(r.gap)) : Kit.eok(r.s); };
 
   async function init() {
