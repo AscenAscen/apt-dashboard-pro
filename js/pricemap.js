@@ -262,7 +262,7 @@ const PriceMap = (() => {
     const h = Math.round(s.h || el.getBoundingClientRect().height || 500);
     $('pmMapW').value = w; $('pmMapWV').textContent = w + '%';
     $('pmMapH').value = Math.min(900, Math.max(300, h)); $('pmMapHV').textContent = h + 'px';
-    if (map) map.relayout();
+    if (map) { map.relayout(); setTimeout(() => { if (ctrl) ctrl.relayout(); }, 120); }   // 지도 크기가 바뀌면 라벨 위치도 다시 맞춤
   }
   function setSize(patch) { Store.set(SIZE, { ...Store.get(SIZE, {}), ...patch }); applySize(); }
   function open() { if (!inited) return; fillFolders(); renderAdded(); draw(); }
