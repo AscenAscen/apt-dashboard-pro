@@ -1,0 +1,62 @@
+name: K-apt 세대수 변환 · 사이트 배포
+
+# kapt/ 폴더에 K-apt 전국 단지 엑셀(공동주택 단지 면적 정보)을 올리면 단지별 세대수(data/kapt/*.json)로 바꾸고 사이트를 다시 배포합니다.
+on:
+  push:
+    branches: [main]
+    paths: ['kapt/**']
+  workflow_dispatch:         # Actions 화면에서 [Run workflow] 로 직접 실행
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: apt-kapt
+  cancel-in-progress: false
+
+jobs:
+  convert:
+    name: K-apt 엑셀 변환
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install openpyxl
+      - name: 엑셀 → data/kapt/*.json (가장 최근 파일만 남김)
+        run: python scripts/kapt_file.py --keep-latest
+      - name: 바뀐 파일 저장(커밋)
+        run: |
+          git config user.name "apt-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A data/kapt data/kapt_file_status.json kapt
+          if git diff --cached --quiet; then echo "바뀐 것 없음"; exit 0; fi
+          git commit -q -m "K-apt 세대수 갱신 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+          for i in 1 2 3; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
+
+  deploy:
+    name: 사이트 배포
+    needs: convert
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

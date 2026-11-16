@@ -6,7 +6,7 @@ on:
   workflow_dispatch:         # Actions 화면에서 [Run workflow] 로 직접 실행
   push:
     branches: [main]         # 화면 파일을 고쳐 올리면 사이트만 다시 배포
-    paths-ignore: ['kb/**']  # kb 폴더(KB 엑셀)만 바뀌면 kb.yml 이 변환·배포를 맡음
+    paths-ignore: ['kb/**', 'kapt/**']  # kb·kapt 폴더(엑셀)만 바뀌면 kb.yml·kapt.yml 이 변환·배포를 맡음
 
 permissions:
   contents: write
