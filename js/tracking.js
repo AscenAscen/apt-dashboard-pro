@@ -94,7 +94,7 @@ const Tracking = (() => {
     $('trkStaged').onclick = (e) => { const b = e.target.closest('button[data-unstage]'); if (!b) return; staged.splice(+b.dataset.unstage, 1); renderStaged(); };
     renderStaged();
     // 체크 일괄 선택 / 해제
-    $('btnTrkSelAll').onclick = () => { visible().forEach(it => checked.add(it.id)); render(); };
+    $('btnTrkSelAll').onclick = () => { visible().forEach(it => checked.add(it.id)); autoReal(); render(); };
     $('btnTrkSelNone').onclick = () => { checked.clear(); render(); };
     Finder.attach($('trkFind'), async (x) => {
       found = x; $('trkFindArea').innerHTML = '<option>불러오는 중…</option>';
@@ -197,6 +197,7 @@ const Tracking = (() => {
     };
     for (const id of [...checked]) if (!items.some(it => it.id === id)) checked.delete(id);   // 삭제된 단지의 체크는 정리
     if (window.innerWidth < 760) $('trkManage').open = false;
+    autoReal();                                   // 새로고침 후 체크돼 있던 단지의 실거래를 다시 읽어 전고점·전저점 채움
     save(); fillSelects();
   }
 
@@ -231,9 +232,9 @@ const Tracking = (() => {
   }
 
   /** 실거래 읽기 — 최근 매매·전세 실거래, 전고점·전저점. popup=true 면 결과 창을 띄움 */
-  async function load(popup) {
+  async function load(popup, only) {
     const scope = inScope(), picked = popup ? scope.filter(it => checked.has(it.id)) : [];
-    const list = picked.length ? picked : scope;            // 체크한 단지가 있으면 그 단지만 (없으면 지금 범위 전체)
+    const list = only || (picked.length ? picked : scope);            // 체크한 단지가 있으면 그 단지만 (없으면 지금 범위 전체)
     if (!list.length) { if (popup) U.toast('불러올 단지가 없습니다.'); return; }
     if (popup && picked.length) U.toast(`체크한 ${picked.length}개 단지만 불러옵니다.`);
     const btn = $('btnTrkLoad');
@@ -271,7 +272,7 @@ const Tracking = (() => {
     } finally {
       btn.disabled = false; btn.textContent = '실거래 불러오기';
     }
-    if (!popup && $('tab-tracking').contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;   // 입력 중이면 다시 그리지 않음
+    if (!popup && $('tab-tracking').contains(document.activeElement) && document.activeElement.matches('input:not([type=checkbox])')) return;   // 입력 중이면 다시 그리지 않음
     render();
     if (popup) showReal(list);
   }
@@ -342,6 +343,12 @@ const Tracking = (() => {
 
   const cardMode = () => (ui.card == null ? window.innerWidth < 760 : ui.card);
 
+  /** 체크된 단지 중 실거래를 아직 읽지 않은 단지만 조용히 읽어서 전고점·전저점을 자동으로 채움 */
+  function autoReal() {
+    const need = items.filter(it => checked.has(it.id) && !real.has(it.id));
+    if (need.length) load(false, need).catch(() => {});
+  }
+
   function render() {
     Store.set(CKEY, [...checked]);                                   // 체크 상태 기억
     const selN = items.filter(it => checked.has(it.id)).length; const sc = $('trkSelCount'); if (sc) sc.textContent = `${selN}개`;
@@ -387,7 +394,7 @@ const Tracking = (() => {
     const table = $('trkTable');
     table.className = ui.info ? '' : 'hideinfo';
     table.innerHTML = head + `<tbody>${body}</tbody>`;
-    table.querySelector('#trkAll').onclick = (e) => { list.forEach(it => (e.target.checked ? checked.add(it.id) : checked.delete(it.id))); render(); $('trkAll').checked = e.target.checked; };
+    table.querySelector('#trkAll').onclick = (e) => { list.forEach(it => (e.target.checked ? checked.add(it.id) : checked.delete(it.id))); autoReal(); render(); $('trkAll').checked = e.target.checked; };
     table.querySelector('thead').onclick = (e) => {
       const m = +e.target.dataset.delmonth;
       if (!m) return;
@@ -399,7 +406,7 @@ const Tracking = (() => {
     const tbody = table.querySelector('tbody');
     tbody.onclick = (e) => {
       const t = e.target;
-      if (t.dataset.chk != null) { const it = list[+t.dataset.chk]; t.checked ? checked.add(it.id) : checked.delete(it.id); }
+      if (t.dataset.chk != null) { const it = list[+t.dataset.chk]; t.checked ? checked.add(it.id) : checked.delete(it.id); autoReal(); }
       if (t.dataset.map != null) App.showMap(list[+t.dataset.map]);
     };
     tbody.onchange = (e) => {
@@ -435,7 +442,7 @@ const Tracking = (() => {
     }).join('') || '<p class="empty">조건에 맞는 단지가 없습니다.</p>';
     box.onclick = (e) => {
       const t = e.target;
-      if (t.dataset.chk != null) { const it = list[+t.dataset.chk]; t.checked ? checked.add(it.id) : checked.delete(it.id); }
+      if (t.dataset.chk != null) { const it = list[+t.dataset.chk]; t.checked ? checked.add(it.id) : checked.delete(it.id); autoReal(); }
       if (t.dataset.map != null) App.showMap(list[+t.dataset.map]);
     };
     box.onchange = (e) => {
