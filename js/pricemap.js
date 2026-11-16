@@ -16,7 +16,7 @@ const PriceMap = (() => {
   const HKEY = 'apt.pmHidden.v1', TCKEY = 'apt.trkChecked.v1';  // 지도에서 숨김 · 시세트래킹 체크
   const SIZE = 'apt.pmSize.v1', MIG = 'apt.pmMigrated.v1', PINKEY = 'apt.trkPins.v1';
   const MAPF = '지도 추가';                                     // 지도에서 추가한 단지가 담기는 폴더
-  let lastRows = [], notFound = '', allF = false;
+  let lastRows = [], notFound = '';
   let baseItems = [], pick = null;
   const userItems = () => Store.get(UKEY, []).map(u => ({ id: u.id, pos: { lat: u.lat, lng: u.lng }, text: u.text, color: u.color || '#8e8e93', rank: 0, user: true }));
   let map = null, ctrl = null, inited = false, seq = 0, lmRows = [];
@@ -50,11 +50,16 @@ const PriceMap = (() => {
     $('pmFolder').innerHTML = '<option value=""></option>' + folders.map(f => `<option>${U.esc(f)}</option>`).join('');
     $('pmFolder').value = f0;
     const pins = Store.get(PINKEY, []), cnt = (f) => all.filter(it => it.folders.includes(f)).length;
-    const order = [...folders].sort((a, b) => (pins.includes(b) - pins.includes(a)));
-    const shown = order.filter(f => allF || pins.includes(f) || f === f0 || cnt(f)), more = order.length - shown.length;
     const chip = (v, label, n) => `<button data-pf="${U.esc(v)}" class="${v === f0 ? 'on' : ''}">${U.esc(label)} <b>${n}</b></button>`;
-    $('pmFolders').innerHTML = chip('', '전체', all.length) + shown.map(f => chip(f, f, cnt(f))).join('') +
-      (more > 0 ? `<button data-pall="1" class="ghost">+${more} 더보기 ▾</button>` : allF ? '<button data-pall="0" class="ghost">빈 폴더 숨기기 ▴</button>' : '');
+    const order = [...folders].sort((a, b) => (pins.includes(b) - pins.includes(a))), box = $('pmFolders');
+    const draw1 = (list) => {
+      const rest = folders.filter(f => !list.includes(f));
+      box.innerHTML = chip('', '전체', all.length) + list.map(f => chip(f, f, cnt(f))).join('') +
+        (rest.length ? `<select class="fmore"><option value="">폴더 더보기 (${rest.length}) ▾</option>${rest.map(f => `<option value="${U.esc(f)}">${U.esc(f)} (${cnt(f)})</option>`).join('')}</select>` : '');
+    };
+    draw1(order.filter(f => pins.includes(f) || f === f0 || cnt(f)));          // 한 줄을 넘으면 고정·지금 폴더만 칩으로
+    const first = box.querySelector('button');
+    if (first && box.offsetParent && box.scrollHeight > first.offsetHeight * 1.7) draw1(order.filter(f => pins.includes(f) || f === f0));
     const ms = Tracking.getMonths().slice().sort((a, b) => b - a), cm = $('pmMonth').value || opts().month || '';
     $('pmMonth').innerHTML = '<option value="">최신 호가</option>' + ms.map(m => `<option value="${m}">${Kit.ymText(m)}</option>`).join('');
     if (ms.map(String).includes(String(cm))) $('pmMonth').value = cm;
@@ -285,8 +290,8 @@ const PriceMap = (() => {
     if (o.name) $('pmName').value = o.name;
     $('pmZone').value = o.zone || '';
     $('pmLm').checked = !!o.lm;                                    // 랜드마크 층: 처음엔 꺼짐
+    $('pmFolders').onchange = (e) => { if (e.target.matches('select.fmore') && e.target.value) { $('pmFolder').value = e.target.value; fillFolders(); draw(); } };
     $('pmFolders').onclick = (e) => {
-      const a = e.target.closest('button[data-pall]'); if (a) { allF = a.dataset.pall === '1'; return fillFolders(); }
       const b = e.target.closest('button[data-pf]'); if (!b) return;
       $('pmFolder').value = b.dataset.pf; fillFolders(); draw();
     };

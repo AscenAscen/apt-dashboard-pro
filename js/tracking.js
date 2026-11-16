@@ -69,6 +69,37 @@ const Tracking = (() => {
     if (!silent) U.toast(n ? `${n}개 단지를 [${folder}] 폴더에 담았습니다.` : '이미 담겨 있는 단지입니다.');
     return n;
   }
+  /* ── 폴더 관리 (도구 서랍의 폴더 표 · 위 버튼 공용) ── */
+  function renameFolder(cur) {
+    if (!cur) return U.toast('이름을 바꿀 폴더를 먼저 고르세요.');
+    if (cur === BASE) return U.toast('[기본] 폴더는 이름을 바꿀 수 없습니다.');
+    const name = (prompt('폴더 이름', cur) || '').trim();
+    if (!name || name === cur) return;
+    if (folders.includes(name)) return U.toast('같은 이름의 폴더가 있습니다.');
+    folders[folders.indexOf(cur)] = name;
+    items.forEach(it => { it.folders = it.folders.map(f => (f === cur ? name : f)); it.folder = it.folders[0]; });
+    const pins = Store.get(PINKEY, []); if (pins.includes(cur)) Store.set(PINKEY, pins.map(f => (f === cur ? name : f)));
+    if (curFolder === cur) { curFolder = name; Store.set('apt.curFolder', name); }
+    save(); fillSelects(); render();
+  }
+  function deleteFolder(cur) {
+    if (!cur) return U.toast('삭제할 폴더를 먼저 고르세요.');
+    if (cur === BASE) return U.toast('[기본] 폴더는 삭제할 수 없습니다.');
+    const inside = items.filter(it => it.folders.includes(cur)), only = inside.filter(it => it.folders.length === 1).length;
+    if (!Vault.sure(`[${cur}] 폴더를 삭제합니다.` + (inside.length ? `\n안에 있는 ${inside.length}개 단지는 지워지지 않습니다.` + (only ? ` (다른 폴더에 없는 ${only}개는 [기본] 폴더로 옮겨집니다)` : '') : ''), inside.length >= 3)) return;
+    items.forEach(it => { it.folders = it.folders.filter(f => f !== cur); if (!it.folders.length) it.folders = [BASE]; it.folder = it.folders[0]; });
+    folders = folders.filter(f => f !== cur);
+    Store.set(PINKEY, Store.get(PINKEY, []).filter(f => f !== cur));
+    if (curFolder === cur) { curFolder = ''; Store.set('apt.curFolder', ''); }
+    save(); fillSelects(); render();
+  }
+  function moveFolder(f, d) {
+    const i = folders.indexOf(f), j = i + d; if (i < 0 || j < 0 || j >= folders.length) return;
+    [folders[i], folders[j]] = [folders[j], folders[i]]; save(); fillSelects();
+  }
+  function pinFolder(f) { const p = Store.get(PINKEY, []); Store.set(PINKEY, p.includes(f) ? p.filter(x => x !== f) : [...p, f]); fillSelects(); }
+  function pickFolder(f) { curFolder = f; Store.set('apt.curFolder', f); checked.clear(); fillSelects(); render(); }
+
   /** 다른 탭(시세지도)에서 호가 적기: patch = { s, r } (만원, null 이면 지움) */
   function setQuote(id, ym, patch) {
     const it = items.find(x => x.id === id); if (!it) return false;
@@ -133,7 +164,7 @@ const Tracking = (() => {
     $('trkStaged').onclick = (e) => { const b = e.target.closest('button[data-unstage]'); if (!b) return; staged.splice(+b.dataset.unstage, 1); renderStaged(); };
     renderStaged();
     // 체크 일괄 선택 / 해제
-    $('btnTrkSelAll').onclick = () => { visible().forEach(it => checked.add(it.id)); autoReal(); render(); };
+    if ($('btnTrkSelAll')) $('btnTrkSelAll').onclick = () => { visible().forEach(it => checked.add(it.id)); autoReal(); render(); };
     $('btnTrkSelNone').onclick = () => { checked.clear(); render(); };
     Finder.attach($('trkFind'), async (x) => {
       found = x; foundAr = null; $('trkFindArea').innerHTML = '<option>불러오는 중…</option>';
@@ -178,10 +209,10 @@ const Tracking = (() => {
       render(); U.toast(`${ymLabel(ym)} 시세 칸을 추가했습니다. 매매·전세 가격을 적어 주세요.`);
     };
     ['trkRegion', 'trkBand', 'trkShow', 'trkSort'].forEach(id => { $(id).onchange = () => { checked.clear(); render(); }; });
+    $('trkFolders').onchange = (e) => { if (e.target.matches('select.fmore') && e.target.value) pickFolder(e.target.value); };
     $('trkFolders').onclick = (e) => {
       const pin = e.target.closest('[data-pin]');
       if (pin) { e.stopPropagation(); const f = pin.dataset.pin, p = Store.get(PINKEY, []); Store.set(PINKEY, p.includes(f) ? p.filter(x => x !== f) : [...p, f]); fillSelects(); return; }
-      const af = e.target.closest('button[data-allf]'); if (af) { ui.allF = af.dataset.allf === '1'; fillSelects(); return; }
       const b = e.target.closest('button[data-folder]'); if (!b) return; curFolder = b.dataset.folder; Store.set('apt.curFolder', curFolder); checked.clear(); fillSelects(); render(); };
     $('btnTrkLoad').onclick = () => load(true);
     $('btnTrkExcel').onclick = excel;
@@ -197,26 +228,8 @@ const Tracking = (() => {
       if (!folders.includes(name)) folders.push(name);
       curFolder = name; Store.set('apt.curFolder', name); save(); fillSelects(); render();
     };
-    $('btnFolderRename').onclick = () => {
-      if (!curFolder) return U.toast('이름을 바꿀 폴더를 먼저 고르세요.');
-      if (curFolder === BASE) return U.toast('[기본] 폴더는 이름을 바꿀 수 없습니다.');
-      const name = (prompt('폴더 이름', curFolder) || '').trim();
-      if (!name || name === curFolder) return;
-      if (folders.includes(name)) return U.toast('같은 이름의 폴더가 있습니다.');
-      folders[folders.indexOf(curFolder)] = name;
-      items.forEach(it => { it.folders = it.folders.map(f => (f === curFolder ? name : f)); it.folder = it.folders[0]; });
-      curFolder = name; Store.set('apt.curFolder', name); save(); fillSelects(); render();
-    };
-    $('btnFolderDelete').onclick = () => {
-      const cur = curFolder;
-      if (!cur) return U.toast('삭제할 폴더를 먼저 고르세요.');
-      if (cur === BASE) return U.toast('[기본] 폴더는 삭제할 수 없습니다.');
-      const inside = items.filter(it => it.folders.includes(cur)), only = inside.filter(it => it.folders.length === 1).length;
-      if (!Vault.sure(`[${cur}] 폴더를 삭제합니다.` + (inside.length ? `\n안에 있는 ${inside.length}개 단지는 지워지지 않습니다.` + (only ? ` (다른 폴더에 없는 ${only}개는 [기본] 폴더로 옮겨집니다)` : '') : ''), inside.length >= 3)) return;
-      items.forEach(it => { it.folders = it.folders.filter(f => f !== cur); if (!it.folders.length) it.folders = [BASE]; it.folder = it.folders[0]; });
-      folders = folders.filter(f => f !== cur);
-      curFolder = ''; Store.set('apt.curFolder', ''); save(); fillSelects(); render();
-    };
+    $('btnFolderRename').onclick = () => renameFolder(curFolder);
+    $('btnFolderDelete').onclick = () => deleteFolder(curFolder);
     const move = (mode) => {
       const to = $('trkMoveTo').value;
       if (!checked.size) return U.toast('먼저 표에서 단지를 체크하세요.');
@@ -249,11 +262,19 @@ const Tracking = (() => {
     const chg = (list) => { const v = list.map(it => compute(it).groups[0]?.sd).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
     const chip = (name, label, list) => { const c = chg(list); return `<button data-folder="${U.esc(name)}" class="${name === curFolder ? 'on' : ''}">${U.esc(label)} <b>${list.length}</b>${!c ? '' : ` <small class="${U.cls(c)}">${c > 0 ? '+' : ''}${(c / 10000).toFixed(2)}억</small>`}</button>`; };
     const pins = Store.get(PINKEY, []), counts = new Map(folders.map(f => [f, items.filter(it => it.folders.includes(f))]));
-    const order = [...folders].sort((a, b) => (pins.includes(b) - pins.includes(a)));
-    const shown = order.filter(f => ui.allF || pins.includes(f) || f === curFolder || counts.get(f).length), more = order.length - shown.length;
     const pinBtn = (f) => `<span class="pin${pins.includes(f) ? ' on' : ''}" data-pin="${U.esc(f)}" title="${pins.includes(f) ? '고정 풀기' : '앞에 고정'}">📌</span>`;
-    $('trkFolders').innerHTML = chip('', '전체', items) + shown.map(f => chip(f, f, counts.get(f)).replace('</button>', pinBtn(f) + '</button>')).join('') +
-      (more > 0 ? `<button data-allf="1" class="ghost">+${more} 더보기 ▾</button>` : ui.allF && order.some(f => !pins.includes(f) && f !== curFolder && !counts.get(f).length) ? '<button data-allf="0" class="ghost">빈 폴더 숨기기 ▴</button>' : '');
+    const chipF = (f) => chip(f, f, counts.get(f)).replace('</button>', pinBtn(f) + '</button>');
+    const box = $('trkFolders');
+    const draw = (list) => {
+      const rest = folders.filter(f => !list.includes(f));
+      box.innerHTML = chip('', '전체', items) + list.map(chipF).join('') +
+        (rest.length ? `<select class="fmore" title="칩에 안 보이는 폴더"><option value="">폴더 더보기 (${rest.length}) ▾</option>${rest.map(f => `<option value="${U.esc(f)}">${U.esc(f)} (${counts.get(f).length})</option>`).join('')}</select>` : '');
+    };
+    // 1) 고정 → 단지 있는 폴더 → 지금 폴더 순으로 칩. 2) 한 줄을 넘으면 고정·지금 폴더만 칩으로 남기고 나머지는 목록으로
+    const order = [...folders].sort((a, b) => (pins.includes(b) - pins.includes(a)));
+    draw(order.filter(f => pins.includes(f) || f === curFolder || counts.get(f).length));
+    const first = box.querySelector('button');
+    if (first && box.scrollHeight > first.offsetHeight * 1.7) draw(order.filter(f => pins.includes(f) || f === curFolder));
     $('trkMoveTo').innerHTML = folders.map(x => `<option>${U.esc(x)}</option>`).join('');
     const cur = $('trkRegion').value, inF = items.filter(it => !curFolder || it.folders.includes(curFolder));
     const names = [...new Set(inF.map(it => `${it.sido} ${it.sgg}`))].sort((a, b) => a.localeCompare(b, 'ko'));
@@ -678,5 +699,5 @@ const Tracking = (() => {
   }
 
   const ext = () => ({ get items() { return items; }, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, folderList: () => folders, setFolders: (f) => { folders = f; Store.set(FKEY, folders); if (!folders.includes(curFolder)) { curFolder = ''; Store.set('apt.curFolder', ''); } fillSelects(); render(); } });
-  return { ext, init, add, setQuote, removeFrom, focus, folderList: () => folders, checkedIds: () => [...checked], all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
+  return { ext, init, add, setQuote, removeFrom, focus, renameFolder, deleteFolder, moveFolder, pinFolder, pickFolder, folderList: () => folders, folderCount: (f) => items.filter(it => it.folders.includes(f)).length, curFolder: () => curFolder, checkedIds: () => [...checked], all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
 })();

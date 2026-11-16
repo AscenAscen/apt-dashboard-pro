@@ -25,9 +25,32 @@ const TrkPlus = (() => {
     $('trkSelBar').hidden = !n;
     if (!n) $('tpBulk').hidden = true;
   }
+  function folderTable() {
+    const tb = $('tpFolders'); if (!tb || $('trkDrawer').hidden) return;
+    const pins = Store.get('apt.trkPins.v1', []), fs = Tracking.folderList(), cur = Tracking.curFolder();
+    tb.innerHTML = '<thead><tr><th>📌</th><th class="l">폴더</th><th>단지</th><th>순서</th><th></th></tr></thead><tbody>' + fs.map((f, i) => {
+      const n = Tracking.folderCount(f), e = U.esc(f), base = f === '기본';
+      return `<tr class="${f === cur ? 'sel' : ''}"><td><button class="mini${pins.includes(f) ? ' on' : ''}" data-fa="pin" data-f="${e}" title="칩 줄 맨 앞에 고정">📌</button></td>` +
+        `<td class="l"><a href="#" data-fa="pick" data-f="${e}">${e}</a></td><td>${n || '<span class="hint" style="margin:0">0</span>'}</td>` +
+        `<td><button class="mini" data-fa="up" data-f="${e}" ${i ? '' : 'disabled'}>▲</button><button class="mini" data-fa="down" data-f="${e}" ${i < fs.length - 1 ? '' : 'disabled'}>▼</button></td>` +
+        `<td>${base ? '' : `<button class="mini" data-fa="ren" data-f="${e}">이름</button><button class="mini danger" data-fa="del" data-f="${e}">삭제</button>`}</td></tr>`;
+    }).join('') + '</tbody>';
+  }
+  function folderAct(e) {
+    const b = e.target.closest('[data-fa]'); if (!b) return; e.preventDefault();
+    const f = b.dataset.f, a = b.dataset.fa;
+    if (a === 'pin') Tracking.pinFolder(f);
+    else if (a === 'pick') Tracking.pickFolder(f);
+    else if (a === 'up') Tracking.moveFolder(f, -1);
+    else if (a === 'down') Tracking.moveFolder(f, 1);
+    else if (a === 'ren') Tracking.renameFolder(f);
+    else if (a === 'del') Tracking.deleteFolder(f);
+    folderTable();
+  }
   function drawer(open) {
     const d = $('trkDrawer'); d.hidden = open == null ? !d.hidden : !open;
     $('btnTrkDrawer').classList.toggle('on', !d.hidden);
+    folderTable();
   }
   function apply() {
     const picked = T.items.filter(it => T.checked.has(it.id));
@@ -105,8 +128,9 @@ const TrkPlus = (() => {
       const fs = T.folderList(), empty = fs.filter(f => f !== '기본' && !T.items.some(it => it.folders.includes(f)));
       if (!empty.length) return U.toast('비어 있는 폴더가 없습니다.');
       if (!confirm(`단지가 없는 폴더 ${empty.length}개를 지울까요?\n${empty.join(', ')}\n(단지가 들어 있는 폴더는 건드리지 않습니다)`)) return;
-      T.setFolders(fs.filter(f => !empty.includes(f))); U.toast(`빈 폴더 ${empty.length}개를 정리했습니다.`);
+      T.setFolders(fs.filter(f => !empty.includes(f))); folderTable(); U.toast(`빈 폴더 ${empty.length}개를 정리했습니다.`);
     };
+    $('tpFolders').onclick = folderAct;
     $('btnTpBulk').onclick = () => { $('tpBulk').hidden = !$('tpBulk').hidden; };
     $('btnTpApply').onclick = apply;
     $('btnTpCheck').onclick = check;
@@ -117,6 +141,7 @@ const TrkPlus = (() => {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('trkDrawer').hidden && $('tpModal')?.hidden !== false) drawer(false); });
     const watch = (el, fn, opt) => el && new MutationObserver(fn).observe(el, opt || { childList: true, characterData: true, subtree: true });
     watch($('trkSelCount'), selbar);
+    watch($('trkFolders'), folderTable);
     watch($('btnTrkStageAll'), () => { $('trkStageRow').hidden = $('btnTrkStageAll').disabled; }, { attributes: true, attributeFilter: ['disabled'] });
     $('trkStageRow').hidden = $('btnTrkStageAll').disabled;
     flow(); selbar();

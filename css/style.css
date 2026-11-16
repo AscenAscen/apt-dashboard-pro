@@ -550,3 +550,7 @@ td.gapbig, .gapbig { background: rgba(255,170,0,.18); font-weight: 700; }
 tr.flash td { animation: flashrow 2.4s ease; }
 @keyframes flashrow { 0%, 60% { background: rgba(255,214,10,.28); } 100% { background: transparent; } }
 @media (max-width: 760px) { .pmpop { left: 8px; right: 8px; bottom: 8px; width: auto; } }
+#trkFolders select.fmore, #pmFolders select.fmore { border-radius: 999px; padding: 6px 12px; border-style: dashed; color: var(--sub); width: auto; }
+#tpFolders tr.sel td { background: var(--sel, var(--panel2)); }
+#tpFolders button.on { background: var(--accent); border-color: var(--accent); }
+#tpFolders a { color: var(--text); text-decoration: none; font-weight: 600; }

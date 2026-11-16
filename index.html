@@ -328,7 +328,6 @@
       <button id="btnTrkDrawer" title="점검 · 동기화 · 폴더 · 백업 · 내려받기">🧰 도구</button>
     </div>
     <div class="bar">
-      <button id="btnTrkSelAll" title="지금 표에 보이는 단지를 모두 체크합니다">보이는 단지 전체 선택</button>
       <button id="btnTrkInfo">단지 정보 펼치기</button>
       <button id="btnTrkCard">카드로 입력</button>
       <span class="progress" id="trkProgress"></span>
@@ -374,9 +373,11 @@
       <button id="btnTpCheck">전수조사 중복·누락 점검</button>
       <button id="btnTpGap">호가-실거래 10%↑ 단지만 보기</button></div>
     <div class="drawsec" id="trkPlus"><h4>기기 동기화 (PC ↔ 휴대폰)</h4></div>
-    <div class="drawsec" id="trkManage"><h4>폴더</h4>
-      <button id="btnFolderNew">새 폴더</button><button id="btnFolderRename">폴더 이름 변경</button><button class="danger" id="btnFolderDelete">폴더 삭제</button><button id="btnFolderClean" title="단지가 하나도 없는 폴더를 한꺼번에 지웁니다 (기본 폴더는 남김)">빈 폴더 한 번에 정리</button>
-      <span class="hint" style="margin:0;width:100%">폴더 칩의 📌 를 누르면 앞에 고정됩니다. 빈 폴더는 숨겨지고 [+n 더보기]로 볼 수 있어요.</span></div>
+    <div class="drawsec" id="trkManage"><h4>폴더 관리</h4>
+      <button id="btnFolderNew">＋ 새 폴더</button><button id="btnFolderClean" title="단지가 하나도 없는 폴더를 한꺼번에 지웁니다 (기본 폴더는 남김)">빈 폴더 한 번에 정리</button>
+      <button id="btnFolderRename" hidden></button><button id="btnFolderDelete" hidden></button>
+      <div class="tablewrap" style="width:100%;max-height:340px"><table class="grid" id="tpFolders"></table></div>
+      <span class="hint" style="margin:0;width:100%">📌 고정한 폴더는 칩 줄 맨 앞에 늘 보입니다. 칩이 한 줄을 넘으면 나머지는 [폴더 더보기] 목록으로 들어갑니다.</span></div>
     <div class="drawsec"><h4>백업 · 기기 사이 옮기기</h4>
       <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
           <button data-vault="full" class="primary" title="이 브라우저에 적어 둔 모든 값(시세트래킹·호가·그룹핑·지도 설정·KB·저장함 …)을 파일 하나로 저장합니다">🛡 전체 백업 저장</button><button data-vault="fullrestore">전체 백업 불러오기</button>
