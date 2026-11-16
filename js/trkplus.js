@@ -5,18 +5,7 @@ const TrkPlus = (() => {
   const FLOW = ['', '관심', '임장 예정', '임장 완료', '매수 후보', '제외'];
   let T = null;
 
-  const html = `<details class="manage" id="trkPlus" open><summary>도구 — 상태 흐름 · 일괄 편집 · 점검 · 호가 이력 · 괴리</summary>
-    <div class="mrow"><span class="mlabel">상태 흐름</span><span id="tpFlow" class="chips"></span></div>
-    <div class="mrow"><span class="mlabel">체크한 단지 일괄 편집</span>
-      <label>상태 <select id="tpStatus"><option value="*">(바꾸지 않음)</option>${FLOW.map(s => `<option value="${s}">${s || '(상태 없음)'}</option>`).join('')}</select></label>
-      <label>생활권 <input id="tpZone" placeholder="(바꾸지 않음)" style="width:130px"></label>
-      <label>메모 뒤에 덧붙이기 <input id="tpMemo" placeholder="(없음)" style="width:150px"></label>
-      <button class="primary" id="btnTpApply">체크한 단지에 적용</button><span class="hint" id="tpApplyInfo" style="margin:0"></span></div>
-    <div class="mrow"><span class="mlabel">점검 · 이력</span>
-      <button id="btnTpCheck">전수조사 중복·누락 점검</button>
-      <button id="btnTpHist">호가 변동 이력 (체크한 단지)</button>
-      <button id="btnTpGap">호가-실거래 10%↑ 단지만 보기</button></div>
-    <div id="tpOut" class="hint" style="margin:6px 0 0" hidden></div></details>`;
+  // 화면 배치는 index.html 에 있음: 상태 칩(#tpFlow) · 선택 막대(#trkSelBar) · 오른쪽 도구 서랍(#trkDrawer)
 
   const modal = () => {
     let m = $('tpModal');
@@ -33,10 +22,19 @@ const TrkPlus = (() => {
   function flow() {
     const cnt = new Map(FLOW.map(s => [s, 0]));
     for (const it of T.items) cnt.set(it.status || '', (cnt.get(it.status || '') || 0) + 1);
-    $('tpFlow').innerHTML = FLOW.map((s, i) => `<button class="chip" data-st="${s}" title="이 상태만 표에 보기">${s || '상태 없음'} <b>${cnt.get(s) || 0}</b></button>${i < FLOW.length - 1 && i > 0 && i < 4 ? '<span class="hint" style="margin:0">→</span>' : ''}`).join('') +
-      '<button class="chip" data-st="*">전체 <b>' + T.items.length + '</b></button>';
+    const cur = $('trkStatus').value || '*';
+    const chip = (v, label, n) => `<button class="chip${cur === v ? ' on' : ''}" data-st="${v}">${label} <b>${n}</b></button>`;
+    $('tpFlow').innerHTML = chip('*', '전체', T.items.length) + FLOW.filter(Boolean).map(s => chip(s, s, cnt.get(s) || 0)).join('') + chip('', '상태 없음', cnt.get('') || 0);
   }
-
+  function selbar() {
+    const n = T.items.filter(it => T.checked.has(it.id)).length;
+    $('trkSelBar').hidden = !n;
+    if (!n) $('tpBulk').hidden = true;
+  }
+  function drawer(open) {
+    const d = $('trkDrawer'); d.hidden = open == null ? !d.hidden : !open;
+    $('btnTrkDrawer').classList.toggle('on', !d.hidden);
+  }
   function apply() {
     const picked = T.items.filter(it => T.checked.has(it.id));
     if (!picked.length) return U.toast('먼저 표에서 단지를 체크하세요.');
@@ -107,18 +105,25 @@ const TrkPlus = (() => {
   }
 
   function init() {
-    if (typeof Tracking === 'undefined' || !Tracking.ext || $('trkPlus')) return;
+    if (typeof Tracking === 'undefined' || !Tracking.ext || !$('tpFlow') || T) return;
     T = Tracking.ext();
-    const anchor = $('trkManage'); if (!anchor) return;
-    anchor.insertAdjacentHTML('beforebegin', html);
-    $('tpFlow').onclick = (e) => { const b = e.target.closest('button[data-st]'); if (b) T.setStatusFilter(b.dataset.st); };
+    $('tpStatus').innerHTML = '<option value="*">(바꾸지 않음)</option>' + FLOW.map(s => `<option value="${s}">${s || '(상태 없음)'}</option>`).join('');
+    $('tpFlow').onclick = (e) => { const b = e.target.closest('button[data-st]'); if (b) { T.setStatusFilter(b.dataset.st); flow(); } };
+    $('btnTpBulk').onclick = () => { $('tpBulk').hidden = !$('tpBulk').hidden; };
     $('btnTpApply').onclick = apply;
     $('btnTpCheck').onclick = check;
     $('btnTpHist').onclick = hist;
-    $('btnTpGap').onclick = () => { $('trkShow').value = 'gap'; T.checked.clear(); T.render(); };
-    const pg = $('trkProgress');
-    if (pg) new MutationObserver(flow).observe(pg, { childList: true, characterData: true, subtree: true });
-    flow();
+    $('btnTpGap').onclick = () => { $('trkShow').value = 'gap'; T.checked.clear(); T.render(); drawer(false); };
+    $('btnTrkDrawer').onclick = () => drawer();
+    $('btnTrkDrawerClose').onclick = () => drawer(false);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('trkDrawer').hidden && $('tpModal')?.hidden !== false) drawer(false); });
+    $('trkStatus').addEventListener('change', flow);
+    const watch = (el, fn, opt) => el && new MutationObserver(fn).observe(el, opt || { childList: true, characterData: true, subtree: true });
+    watch($('trkProgress'), flow);
+    watch($('trkSelCount'), selbar);
+    watch($('btnTrkStageAll'), () => { $('trkStageRow').hidden = $('btnTrkStageAll').disabled; }, { attributes: true, attributeFilter: ['disabled'] });
+    $('trkStageRow').hidden = $('btnTrkStageAll').disabled;
+    flow(); selbar();
   }
-  return { init, flow };
+  return { init, flow, drawer };
 })();

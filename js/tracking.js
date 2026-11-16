@@ -300,6 +300,7 @@ const Tracking = (() => {
     $('realModal').hidden = false;
   }
 
+  const selCnt = () => { const n = items.filter(it => checked.has(it.id)).length, sc = $('trkSelCount'); if (sc) sc.textContent = `${n}개`; };
   const GAPLIM = 10;   // 호가가 최근 실거래와 이 % 이상 벌어지면 강조
   const gapPct = (c) => (c.askGap != null && c.realSale ? c.askGap / c.realSale.price * 100 : null);
 
@@ -369,7 +370,7 @@ const Tracking = (() => {
 
   function render() {
     Store.set(CKEY, [...checked]);                                   // 체크 상태 기억
-    const selN = items.filter(it => checked.has(it.id)).length; const sc = $('trkSelCount'); if (sc) sc.textContent = `${selN}개`;
+    selCnt();
     const list = visible(), scope = inScope(), m0 = months[0];
     $('trkEmpty').hidden = items.length > 0;
     $('trkNoMonth').hidden = !(items.length && !months.length);
@@ -424,7 +425,7 @@ const Tracking = (() => {
     const tbody = table.querySelector('tbody');
     tbody.onclick = (e) => {
       const t = e.target;
-      if (t.dataset.chk != null) { const it = list[+t.dataset.chk]; t.checked ? checked.add(it.id) : checked.delete(it.id); autoReal(); }
+      if (t.dataset.chk != null) { const it = list[+t.dataset.chk]; t.checked ? checked.add(it.id) : checked.delete(it.id); autoReal(); selCnt(); }
       if (t.dataset.map != null) App.showMap(list[+t.dataset.map]);
     };
     tbody.onchange = (e) => {
@@ -460,7 +461,7 @@ const Tracking = (() => {
     }).join('') || '<p class="empty">조건에 맞는 단지가 없습니다.</p>';
     box.onclick = (e) => {
       const t = e.target;
-      if (t.dataset.chk != null) { const it = list[+t.dataset.chk]; t.checked ? checked.add(it.id) : checked.delete(it.id); autoReal(); }
+      if (t.dataset.chk != null) { const it = list[+t.dataset.chk]; t.checked ? checked.add(it.id) : checked.delete(it.id); autoReal(); selCnt(); }
       if (t.dataset.map != null) App.showMap(list[+t.dataset.map]);
     };
     box.onchange = (e) => {
@@ -631,6 +632,6 @@ const Tracking = (() => {
     return items.length;
   }
 
-  const ext = () => ({ items, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, setStatusFilter: (v) => { $('trkStatus').value = v; checked.clear(); render(); } });
+  const ext = () => ({ get items() { return items; }, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, setStatusFilter: (v) => { $('trkStatus').value = v; checked.clear(); render(); } });
   return { ext, init, add, all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
 })();

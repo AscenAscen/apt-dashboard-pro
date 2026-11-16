@@ -306,53 +306,55 @@
       <button id="btnTrkFindTrades" title="시세트래킹에 담지 않고 이 단지의 매매·전세 실거래를 바로 봅니다">실거래 바로 보기</button>
       <button id="btnTrkStage" title="지금 고른 단지·평형을 아래 대기 목록에 쌓아 둡니다 (여러 개 가능)">목록에 담기</button>
     </div>
-    <div class="filters" id="trkStageRow" style="margin-top:6px"><span class="hint" style="margin:0">대기 목록:</span><span id="trkStaged"></span><button class="primary" id="btnTrkStageAll" disabled>대기 0개 한꺼번에 추가</button></div>
-    <div class="filters" style="margin-top:12px"><span class="hint" style="margin:0">체크한 단지 <b id="trkSelCount">0개</b></span><button id="btnTrkSelAll" title="지금 표에 보이는 단지를 모두 체크합니다">보이는 단지 전체 선택</button><button id="btnTrkSelNone" title="체크를 모두 풉니다">선택 해제</button></div>
-    <div class="filters" style="margin-top:12px">
-      <label>기록할 달 <input type="month" id="trkNewMonth"></label>
-      <button class="primary" id="btnTrkAddMonth">시세 추가</button>
-      <button id="btnTrkLoad" title="표에서 체크한 단지가 있으면 그 단지만, 없으면 지금 보이는 범위 전체의 최근 실거래를 불러옵니다">실거래 불러오기 (체크한 단지만)</button>
-      <button id="btnTrkTrades" class="primary" title="체크한 단지의 매매·전세 실거래를 표 아래에서 기간 골라 봅니다">선택 단지 실거래 조회</button>
-      <button id="btnTrkGoTrades" hidden title="표 아래의 실거래 조회 결과로 이동">▼ 결과 보기</button>
-      <span class="sep"></span>
-      <label>지역 <select id="trkRegion"><option value="">전체</option></select></label>
-      <label>상태 <select id="trkStatus"></select></label>
-      <label>보기
-        <select id="trkShow">
-          <option value="">전체</option><option value="empty">최신 달 아직 안 적은 단지</option><option value="down">매매 호가 내린 단지</option>
-          <option value="rentup">전세 호가 오른 단지</option><option value="new">새 실거래 있는 단지</option><option value="gap">호가-실거래 차이 10% 이상</option>
-        </select>
-      </label>
-      <label>정렬
-        <select id="trkSort">
-          <option value="">담은 순</option><option value="price">매매 호가 높은 순</option><option value="up">전월 대비 상승 큰 순</option>
-          <option value="down">전월 대비 하락 큰 순</option><option value="diff">호가-실거래 차이 큰 순</option><option value="gappct">호가-실거래 차이(%) 큰 순</option><option value="name">단지명순</option>
-        </select>
-      </label>
-    </div>
-    <details class="manage" id="trkManage" open><summary>관리 — 폴더 · 옮기기 · 백업 · 내려받기 · 삭제</summary>
-      <div class="mrow"><span class="mlabel">폴더</span>
-        <button id="btnFolderNew">새 폴더</button><button id="btnFolderRename">폴더 이름 변경</button><button class="danger" id="btnFolderDelete">폴더 삭제</button></div>
-      <div class="mrow"><span class="mlabel">체크한 단지를</span>
-        <select id="trkMoveTo"></select><button id="btnTrkAddTo" title="지금 폴더에도 두고 이 폴더에도 담습니다">이 폴더에도 담기</button><button id="btnTrkMove">이 폴더로 옮기기</button>
-        <button id="btnTrkOut">지금 폴더에서 빼기</button><button id="btnTrkSame" title="최신 달이 비어 있는 단지에 바로 앞 기록을 그대로 넣습니다">지난 기록과 같음</button>
-        <button class="danger" id="btnTrkDelete">선택 삭제</button></div>
-      <div class="mrow"><span class="mlabel">기기 사이 옮기기 · 백업</span>
-          <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
-          <button data-vault="full" class="primary" title="이 브라우저에 적어 둔 모든 값(시세트래킹·호가·그룹핑·지도 설정·KB·저장함 …)을 파일 하나로 저장합니다">🛡 전체 백업 저장</button><button data-vault="fullrestore">전체 백업 불러오기</button>
-          <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
-          <span class="bkinfo"></span></div>
-      <div class="mrow"><span class="mlabel">내려받기</span>
-        <button id="btnTrkExcel">표 엑셀 다운로드</button>
-        <select id="trkFormat"><option value="xlsx">엑셀(.xlsx)</option><option value="csv">CSV</option></select><button id="btnTrkTradesDl">실거래 내역 다운로드</button></div>
-    </details>
+    <div class="filters" id="trkStageRow" style="margin-top:6px" hidden><span class="hint" style="margin:0">대기 목록:</span><span id="trkStaged"></span><button class="primary" id="btnTrkStageAll" disabled>대기 0개 한꺼번에 추가</button></div>
   </section>
   <section class="panel">
+    <div class="filters trkbar">
+      <label>기록할 달 <input type="month" id="trkNewMonth"></label>
+      <button class="primary" id="btnTrkAddMonth">시세 추가</button>
+      <button id="btnTrkLoad" title="표에서 체크한 단지가 있으면 그 단지만, 없으면 지금 보이는 범위 전체의 최근 실거래를 불러옵니다">실거래 불러오기</button>
+      <span class="sep"></span>
+      <label>지역 <select id="trkRegion"><option value="">전체</option></select></label>
+      <label hidden>상태 <select id="trkStatus"></select></label>
+      <label>보기 <select id="trkShow">
+          <option value="">전체</option><option value="empty">최신 달 아직 안 적은 단지</option><option value="down">매매 호가 내린 단지</option>
+          <option value="rentup">전세 호가 오른 단지</option><option value="new">새 실거래 있는 단지</option><option value="gap">호가-실거래 차이 10% 이상</option>
+        </select></label>
+      <label>정렬 <select id="trkSort">
+          <option value="">담은 순</option><option value="price">매매 호가 높은 순</option><option value="up">전월 대비 상승 큰 순</option>
+          <option value="down">전월 대비 하락 큰 순</option><option value="diff">호가-실거래 차이 큰 순</option><option value="gappct">호가-실거래 차이(%) 큰 순</option><option value="name">단지명순</option>
+        </select></label>
+      <span class="grow"></span>
+      <button id="btnTrkDrawer" title="점검 · 동기화 · 폴더 · 백업 · 내려받기">🧰 도구</button>
+    </div>
+    <div class="trkflow"><span class="hint" style="margin:0">상태</span><span id="tpFlow" class="chips"></span></div>
     <div class="bar">
+      <button id="btnTrkSelAll" title="지금 표에 보이는 단지를 모두 체크합니다">보이는 단지 전체 선택</button>
       <button id="btnTrkInfo">단지 정보 펼치기</button>
       <button id="btnTrkCard">카드로 입력</button>
       <span class="progress" id="trkProgress"></span>
       <span class="grow"></span>
+      <button id="btnTrkGoTrades" hidden title="표 아래의 실거래 조회 결과로 이동">▼ 실거래 결과 보기</button>
+    </div>
+    <div class="selbar" id="trkSelBar" hidden>
+      <div class="selrow">
+        <b id="trkSelCount">0개</b><span class="hint" style="margin:0">선택</span>
+        <button id="btnTpBulk">✎ 일괄 편집</button>
+        <button id="btnTrkTrades" class="primary" title="체크한 단지의 매매·전세 실거래를 표 아래에서 기간 골라 봅니다">실거래 조회</button>
+        <button id="btnTpHist">호가 이력</button>
+        <button id="btnTrkSame" title="최신 달이 비어 있는 단지에 바로 앞 기록을 그대로 넣습니다">지난 기록과 같음</button>
+        <span class="sep"></span>
+        <label>폴더 <select id="trkMoveTo"></select></label><button id="btnTrkAddTo" title="지금 폴더에도 두고 이 폴더에도 담습니다">이 폴더에도 담기</button><button id="btnTrkMove">이 폴더로 옮기기</button><button id="btnTrkOut">지금 폴더에서 빼기</button>
+        <span class="sep"></span>
+        <button class="danger" id="btnTrkDelete">삭제</button>
+        <button id="btnTrkSelNone" title="체크를 모두 풉니다">✕ 선택 해제</button>
+      </div>
+      <div class="selrow" id="tpBulk" hidden>
+        <label>상태 <select id="tpStatus"></select></label>
+        <label>생활권 <input id="tpZone" placeholder="(바꾸지 않음)" style="width:130px"></label>
+        <label>메모 뒤에 덧붙이기 <input id="tpMemo" placeholder="(없음)" style="width:150px"></label>
+        <button class="primary" id="btnTpApply">체크한 단지에 적용</button><span class="hint" id="tpApplyInfo" style="margin:0"></span>
+      </div>
     </div>
     <details class="help"><summary>도움말</summary>
       <p class="hint"><b>시세 추가</b>를 누르면 그 달의 칸 묶음이 맨 앞에 생기고, 예전 기록은 오른쪽으로 밀려 계속 남습니다.
@@ -360,14 +362,31 @@
       <b>전고점·전저점</b>은 2020년 이후 실거래(직거래 제외)로 자동 기입되며, 칸을 눌러 고칠 수 있고 지우면 자동값으로 돌아갑니다.
       하락률·상승률은 가장 최근에 적은 매매가 기준이며, 적지 않았으면 최근 실거래가 기준입니다. <b>호가-실거래</b>는 적은 매매 호가에서 최근 매매 실거래가를 뺀 값입니다.
       <b>단지 정보 펼치기</b>를 누르면 생활권·세대수·구조·방·화·링크 칸이 나옵니다. 단지명에 마우스를 올리면 담긴 폴더가 보입니다.
-      기록은 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 <b>관리 → 코드로 내보내기</b>로 복사한 글자를 그 기기의 <b>코드 가져오기</b>에 붙여 넣으세요.</p>
+      기록은 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 오른쪽 <b>🧰 도구</b>의 백업이나 기기 동기화를 쓰세요.</p>
     </details>
     <p class="empty" id="trkNoMonth" hidden>아직 기록한 달이 없습니다. 위에서 달을 고르고 <b>시세 추가</b>를 눌러 가격 칸을 만드세요.</p>
     <div id="trkCards" hidden></div>
     <div class="tablewrap"><table id="trkTable"></table></div>
-    <p class="empty" id="trkEmpty">담아 둔 단지가 없습니다. [실거래 조회]나 [전수조사]에서 단지를 체크하고 <b>트래킹에 담기</b>를 누르세요.</p>
+    <p class="empty" id="trkEmpty">담아 둔 단지가 없습니다. 위의 단지 검색이나 [실거래 조회]·[전수조사]에서 <b>트래킹에 담기</b>를 누르세요.</p>
   </section>
   <section class="panel" id="tpTrack" hidden></section>
+  <aside class="drawer" id="trkDrawer" hidden>
+    <div class="drawhead"><strong>🧰 도구</strong><span class="grow"></span><button id="btnTrkDrawerClose">닫기 ✕</button></div>
+    <div class="drawsec"><h4>점검</h4>
+      <button id="btnTpCheck">전수조사 중복·누락 점검</button>
+      <button id="btnTpGap">호가-실거래 10%↑ 단지만 보기</button></div>
+    <div class="drawsec" id="trkPlus"><h4>기기 동기화 (PC ↔ 휴대폰)</h4></div>
+    <div class="drawsec" id="trkManage"><h4>폴더</h4>
+      <button id="btnFolderNew">새 폴더</button><button id="btnFolderRename">폴더 이름 변경</button><button class="danger" id="btnFolderDelete">폴더 삭제</button></div>
+    <div class="drawsec"><h4>백업 · 기기 사이 옮기기</h4>
+      <button data-vault="out">코드로 내보내기</button><button data-vault="in">코드 가져오기</button>
+          <button data-vault="full" class="primary" title="이 브라우저에 적어 둔 모든 값(시세트래킹·호가·그룹핑·지도 설정·KB·저장함 …)을 파일 하나로 저장합니다">🛡 전체 백업 저장</button><button data-vault="fullrestore">전체 백업 불러오기</button>
+          <button data-vault="file">백업 파일 저장</button><button data-vault="restore">백업 파일 불러오기</button>
+          <span class="bkinfo"></span></div>
+    <div class="drawsec"><h4>내려받기</h4>
+      <button id="btnTrkExcel">표 엑셀 다운로드</button>
+      <select id="trkFormat"><option value="xlsx">엑셀(.xlsx)</option><option value="csv">CSV</option></select><button id="btnTrkTradesDl">실거래 내역 다운로드</button></div>
+  </aside>
 </main>
 
 <!-- ═══════════════ 2-1. 단지 비교 ═══════════════ -->

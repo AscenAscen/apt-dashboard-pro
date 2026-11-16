@@ -46,7 +46,7 @@ const Sync = (() => {
   function init() {
     const host = $('trkPlus'); if (!host || $('syRepo')) return;
     const c = cfg();
-    host.insertAdjacentHTML('beforeend', `<div class="mrow"><span class="mlabel">기기 동기화 (PC ↔ 휴대폰)</span>
+    host.insertAdjacentHTML('beforeend', `<div class="drawform">
       <label>저장소 <input id="syRepo" placeholder="아이디/저장소이름" style="width:190px" value="${U.esc(c.repo || '')}"></label>
       <label>토큰 <input id="syToken" type="password" placeholder="github_pat_…" style="width:190px" value="${U.esc(c.token || '')}" autocomplete="off"></label>
       <button id="btnSyPush" class="primary" title="이 기기의 기록을 저장소로 올립니다">⬆ 올리기</button><button id="btnSyPull" title="저장소의 기록을 이 기기에 합칩니다">⬇ 내려받아 합치기</button>

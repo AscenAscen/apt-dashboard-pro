@@ -498,3 +498,27 @@ table.pivot td.pvover { outline: 2px dashed var(--accent); outline-offset: -2px;
 td.gapbig, .gapbig { background: rgba(255,170,0,.18); font-weight: 700; }
 .mlbadge { display: inline-block; margin-left: 5px; padding: 0 4px; border-radius: 4px; background: #2f6fed; color: #fff; font-size: .8em; font-weight: 700; }
 .pvcmp { display: block; font-size: .85em; color: var(--sub); } .pvcmp.up { color: var(--up); } .pvcmp.down { color: var(--down, #4f9cff); }
+
+/* ── 시세트래킹 배치: 상태 칩 · 선택 막대 · 오른쪽 도구 서랍 ── */
+.trkbar { margin-bottom: 8px; }
+.trkflow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 10px; }
+.trkflow .chips { margin: 0; }
+.chip.on, #btnTrkDrawer.on { background: var(--accent); color: var(--on-accent, #fff); border-color: var(--accent); }
+.selbar { position: sticky; top: 0; z-index: 6; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 10px; background: var(--sel, var(--panel2)); }
+.selbar .selrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.selbar .selrow + .selrow { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.selbar label { display: inline-flex; align-items: center; gap: 4px; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 92vw; z-index: 60; overflow: auto; padding: 14px 16px 24px;
+  background: var(--panel); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.35); }
+.drawer[hidden] { display: none; }
+.drawhead { display: flex; align-items: center; gap: 8px; position: sticky; top: -14px; background: var(--panel); padding: 4px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.drawsec { padding: 10px 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.drawsec h4 { width: 100%; margin: 0 0 2px; font-size: .95em; color: var(--sub); }
+.drawsec .bkinfo { width: 100%; }
+.drawform { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
+.drawform label { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.drawform input { width: 100% !important; box-sizing: border-box; }
+@media (max-width: 760px) {
+  .drawer { top: auto; left: 0; width: auto; max-width: none; max-height: 78vh; border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.35); }
+}
+#tpModal { z-index: 70; }
