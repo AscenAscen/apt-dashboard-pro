@@ -270,7 +270,7 @@
         <button id="btnSvSeen" hidden>새 거래 확인했음</button>
         <span class="grow"></span>
         <button class="primary" id="btnSvTrack">선택 단지 시세트래킹에 담기</button>
-        <button id="btnSvToMap" title="체크한 단지를 시세지도에 라벨로 올립니다 (시세트래킹에는 담지 않음)">선택 단지 시세지도로 보내기</button>
+        
         <button id="btnSvExcel">엑셀 다운로드</button>
       </div>
       <details class="help"><summary>도움말</summary>
@@ -850,48 +850,51 @@
 <!-- ═══════════════ 랜드마크 ═══════════════ -->
 <!-- ═══════════════ 시세지도 ═══════════════ -->
 <main id="tab-map" class="tab" hidden>
-  <section class="panel empty" id="pmEmpty" hidden>시세트래킹에 담은 단지가 없습니다. 실거래 조회에서 단지를 담으면 이 지도에 가격 라벨로 나타납니다.</section>
   <section class="panel">
     <div class="filters">
-      <label class="findlab">➕ 단지 직접 추가 <input type="search" id="pmAddFind" placeholder="단지명 검색 후 고르기" autocomplete="off"></label>
+      <label class="findlab">➕ 단지 추가 <input type="search" id="pmAddFind" placeholder="단지명 검색 후 고르기" autocomplete="off"></label>
       <label>평형 <select id="pmAddArea"><option value="">단지를 먼저 고르세요</option></select></label>
       <button id="btnPmAdd" class="primary" disabled>지도에 추가</button>
-      <span class="hint" id="pmAddHint" style="margin:0">시세트래킹에 없는 단지도 골라서 지도에 올릴 수 있습니다.</span>
+      <span class="hint" id="pmAddHint" style="margin:0">추가한 단지는 시세트래킹의 <b>지도 추가</b> 폴더에 담겨, 표에서 호가를 적을 수 있습니다.</span>
     </div>
-    <details id="pmAddedBox" hidden style="margin-top:8px">
-      <summary id="pmAddedSum" style="cursor:pointer;color:var(--sub)">직접 추가한 단지</summary>
-      <div id="pmAdded" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;max-height:160px;overflow:auto"></div>
-    </details>
   </section>
-  <section class="panel"><div class="chips" id="pmViews"></div></section>
+  <section class="panel empty" id="pmEmpty" hidden>시세트래킹에 담은 단지가 없습니다. 위에서 단지를 추가하거나 시세트래킹·전수조사에서 단지를 담으면 이 지도에 가격 라벨로 나타납니다.</section>
   <div id="pmBody">
     <section class="panel" id="pmPanel">
-      <div class="bar"><strong>시세지도</strong>
-        <label class="inline">권역 <select id="pmZone"><option value="">전체</option><option>서울</option><option>수도권</option><option>광역시</option><option>중소도시</option></select></label>
-        <label class="inline">폴더 <select id="pmFolder"><option value="">시세트래킹 전체</option></select></label>
-        <label class="inline">라벨에 표시 <select id="pmShow"><option value="s">매매 가격</option><option value="r">전세 가격</option><option value="gap">매-전 (투자금)</option><option value="ratio">전세가율</option><option value="none">단지명만</option></select></label>
-        <label class="inline">글자 <select id="pmName"><option value="both">단지명 + 값</option><option value="val">값만</option><option value="name">단지명만</option></select></label>
-        <label class="inline">기준 달 <select id="pmMonth"><option value="">최신 호가</option></select></label>
-        <button id="btnPmRefresh">새로 그리기</button>
-        <button id="btnPmClearSent" title="직접 추가한 단지와 전수조사에서 보낸 단지를 지도에서 모두 뺍니다" hidden>직접 추가·전수조사 단지 모두 빼기</button>
-        <span class="grow"></span><span class="hint" id="pmCount" style="margin:0"></span></div>
-      <div class="bar" style="margin:4px 0 8px"><span class="hint" style="margin:0">지도 크기</span>
-        <label class="inline">가로 <input type="range" id="pmMapW" min="40" max="100" step="5" style="width:160px"> <b id="pmMapWV" style="min-width:44px">100%</b></label>
-        <label class="inline">세로 <input type="range" id="pmMapH" min="300" max="900" step="20" style="width:160px"> <b id="pmMapHV" style="min-width:52px"></b></label>
-        <button id="btnPmSize" title="지도 크기를 처음 상태로 되돌립니다">기본 크기</button></div>
-      <p class="hint">시세트래킹에 담은 단지의 가격을 지도에 보여 줍니다. <span style="color:#4f9cff">●</span> 파랑 = 내가 적은 호가, <span style="color:#f5a742">●</span> 주황(·실) = 호가가 없어 최근 실거래로 대신한 값. 임장 보고서용으로 라벨 위치를 정리하려면 <b>라벨 편집 모드</b>를 켜고 끌어서 옮기세요.</p>
-      <div class="bar" style="margin:4px 0 8px"><span class="hint" style="margin:0">영역으로 묶기</span><button id="btnPaDraw" title="지도에서 점을 눌러 다각형을 그리면 안에 든 단지가 한 묶음이 됩니다">▦ 영역 그리기</button><button id="btnPaDone" class="primary" hidden>그리기 완료</button><button id="btnPaCancel" hidden>취소</button><span class="hint" id="paHint" style="margin:0"></span></div>
-      <div class="tablewrap short" id="paList"></div>
-      <div id="pmCtl"></div>
+      <div class="chips" id="pmFolders"></div>
+      <select id="pmFolder" hidden><option value=""></option></select>
+      <div class="filters pmbar">
+        <label>권역 <select id="pmZone"><option value="">전체</option><option>서울</option><option>수도권</option><option>광역시</option><option>중소도시</option></select></label>
+        <label>금액대 <select id="pmBand"><option value="">전체</option></select></label>
+        <label>라벨에 표시 <select id="pmShow"><option value="s">매매 가격</option><option value="r">전세 가격</option><option value="gap">매-전 (투자금)</option><option value="ratio">전세가율</option><option value="none">단지명만</option></select></label>
+        <label>글자 <select id="pmName"><option value="both">단지명 + 값</option><option value="val">값만</option><option value="name">단지명만</option></select></label>
+        <label>기준 달 <select id="pmMonth"><option value="">최신 호가</option></select></label>
+        <label>프리셋 <select id="pmPreset"><option value="">(고르기)</option><option value="report">보고서용</option><option value="field">임장용</option><option value="simple">간단히</option></select></label>
+        <label class="inline chk"><input type="checkbox" id="pmLm"> ★ 랜드마크 함께 보기</label>
+        <span class="grow"></span>
+        <button id="btnPmDrawer" title="지도 크기 · 라벨 모양 · 캡처 · 영역 그리기 · 단지 목록">🎨 꾸미기</button>
+      </div>
+      <p class="hint pmhint"><span style="color:#4f9cff">●</span> 내가 적은 호가 · <span style="color:#f5a742">●</span> ·실 = 호가가 없어 최근 실거래로 대신 · 진한 테두리 = 시세트래킹에서 체크한 단지 · 라벨을 누르면 호가를 바로 적을 수 있습니다. <span id="pmCount"></span></p>
       <div class="kmap tallmap" id="pmMap"><p class="empty" id="pmMapMsg"></p></div>
       <div class="cards" id="pmCard" style="margin-top:10px"></div>
-      <details id="pmListBox" style="margin-top:10px"><summary style="cursor:pointer">단지 목록 — 체크 · 지도 보이기 · 라벨 보이기 · ★ 랜드마크</summary>
-        <div class="bar" style="margin:8px 0"><button id="btnPmMapAllOn">지도에 모두 보이기</button><button id="btnPmMapAllOff">지도에서 모두 숨기기</button><span class="hint" style="margin:0">아래 목록은 위의 보기 칩에 맞춰 나옵니다.</span></div>
-        <div class="tablewrap short"><table id="pmListTable"></table></div></details>
       <details open style="margin-top:10px"><summary>지도에 올라간 단지 표 (엑셀로 받을 수 있습니다)</summary>
         <div class="tablewrap short"><table id="pmTable" data-title="시세지도 단지"></table></div></details>
     </section>
   </div>
+  <div class="pmpop" id="pmPop" hidden></div>
+  <aside class="drawer" id="pmDrawer" hidden>
+    <div class="drawhead"><strong>🎨 꾸미기</strong><span class="grow"></span><button id="btnPmDrawerClose">닫기 ✕</button></div>
+    <div class="drawsec"><h4>지도 크기</h4>
+      <label class="inline">가로 <input type="range" id="pmMapW" min="40" max="100" step="5" style="width:150px"> <b id="pmMapWV" style="min-width:44px">100%</b></label>
+      <label class="inline">세로 <input type="range" id="pmMapH" min="300" max="900" step="20" style="width:150px"> <b id="pmMapHV" style="min-width:52px"></b></label>
+      <button id="btnPmSize" title="지도 크기를 처음 상태로 되돌립니다">기본 크기</button></div>
+    <div class="drawsec"><h4>라벨 · 캡처</h4><div id="pmCtl" class="pmctl"></div></div>
+    <div class="drawsec"><h4>영역으로 묶기</h4><div class="bar" style="margin:4px 0 8px"><span class="hint" style="margin:0">영역으로 묶기</span><button id="btnPaDraw" title="지도에서 점을 눌러 다각형을 그리면 안에 든 단지가 한 묶음이 됩니다">▦ 영역 그리기</button><button id="btnPaDone" class="primary" hidden>그리기 완료</button><button id="btnPaCancel" hidden>취소</button><span class="hint" id="paHint" style="margin:0"></span></div>
+      <div class="tablewrap short" id="paList" style="width:100%"></div></div>
+    <div class="drawsec"><h4>단지 목록 — 지도 · 라벨 켜고 끄기 · ★ 랜드마크</h4>
+      <button id="btnPmMapAllOn">지도에 모두 보이기</button><button id="btnPmMapAllOff">지도에서 모두 숨기기</button>
+      <div class="tablewrap short" style="width:100%"><table id="pmListTable"></table></div></div>
+  </aside>
 </main>
 
 <main id="tab-land" class="tab" hidden>

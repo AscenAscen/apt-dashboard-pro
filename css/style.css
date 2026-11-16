@@ -527,3 +527,26 @@ td.gapbig, .gapbig { background: rgba(255,170,0,.18); font-weight: 700; }
 #trkFolders button:hover span.pin { opacity: .7; }
 #trkFolders button:hover span.pin.on { opacity: 1; }
 #trkFolders button.ghost { background: transparent; border-style: dashed; color: var(--sub); }
+
+/* ── 시세지도 개편: 필터 한 줄 · 라벨 작은 창 · 랜드마크 층 · 체크 강조 ── */
+#pmFolders { margin-bottom: 8px; }
+#pmFolders button.ghost { background: transparent; border-style: dashed; color: var(--sub); }
+.pmbar { margin-bottom: 4px; }
+.pmbar label.chk { display: inline-flex; align-items: center; gap: 4px; flex-direction: row; }
+.pmhint { margin: 2px 0 8px; }
+.mllabel.mlhot { outline: 3px solid #ffd60a; outline-offset: 1px; font-weight: 800; }
+.mllabel.mllm { background: rgba(60,60,67,.85) !important; color: #e5e5ea !important; border-left-color: #8e8e93 !important; font-weight: 600; }
+.pmpop { position: fixed; right: 18px; bottom: 18px; z-index: 65; width: 360px; max-width: calc(100vw - 24px); padding: 12px 14px;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.pmpop[hidden] { display: none; }
+.pphead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ppgrid { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0; font-size: .92em; }
+.ppgrid span { color: var(--sub); }
+.ppin { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px; padding: 8px 0; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); margin-bottom: 8px; }
+.ppin .hint { width: 100%; }
+.ppin input { width: 90px; }
+.pmctl .mlctl, .pmctl > * { flex-wrap: wrap; }
+#pmDrawer .drawsec .bar { flex-wrap: wrap; width: 100%; }
+tr.flash td { animation: flashrow 2.4s ease; }
+@keyframes flashrow { 0%, 60% { background: rgba(255,214,10,.28); } 100% { background: transparent; } }
+@media (max-width: 760px) { .pmpop { left: 8px; right: 8px; bottom: 8px; width: auto; } }

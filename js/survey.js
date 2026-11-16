@@ -93,7 +93,7 @@ const Survey = (() => {
       if (!sel.length) return U.toast('먼저 표에서 단지를 체크하세요.');
       Tracking.add(sel); checked.clear(); render();
     };
-    $('btnSvToMap').onclick = () => {
+    if ($('btnSvToMap')) $('btnSvToMap').onclick = () => {
       const sel = rows.filter(r => checked.has(r.id));
       if (!sel.length) return U.toast('먼저 표에서 단지를 체크하세요.');
       const n = PriceMap.send(sel.map(r => r.id));

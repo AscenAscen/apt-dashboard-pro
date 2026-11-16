@@ -50,12 +50,13 @@ const Tracking = (() => {
   const toMan = (text) => { const n = parseFloat(String(text).replace(/,/g, '')); return isNaN(n) ? null : Math.round(n * 10000); };
 
   /** [실거래 조회]·[전수조사] 등에서 넘어온 단지를 지금 보고 있는 폴더에 추가 */
-  function add(rows) {
-    const folder = curFolder || BASE;
+  function add(rows, toFolder, silent) {
+    const folder = toFolder || curFolder || BASE;
+    if (toFolder && !folders.includes(toFolder)) folders.push(toFolder);
     let n = 0;
     for (const r of rows) {
       const old = items.find(it => it.id === r.id);
-      if (old) { if (!old.folders.includes(folder) && curFolder) { old.folders.push(folder); n++; } continue; }
+      if (old) { if (!old.folders.includes(folder) && (curFolder || toFolder)) { old.folders.push(folder); n++; } continue; }
       const it = { id: r.id, code: r.code, sido: r.sido, sgg: r.sgg, dong: r.dong, jibun: r.jibun, key: r.key, name: r.name,
         g: r.g, buildYear: r.buildYear, households: '', structure: '', rooms: '', baths: '', link: '', zone: '', pyeong: '',
         folders: [folder], folder, quotes: {}, qt: {}, status: '', memo: '', lastSale: r.st?.last?.price ?? null };
@@ -65,7 +66,33 @@ const Tracking = (() => {
     }
     if (n && !months.length) months = [thisMonth()];          // 처음 담을 때 이번 달 칸을 바로 만듦
     save(); fillSelects();
-    U.toast(n ? `${n}개 단지를 [${folder}] 폴더에 담았습니다.` : '이미 담겨 있는 단지입니다.');
+    if (!silent) U.toast(n ? `${n}개 단지를 [${folder}] 폴더에 담았습니다.` : '이미 담겨 있는 단지입니다.');
+    return n;
+  }
+  /** 다른 탭(시세지도)에서 호가 적기: patch = { s, r } (만원, null 이면 지움) */
+  function setQuote(id, ym, patch) {
+    const it = items.find(x => x.id === id); if (!it) return false;
+    if (!months.includes(ym)) { months.push(ym); months.sort((a, b) => b - a); }
+    const q = it.quotes[ym] = { ...(it.quotes[ym] || {}) };
+    for (const f of ['s', 'r']) if (f in patch) { if (patch[f] == null) delete q[f]; else q[f] = patch[f]; }
+    it.qt = it.qt || {}; it.qt[ym] = Date.now();
+    save(); return true;
+  }
+  /** 폴더에서 빼기. 그 폴더에만 있던 단지면 시세트래킹에서 지움 → 'deleted' */
+  function removeFrom(id, folder) {
+    const it = items.find(x => x.id === id); if (!it) return null;
+    it.folders = it.folders.filter(f => f !== folder);
+    if (!it.folders.length) { items = items.filter(x => x !== it); checked.delete(id); save(); fillSelects(); return 'deleted'; }
+    save(); fillSelects(); return 'removed';
+  }
+  /** 시세트래킹 표에서 이 단지를 찾아 보여 줌 (필터를 풀고 그 줄로 이동·깜빡임) */
+  function focus(id) {
+    const it = items.find(x => x.id === id); if (!it) return;
+    if (curFolder && !it.folders.includes(curFolder)) { curFolder = ''; Store.set('apt.curFolder', ''); }
+    ['trkRegion', 'trkBand', 'trkShow'].forEach(k => { $(k).value = ''; });
+    fillSelects(); render();
+    const i = visible().indexOf(it), tr = document.querySelector(`#trkTable tr[data-i="${i}"]`) || document.querySelector(`#trkCards [data-i="${i}"]`);
+    if (tr) { tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); tr.classList.add('flash'); setTimeout(() => tr.classList.remove('flash'), 2500); }
   }
 
   function init() {
@@ -651,5 +678,5 @@ const Tracking = (() => {
   }
 
   const ext = () => ({ get items() { return items; }, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, folderList: () => folders, setFolders: (f) => { folders = f; Store.set(FKEY, folders); if (!folders.includes(curFolder)) { curFolder = ''; Store.set('apt.curFolder', ''); } fillSelects(); render(); } });
-  return { ext, init, add, all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
+  return { ext, init, add, setQuote, removeFrom, focus, folderList: () => folders, checkedIds: () => [...checked], all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
 })();

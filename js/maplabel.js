@@ -175,7 +175,7 @@ const MapLabel = (() => {
       const g = G(), i = I(row.item.id), col = i.c || row.item.color || '#ff3b30';
       row.el.style.fontSize = e.f + 'px'; row.el.style.transform = `scale(${e.s})`;
       row.el.style.fontFamily = useFont(g.ff || '');
-      row.el.className = 'mllabel' + (g.ds ? ' ds-' + g.ds : '');
+      row.el.className = 'mllabel' + (g.ds ? ' ds-' + g.ds : '') + (row.item.cls ? ' ' + row.item.cls : '');
       row.el.textContent = (i.t || row.item.text);
       if (g.bd && row.item.badge && !i.t) { const b = document.createElement('span'); b.className = 'mlbadge'; b.textContent = row.item.badge; row.el.appendChild(b); }
       row.el.style.borderLeftColor = row.el.style.borderColor = ''; row.el.style.background = row.el.style.color = '';
