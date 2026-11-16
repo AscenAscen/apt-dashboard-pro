@@ -1,0 +1,93 @@
+name: 실거래가 자동 수집 · 사이트 배포
+
+on:
+  schedule:
+    - cron: '17 */2 * * *'   # 2시간마다 (하루 호출 수는 수집기가 한도 안에서 관리)
+  workflow_dispatch:         # Actions 화면에서 [Run workflow] 로 직접 실행
+  push:
+    branches: [main]         # 화면 파일을 고쳐 올리면 사이트만 다시 배포
+    paths-ignore: ['kb/**']  # kb 폴더(KB 엑셀)만 바뀌면 kb.yml 이 변환·배포를 맡음
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: apt-dashboard       # 동시에 두 번 돌지 않게 (겹치면 줄 서서 대기)
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: 데이터 수집
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 인증키 확인 (실패하면 여기서 멈춤)
+        env:
+          MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+        run: python scripts/collect.py --check
+
+      - name: 추가 자료 키 확인 (단지 정보·R-ONE, 실패해도 계속 진행)
+        continue-on-error: true
+        env:
+          MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+          RONE_API_KEY: ${{ secrets.RONE_API_KEY }}
+        run: python scripts/extra.py --check
+
+      - name: 실거래가 수집
+        env:
+          MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+          MAX_CALLS_PER_API: ${{ vars.MAX_CALLS_PER_API }}   # 비워 두면 기본값 9500
+          DAILY_MAX_PER_API: ${{ vars.DAILY_MAX_PER_API }}   # 비워 두면 기본값 9500
+          MAX_MINUTES: ${{ vars.MAX_MINUTES }}               # 비워 두면 기본값 100
+          RONE_API_KEY: ${{ secrets.RONE_API_KEY }}          # 한국부동산원 통계 키 (없으면 그 부분만 건너뜀)
+        run: python scripts/collect.py
+
+      - name: 월간 요약 만들기 (신고가·급락·투자금 변화, 실패해도 계속 진행)
+        if: always()
+        continue-on-error: true
+        run: python scripts/monthly_summary.py
+
+      - name: 바뀐 데이터 저장(커밋)
+        if: always()
+        run: |
+          git config user.name "apt-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "바뀐 데이터 없음"
+            exit 0
+          fi
+          git commit -q -m "데이터 갱신 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+          for i in 1 2 3; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
+
+  deploy:
+    name: 사이트 배포
+    needs: collect
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
