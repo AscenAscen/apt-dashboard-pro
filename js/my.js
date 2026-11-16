@@ -220,7 +220,7 @@ const My = (() => {
     ['size', '평형대', r => band(CONFIG.toPyeong(r.g), 10, '평대'), (a, b) => parseFloat(a) - parseFloat(b)],
     ['hh', '세대수', r => (!r.hh ? null : r.hh < 300 ? '300세대 미만' : r.hh < 500 ? '300~499' : r.hh < 1000 ? '500~999' : '1000세대 이상'), null, ['1000세대 이상', '500~999', '300~499', '300세대 미만']],
     ['ratio', '전세가율', r => (r.ratio == null ? null : `${Math.floor(r.ratio / 10) * 10}%대`), (a, b) => parseFloat(b) - parseFloat(a)],
-    ['status', '상태', r => r.rec.status || '(상태 없음)'], ['folder', '폴더', r => (r.rec.folders || [])[0] || null],
+    ['region', '권역', r => CONFIG.zoneOf(r.sido), null, CONFIG.ZONES], ['folder', '폴더', r => (r.rec.folders || [])[0] || null],
   ];
   let pvRows = [], pvGrid = null, pvPick = null;
   /* 자동 묶기 편집: 삭제(removed) · 고정값(fix: 가격·칸) · 직접 추가(adds) · 칸 이름(labels) · 크기(w,h). 자동 값은 건드리지 않고 위에 덮어씀 */

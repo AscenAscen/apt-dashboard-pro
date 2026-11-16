@@ -522,3 +522,8 @@ td.gapbig, .gapbig { background: rgba(255,170,0,.18); font-weight: 700; }
   .drawer { top: auto; left: 0; width: auto; max-width: none; max-height: 78vh; border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.35); }
 }
 #tpModal { z-index: 70; }
+#trkFolders span.pin { margin-left: 6px; font-size: 12px; opacity: .25; cursor: pointer; }
+#trkFolders span.pin.on { opacity: 1; }
+#trkFolders button:hover span.pin { opacity: .7; }
+#trkFolders button:hover span.pin.on { opacity: 1; }
+#trkFolders button.ghost { background: transparent; border-style: dashed; color: var(--sub); }

@@ -7,7 +7,7 @@
    ───────────────────────────────────────────────────────── */
 const Tracking = (() => {
   const $ = (id) => document.getElementById(id);
-  const KEY = 'apt.tracking.v1', FKEY = 'apt.folders.v1', MKEY = 'apt.trkMonths.v1', SKEY = 'apt.survey.v1', BASE = '기본';
+  const KEY = 'apt.tracking.v1', FKEY = 'apt.folders.v1', MKEY = 'apt.trkMonths.v1', SKEY = 'apt.survey.v1', BASE = '기본', PINKEY = 'apt.trkPins.v1';   // 상태 값(it.status)은 지우지 않고 화면에서만 숨김
   // 엑셀의 열 이름 (순서를 바꾸려면 여기서)
   const FIXED = ['가격대', '시', '구', '동', '생활권', '단지명', '연식', '연차', '세대수', '평형', '구조', '방', '화', '링크', '전고점', '전고 대비 하락률', '전저점', '전저 대비 상승률'];
   const GROUP = ['매매', '매매 개수', '전월 대비', '전세', '전세 개수', '전월 대비', '매-전(투자금)', '전월 대비', '전세가율', '전월 대비'];
@@ -150,9 +150,12 @@ const Tracking = (() => {
       if (!addMonth(ym)) return U.toast(`${ymLabel(ym)} 칸은 이미 있습니다.`);
       render(); U.toast(`${ymLabel(ym)} 시세 칸을 추가했습니다. 매매·전세 가격을 적어 주세요.`);
     };
-    $('trkStatus').innerHTML = '<option value="*">전체</option>' + STATUSES.map(s => `<option value="${s}">${s || '(상태 없음)'}</option>`).join('');
-    ['trkRegion', 'trkStatus', 'trkShow', 'trkSort'].forEach(id => { $(id).onchange = () => { checked.clear(); render(); }; });
-    $('trkFolders').onclick = (e) => { const b = e.target.closest('button[data-folder]'); if (!b) return; curFolder = b.dataset.folder; Store.set('apt.curFolder', curFolder); checked.clear(); fillSelects(); render(); };
+    ['trkRegion', 'trkBand', 'trkShow', 'trkSort'].forEach(id => { $(id).onchange = () => { checked.clear(); render(); }; });
+    $('trkFolders').onclick = (e) => {
+      const pin = e.target.closest('[data-pin]');
+      if (pin) { e.stopPropagation(); const f = pin.dataset.pin, p = Store.get(PINKEY, []); Store.set(PINKEY, p.includes(f) ? p.filter(x => x !== f) : [...p, f]); fillSelects(); return; }
+      const af = e.target.closest('button[data-allf]'); if (af) { ui.allF = af.dataset.allf === '1'; fillSelects(); return; }
+      const b = e.target.closest('button[data-folder]'); if (!b) return; curFolder = b.dataset.folder; Store.set('apt.curFolder', curFolder); checked.clear(); fillSelects(); render(); };
     $('btnTrkLoad').onclick = () => load(true);
     $('btnTrkExcel').onclick = excel;
     $('btnTrkTradesDl').onclick = downloadTrades;
@@ -218,21 +221,37 @@ const Tracking = (() => {
   function fillSelects() {
     const chg = (list) => { const v = list.map(it => compute(it).groups[0]?.sd).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
     const chip = (name, label, list) => { const c = chg(list); return `<button data-folder="${U.esc(name)}" class="${name === curFolder ? 'on' : ''}">${U.esc(label)} <b>${list.length}</b>${!c ? '' : ` <small class="${U.cls(c)}">${c > 0 ? '+' : ''}${(c / 10000).toFixed(2)}억</small>`}</button>`; };
-    $('trkFolders').innerHTML = chip('', '전체', items) + folders.map(f => chip(f, f, items.filter(it => it.folders.includes(f)))).join('');
+    const pins = Store.get(PINKEY, []), counts = new Map(folders.map(f => [f, items.filter(it => it.folders.includes(f))]));
+    const order = [...folders].sort((a, b) => (pins.includes(b) - pins.includes(a)));
+    const shown = order.filter(f => ui.allF || pins.includes(f) || f === curFolder || counts.get(f).length), more = order.length - shown.length;
+    const pinBtn = (f) => `<span class="pin${pins.includes(f) ? ' on' : ''}" data-pin="${U.esc(f)}" title="${pins.includes(f) ? '고정 풀기' : '앞에 고정'}">📌</span>`;
+    $('trkFolders').innerHTML = chip('', '전체', items) + shown.map(f => chip(f, f, counts.get(f)).replace('</button>', pinBtn(f) + '</button>')).join('') +
+      (more > 0 ? `<button data-allf="1" class="ghost">+${more} 더보기 ▾</button>` : ui.allF && order.some(f => !pins.includes(f) && f !== curFolder && !counts.get(f).length) ? '<button data-allf="0" class="ghost">빈 폴더 숨기기 ▴</button>' : '');
     $('trkMoveTo').innerHTML = folders.map(x => `<option>${U.esc(x)}</option>`).join('');
-    const cur = $('trkRegion').value;
-    const names = [...new Set(items.filter(it => !curFolder || it.folders.includes(curFolder)).map(it => `${it.sido} ${it.sgg}`))].sort((a, b) => a.localeCompare(b, 'ko'));
-    $('trkRegion').innerHTML = '<option value="">전체</option>' + names.map(n => `<option>${U.esc(n)}</option>`).join('');
-    if (names.includes(cur)) $('trkRegion').value = cur;
+    const cur = $('trkRegion').value, inF = items.filter(it => !curFolder || it.folders.includes(curFolder));
+    const names = [...new Set(inF.map(it => `${it.sido} ${it.sgg}`))].sort((a, b) => a.localeCompare(b, 'ko'));
+    const zc = (z) => inF.filter(it => CONFIG.zoneOf(it.sido) === z).length;
+    $('trkRegion').innerHTML = '<option value="">전체</option><optgroup label="권역">' + CONFIG.ZONES.map(z => `<option value="z:${z}">${z} (${zc(z)})</option>`).join('') + '</optgroup>' +
+      (names.length ? '<optgroup label="시·구">' + names.map(n => `<option>${U.esc(n)}</option>`).join('') + '</optgroup>' : '');
+    $('trkRegion').value = cur && (cur.startsWith('z:') || names.includes(cur)) ? cur : '';
+    const curB = $('trkBand').value, bands = new Map();
+    inF.forEach(it => { const b = compute(it).band; if (b) bands.set(b, (bands.get(b) || 0) + 1); });
+    const bl = [...bands.keys()].sort((a, b) => (parseFloat(a) || 0) - (parseFloat(b) || 0));
+    $('trkBand').innerHTML = '<option value="">전체</option>' + bl.map(b => `<option value="${b}">${b} (${bands.get(b)})</option>`).join('');
+    $('trkBand').value = bands.has(curB) ? curB : '';
   }
 
-  const inScope = () => { const reg = $('trkRegion').value; return items.filter(it => (!curFolder || it.folders.includes(curFolder)) && (!reg || `${it.sido} ${it.sgg}` === reg)); };
+  const inScope = () => {
+    const reg = $('trkRegion').value, band = $('trkBand').value;
+    return items.filter(it => (!curFolder || it.folders.includes(curFolder)) &&
+      (!reg || (reg.startsWith('z:') ? CONFIG.zoneOf(it.sido) === reg.slice(2) : `${it.sido} ${it.sgg}` === reg)) && (!band || compute(it).band === band));
+  };
   const isNew = (it) => { const rl = real.get(it.id); return !!rl && ((rl.sale && it.seenSale && rl.sale.d > it.seenSale) || (rl.rent && it.seenRent && rl.rent.d > it.seenRent)); };
 
   /** 화면에 보일 단지: 폴더·지역·상태·보기 조건 → 정렬 */
   function visible() {
-    const st = $('trkStatus').value, show = $('trkShow').value, sort = $('trkSort').value, m0 = months[0];
-    let list = inScope().filter(it => st === '*' || (it.status || '') === st);
+    const show = $('trkShow').value, sort = $('trkSort').value, m0 = months[0];
+    let list = inScope();
     const c = new Map(list.map(it => [it.id, compute(it)]));
     if (show === 'empty') list = list.filter(it => m0 && it.quotes[m0]?.s == null);
     if (show === 'down') list = list.filter(it => c.get(it.id).groups[0]?.sd < 0);
@@ -386,7 +405,7 @@ const Tracking = (() => {
     if (card) return renderCards(list);
 
     const fx = (label, cls = '') => `<th rowspan="2" class="${cls}">${label}</th>`;
-    const head = `<thead><tr>${fx('<input type="checkbox" id="trkAll">', 'c')}${fx('상태')}${fx('가격대')}${fx('시', 'l')}${fx('구', 'l')}${fx('동', 'l')}${fx('생활권', 'l info')}${fx('단지명', 'l name')}` +
+    const head = `<thead><tr>${fx('<input type="checkbox" id="trkAll">', 'c')}${fx('가격대')}${fx('시', 'l')}${fx('구', 'l')}${fx('동', 'l')}${fx('생활권', 'l info')}${fx('단지명', 'l name')}` +
       `${fx('연식')}${fx('연차')}${fx('세대수', 'info')}${fx('평형')}${fx('구조', 'info')}${fx('방', 'info')}${fx('화', 'info')}${fx('링크', 'info')}` +
       `${fx('전고점')}${fx('전고 대비 하락률')}${fx('전저점')}${fx('전저 대비 상승률')}${fx('호가-실거래')}` +
       months.map((m, k) => `<th colspan="10" class="grp c">${ymLabel(m)}${k === 0 ? ' · 최신' : ''} <button class="mini" data-delmonth="${m}" title="이 달 기록 삭제">×</button></th>`).join('') +
@@ -401,7 +420,6 @@ const Tracking = (() => {
       const over = (f, v, auto) => `<td><input class="num${it[f] != null ? ' edited' : ''}" data-o="${f}" inputmode="decimal" value="${eok(v)}" placeholder="자동" title="${auto ? `실거래 ${U.price(auto.price)} (${U.date(auto.d)}) · 눌러서 수정, 지우면 자동값` : '실거래 자료 없음 · 직접 입력'}"></td>`;
       const qin = (m, f, ph, isPrice, first) => { const v = (it.quotes[m] || {})[f]; return `<td class="${first ? 'gl' : ''}"><input class="num" data-m="${m}" data-q="${f}" inputmode="decimal" value="${isPrice ? eok(v) : (v ?? '')}" placeholder="${ph}"></td>`; };
       return `<tr data-i="${i}" class="${isNew(it) ? 'newtrade' : ''}"><td class="c"><input type="checkbox" data-chk="${i}" ${checked.has(it.id) ? 'checked' : ''}></td>` +
-        `<td><select data-f="status" class="st">${STATUSES.map(s => `<option ${s === (it.status || '') ? 'selected' : ''} value="${s}">${s || '-'}</option>`).join('')}</select></td>` +
         `${cell('band')}<td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(it.dong)}</td><td class="l info">${inp(it, 'zone', '', '생활권')}</td>` +
         `<td class="l name" title="${U.esc(it.folders.join(', '))}">${U.esc(it.name)}${isNew(it) ? ' <span class="tag">새 거래</span>' : ''}</td>` +
         `<td>${it.buildYear || '-'}</td><td>${it.buildYear ? CONFIG.toAge(it.buildYear) : '-'}</td><td class="info">${inp(it, 'households', '', '직접 입력')}</td><td>${it.g}㎡<small>${U.esc(pyeong(it))}</small></td><td class="info">${inp(it, 'structure', '', '계/복')}</td><td class="info">${inp(it, 'rooms')}</td><td class="info">${inp(it, 'baths')}</td>` +
@@ -452,7 +470,7 @@ const Tracking = (() => {
       const qin = (f, ph, isPrice) => `<input class="num" data-m="${m0}" data-q="${f}" inputmode="decimal" value="${isPrice ? eok(q[f]) : (q[f] ?? '')}" placeholder="${ph}">`;
       return `<div class="tcard${isNew(it) ? ' newtrade' : ''}" data-i="${i}">
         <div class="thead"><label><input type="checkbox" data-chk="${i}" ${checked.has(it.id) ? 'checked' : ''}> <b>${U.esc(it.name)}</b> ${it.g}㎡ <small>${U.esc(pyeong(it))}</small></label>
-          <select data-f="status" class="st">${STATUSES.map(s => `<option ${s === (it.status || '') ? 'selected' : ''} value="${s}">${s || '상태'}</option>`).join('')}</select></div>
+</div>
         <div class="tsub">${U.esc(it.sgg)} ${U.esc(it.dong)}${it.buildYear ? ` · ${it.buildYear}년` : ''}${p0 ? ` · 지난 기록 매매 ${p.s != null ? eok(p.s) + '억' : '-'} / 전세 ${p.r != null ? eok(p.r) + '억' : '-'}` : ''}</div>
         <div class="tgrid"><label>매매(억) ${qin('s', '예: 14.3', true)}</label><label>매물 수 ${qin('sn', '개')}</label><label>전세(억) ${qin('r', '예: 7.5', true)}</label><label>매물 수 ${qin('rn', '개')}</label></div>
         <div class="tcalc" data-calc>${cardCalc(c, g)}</div>
@@ -523,7 +541,7 @@ const Tracking = (() => {
     const list = sel.length ? sel : visible();
     if (!list.length) return U.toast('내려받을 단지가 없습니다.');
     const r1 = (v) => (v == null ? '' : +v.toFixed(1));
-    const tail = ['호가-실거래', '최근 매매 실거래', '매매 실거래일', '최근 전세 실거래', '전세 실거래일', '상태', '메모', '폴더'];
+    const tail = ['호가-실거래', '최근 매매 실거래', '매매 실거래일', '최근 전세 실거래', '전세 실거래일', '메모', '폴더'];
     const top = [...FIXED.map(() => ''), ...months.flatMap(m => [ymLabel(m), ...GROUP.slice(1).map(() => '')]), ...tail.map(() => '')];
     const head = [...FIXED.map(n => (n === '구조' ? '구조(계,복)' : n)), ...months.flatMap(() => GROUP), ...tail];
     const rows = list.map(it => {
@@ -531,7 +549,7 @@ const Tracking = (() => {
       return { sort: c.base || 0, row: [c.band, si, gu, it.dong, it.zone, it.name, it.buildYear || '', it.buildYear ? CONFIG.toAge(it.buildYear) : '', it.households, pyeong(it),
         it.structure, it.rooms, it.baths, link(it), c.peak ?? '', r1(c.drop), c.trough ?? '', r1(c.rise),
         ...c.groups.flatMap(g => [g.s ?? '', g.sn ?? '', g.sd ?? '', g.r ?? '', g.rn ?? '', g.rd ?? '', g.gap ?? '', g.gd ?? '', r1(g.ratio), r1(g.rtd)]),
-        c.askGap ?? '', c.realSale?.price ?? '', U.date(c.realSale?.d), c.realRent?.price ?? '', U.date(c.realRent?.d), it.status || '', it.memo || '', it.folders.join(', ')] };
+        c.askGap ?? '', c.realSale?.price ?? '', U.date(c.realSale?.d), c.realRent?.price ?? '', U.date(c.realRent?.d), it.memo || '', it.folders.join(', ')] };
     }).sort((a, b) => b.sort - a.sort).map(x => x.row);
     U.download(`시세트래킹_${curFolder ? curFolder.replace(/[\\/:*?"<>|]/g, '_') + '_' : ''}${U.stamp()}`, [
       { name: '시세트래킹', rows: [top, head, ...rows] },
@@ -632,6 +650,6 @@ const Tracking = (() => {
     return items.length;
   }
 
-  const ext = () => ({ get items() { return items; }, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, setStatusFilter: (v) => { $('trkStatus').value = v; checked.clear(); render(); } });
+  const ext = () => ({ get items() { return items; }, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, folderList: () => folders, setFolders: (f) => { folders = f; Store.set(FKEY, folders); if (!folders.includes(curFolder)) { curFolder = ''; Store.set('apt.curFolder', ''); } fillSelects(); render(); } });
   return { ext, init, add, all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
 })();

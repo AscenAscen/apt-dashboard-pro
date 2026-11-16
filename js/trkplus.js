@@ -19,13 +19,7 @@ const TrkPlus = (() => {
   };
   const show = (title, body) => { const m = modal(); $('tpTitle').textContent = title; $('tpBody').innerHTML = body; m.hidden = false; };
 
-  function flow() {
-    const cnt = new Map(FLOW.map(s => [s, 0]));
-    for (const it of T.items) cnt.set(it.status || '', (cnt.get(it.status || '') || 0) + 1);
-    const cur = $('trkStatus').value || '*';
-    const chip = (v, label, n) => `<button class="chip${cur === v ? ' on' : ''}" data-st="${v}">${label} <b>${n}</b></button>`;
-    $('tpFlow').innerHTML = chip('*', '전체', T.items.length) + FLOW.filter(Boolean).map(s => chip(s, s, cnt.get(s) || 0)).join('') + chip('', '상태 없음', cnt.get('') || 0);
-  }
+  const flow = () => {};   // 상태 기능은 화면에서 뺐습니다 (값은 그대로 보관)
   function selbar() {
     const n = T.items.filter(it => T.checked.has(it.id)).length;
     $('trkSelBar').hidden = !n;
@@ -38,8 +32,8 @@ const TrkPlus = (() => {
   function apply() {
     const picked = T.items.filter(it => T.checked.has(it.id));
     if (!picked.length) return U.toast('먼저 표에서 단지를 체크하세요.');
-    const st = $('tpStatus').value, zone = $('tpZone').value.trim(), memo = $('tpMemo').value.trim();
-    if (st === '*' && !zone && !memo) return U.toast('바꿀 값을 하나 이상 고르거나 적어 주세요.');
+    const st = '*', zone = $('tpZone').value.trim(), memo = $('tpMemo').value.trim();
+    if (!zone && !memo) return U.toast('생활권이나 메모를 적어 주세요.');
     for (const it of picked) {
       if (st !== '*') it.status = st;
       if (zone) it.zone = zone;
@@ -105,10 +99,14 @@ const TrkPlus = (() => {
   }
 
   function init() {
-    if (typeof Tracking === 'undefined' || !Tracking.ext || !$('tpFlow') || T) return;
+    if (typeof Tracking === 'undefined' || !Tracking.ext || !$('trkSelBar') || T) return;
     T = Tracking.ext();
-    $('tpStatus').innerHTML = '<option value="*">(바꾸지 않음)</option>' + FLOW.map(s => `<option value="${s}">${s || '(상태 없음)'}</option>`).join('');
-    $('tpFlow').onclick = (e) => { const b = e.target.closest('button[data-st]'); if (b) { T.setStatusFilter(b.dataset.st); flow(); } };
+    $('btnFolderClean').onclick = () => {
+      const fs = T.folderList(), empty = fs.filter(f => f !== '기본' && !T.items.some(it => it.folders.includes(f)));
+      if (!empty.length) return U.toast('비어 있는 폴더가 없습니다.');
+      if (!confirm(`단지가 없는 폴더 ${empty.length}개를 지울까요?\n${empty.join(', ')}\n(단지가 들어 있는 폴더는 건드리지 않습니다)`)) return;
+      T.setFolders(fs.filter(f => !empty.includes(f))); U.toast(`빈 폴더 ${empty.length}개를 정리했습니다.`);
+    };
     $('btnTpBulk').onclick = () => { $('tpBulk').hidden = !$('tpBulk').hidden; };
     $('btnTpApply').onclick = apply;
     $('btnTpCheck').onclick = check;
@@ -117,9 +115,7 @@ const TrkPlus = (() => {
     $('btnTrkDrawer').onclick = () => drawer();
     $('btnTrkDrawerClose').onclick = () => drawer(false);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('trkDrawer').hidden && $('tpModal')?.hidden !== false) drawer(false); });
-    $('trkStatus').addEventListener('change', flow);
     const watch = (el, fn, opt) => el && new MutationObserver(fn).observe(el, opt || { childList: true, characterData: true, subtree: true });
-    watch($('trkProgress'), flow);
     watch($('trkSelCount'), selbar);
     watch($('btnTrkStageAll'), () => { $('trkStageRow').hidden = $('btnTrkStageAll').disabled; }, { attributes: true, attributeFilter: ['disabled'] });
     $('trkStageRow').hidden = $('btnTrkStageAll').disabled;

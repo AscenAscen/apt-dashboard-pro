@@ -32,7 +32,7 @@ const PriceMap = (() => {
     $('pmMonth').innerHTML = '<option value="">최신 호가</option>' + ms.map(m => `<option value="${m}">${Kit.ymText(m)}</option>`).join('');
     if (ms.map(String).includes(String(cm))) $('pmMonth').value = cm;
   }
-  const saveOpts = () => Store.set(SKEY, { folder: $('pmFolder').value, show: $('pmShow').value, name: $('pmName').value, month: $('pmMonth').value, view });
+  const saveOpts = () => Store.set(SKEY, { folder: $('pmFolder').value, zone: $('pmZone').value, show: $('pmShow').value, name: $('pmName').value, month: $('pmMonth').value, view });
   const setOf = (k) => new Set(Store.get(k, []));
   const landMap = () => Store.get(LAND, {});
   const landSet = () => new Set(Object.keys(landMap()));
@@ -125,6 +125,7 @@ const PriceMap = (() => {
     else if (view === 'sent') list = list.filter(x => sentIds.has(x.id));
     else if (view === 'mine') list = list.filter(x => mineIds.has(x.id));
     else if (view === 'chk') list = list.filter(x => mcSet.has(x.id) || tcSet.has(x.id));
+    const zone = $('pmZone').value; if (zone) list = list.filter(x => CONFIG.zoneOf(x.sido) === zone);
     if (!list.length) { baseItems = []; lastRows = []; renderList(); refreshMap(); $('pmCount').textContent = ''; return say('이 보기에 해당하는 단지가 없습니다.'); }
     if (!KMap.ready()) return say(KMap.needKeyHtml);
     say(`가격을 불러오는 중… (${list.length}개 단지)`);
@@ -163,9 +164,8 @@ const PriceMap = (() => {
     const cnt = new Map(); ok.forEach(r => cnt.set(`${r.code}|${r.key}`, (cnt.get(`${r.code}|${r.key}`) || 0) + 1));
     const items = ok.map(r => {
       const t = textOf(r, cnt.get(`${r.code}|${r.key}`) > 1);
-      const ICONS = { '관심': '⭐', '임장 예정': '🗓', '임장 완료': '✅', '매수 후보': '🔥', '제외': '✖' };
-      return { id: r.id, pos: r.pos, text: t.text, color: t.real ? '#f5a742' : '#4f9cff', rank: 0,
-        icon: ICONS[(r.rec && r.rec.status) || ''] || '', badge: r.drop != null && r.drop <= -5 ? `▼${Math.abs(r.drop).toFixed(0)}%` : '' };
+        return { id: r.id, pos: r.pos, text: t.text, color: t.real ? '#f5a742' : '#4f9cff', rank: 0,
+        badge: r.drop != null && r.drop <= -5 ? `▼${Math.abs(r.drop).toFixed(0)}%` : '' };
     });
     map.relayout();
     baseItems = items;
@@ -236,11 +236,12 @@ const PriceMap = (() => {
     $('pmListTable').onclick = (e) => { const id = e.target.closest('button[data-lm]')?.dataset.lm; if (id == null) return; const row = lastRows.find(r => r.id === id) || { id, ...Kit.parseId(id) }; toggleLand(row, !landSet().has(id)); draw(); };
     $('btnPmMapAllOn').onclick = () => { const s = setOf(HKEY); lastRows.forEach(r => s.delete(r.id)); Store.set(HKEY, [...s]); renderList(); refreshMap(); };
     $('btnPmMapAllOff').onclick = () => { const s = setOf(HKEY); lastRows.forEach(r => { if (r.pos) s.add(r.id); }); Store.set(HKEY, [...s]); renderList(); refreshMap(); };
-    $('pmFolder').onchange = $('pmMonth').onchange = draw;
+    $('pmFolder').onchange = $('pmMonth').onchange = $('pmZone').onchange = draw;
+    $('pmZone').value = Store.get(SKEY, {}).zone || '';
     $('btnPmClearSent').onclick = () => { if (!confirm('직접 추가·전수조사에서 보낸 단지를 시세지도에서 모두 뺄까요? (원래 기록은 그대로입니다)')) return; Store.set(XKEY, []); Store.set(DKEY, []); fillFolders(); renderAdded(); draw(); };
     // 저장함: 라벨 위치·모양·메모 라벨·보낸 단지·표시 설정을 통째로 (예: "2026-11 평촌 지도")
     Saves.register('map', { name: '시세지도', hint: '라벨 위치·크기·글씨체·모양, 직접 추가한 메모 라벨, 표시 설정(폴더·기준 달)을 저장합니다. 달마다 한 번씩 저장해 두면 그때의 지도를 다시 볼 수 있습니다.',
-      note: () => `${$('pmFolder').value || '전체'} · ${$('pmMonth').selectedOptions[0]?.text || '최신 호가'} · ${$('pmCount').textContent}`,
+      note: () => `${$('pmZone').value ? $('pmZone').value + ' · ' : ''}${$('pmFolder').value || '전체'} · ${$('pmMonth').selectedOptions[0]?.text || '최신 호가'} · ${$('pmCount').textContent}`,
       get: () => { const all = Store.get('apt.mapLabel.v1', {}), mine = {}; Object.keys(all).filter(k => k.startsWith('map:')).forEach(k => { mine[k] = all[k]; });
         return { opts: Store.get(SKEY, {}), labels: mine, user: Store.get(UKEY, []), sent: Store.get(XKEY, []), dir: Store.get(DKEY, []), size: Store.get(SIZE, {}), hid: Store.get(HKEY, []), chk: Store.get(MCKEY, []) }; },
       set: (d) => { const all = Store.get('apt.mapLabel.v1', {}); Object.keys(all).filter(k => k.startsWith('map:')).forEach(k => delete all[k]); Object.assign(all, d.labels || {});

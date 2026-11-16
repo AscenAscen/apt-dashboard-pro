@@ -18,6 +18,9 @@ const CONFIG = {
   toAge: (buildYear) => new Date().getFullYear() - buildYear,
 
   // 가격대 이름 (만원 → "5억대")
+  // 권역: 서울 / 수도권(경기·인천) / 광역시(부산·대구·광주·대전·울산·세종) / 중소도시(나머지)
+  ZONES: ['서울', '수도권', '광역시', '중소도시'],
+  zoneOf: (sido) => { const s = sido || ''; return s.startsWith('서울') ? '서울' : /^(경기|인천)/.test(s) ? '수도권' : /^(부산|대구|광주|대전|울산|세종)/.test(s) ? '광역시' : '중소도시'; },
   priceBand: (manwon) => manwon < 10000 ? '1억 미만' : Math.floor(manwon / 10000) + '억대',
 
   // 단지 링크(자동). 네이버 검색 결과 맨 위에 네이버페이 부동산 단지 카드가 나옵니다.

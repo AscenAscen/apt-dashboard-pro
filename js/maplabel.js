@@ -111,7 +111,6 @@ const MapLabel = (() => {
       <label class="inline">글씨체 <select data-ml="ff">${FONTS.map(f => `<option value="${f.k}">${f.name}</option>`).join('')}</select></label>
       <label class="inline">라벨 모양 <select data-ml="ds">${DESIGNS.map(d => `<option value="${d.k}">${d.name}</option>`).join('')}</select></label>
       <label class="inline">프리셋 <select data-ml="preset">${PRESETS.map(p => `<option value="${p.k}">${p.name}</option>`).join('')}</select></label>
-      <label class="inline"><input type="checkbox" data-ml="ic"> 상태 아이콘</label>
       <label class="inline"><input type="checkbox" data-ml="bd"> 하락률 뱃지</label>
       ${o.onAdd ? '<button data-ml="add" title="누른 뒤 지도의 원하는 곳을 한 번 누르면 메모 라벨이 생깁니다">＋ 라벨 추가</button>' : ''}
       <button data-ml="unhide" title="숨긴 라벨을 모두 다시 보이게 합니다">숨긴 라벨 보이기</button>
@@ -138,7 +137,7 @@ const MapLabel = (() => {
       const g = G();
       q('scale').value = Math.round(g.s * 100); v('scale').textContent = Math.round(g.s * 100) + '%';
       q('font').value = g.f; v('font').textContent = g.f + 'px';
-      q('ff').value = g.ff || ''; q('ds').value = g.ds || ''; q('ic').checked = !!g.ic; q('bd').checked = !!g.bd; q('preset').value = '';
+      q('ff').value = g.ff || ''; q('ds').value = g.ds || ''; q('bd').checked = !!g.bd; q('preset').value = '';
       q('edit').checked = edit; v('hint').hidden = !edit;
       if (q('add')) q('add').classList.toggle('on', adding);
       const pop = ctl.querySelector('.mlpop'), r = sel && rows.get(sel);
@@ -177,7 +176,7 @@ const MapLabel = (() => {
       row.el.style.fontSize = e.f + 'px'; row.el.style.transform = `scale(${e.s})`;
       row.el.style.fontFamily = useFont(g.ff || '');
       row.el.className = 'mllabel' + (g.ds ? ' ds-' + g.ds : '');
-      row.el.textContent = (g.ic && row.item.icon && !i.t ? row.item.icon + ' ' : '') + (i.t || row.item.text);
+      row.el.textContent = (i.t || row.item.text);
       if (g.bd && row.item.badge && !i.t) { const b = document.createElement('span'); b.className = 'mlbadge'; b.textContent = row.item.badge; row.el.appendChild(b); }
       row.el.style.borderLeftColor = row.el.style.borderColor = ''; row.el.style.background = row.el.style.color = '';
       if (g.ds === 'fill') { row.el.style.background = col; row.el.style.borderColor = col; }
