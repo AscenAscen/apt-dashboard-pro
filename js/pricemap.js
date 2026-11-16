@@ -8,6 +8,9 @@
 const PriceMap = (() => {
   const $ = (id) => document.getElementById(id);
   const SKEY = 'apt.pmOpts.v1', UKEY = 'apt.pmLabels.v1', XKEY = 'apt.pmExtra.v1', SENT = '(직접 추가·전수조사 단지)';
+  const LKEY = 'apt.pmLandmarks.v1', HKEY = 'apt.pmHidden.v1', MCKEY = 'apt.pmChecked.v1', TCKEY = 'apt.trkChecked.v1';   // 랜드마크 · 지도에서 숨김 · 지도에서 체크 · 시세트래킹 체크
+  const VIEWS = [['all', '전체'], ['trk', '시세트래킹'], ['lm', '랜드마크'], ['sent', '전수조사 선택'], ['chk', '내가 선택']];
+  let view = 'all', lastRows = [], notFound = '', countBase = 0;
   let baseItems = [], pick = null;     // pick: 검색으로 고른 단지 (아직 추가 전)
   const userItems = () => Store.get(UKEY, []).map(u => ({ id: u.id, pos: { lat: u.lat, lng: u.lng }, text: u.text, color: u.color || '#8e8e93', rank: 0, user: true }));
   let map = null, ctrl = null, inited = false, seq = 0;
@@ -25,7 +28,35 @@ const PriceMap = (() => {
     $('pmMonth').innerHTML = '<option value="">최신 호가</option>' + ms.map(m => `<option value="${m}">${Kit.ymText(m)}</option>`).join('');
     if (ms.map(String).includes(String(cm))) $('pmMonth').value = cm;
   }
-  const saveOpts = () => Store.set(SKEY, { folder: $('pmFolder').value, show: $('pmShow').value, name: $('pmName').value, month: $('pmMonth').value });
+  const saveOpts = () => Store.set(SKEY, { folder: $('pmFolder').value, show: $('pmShow').value, name: $('pmName').value, month: $('pmMonth').value, view });
+  const setOf = (k) => new Set(Store.get(k, []));
+  const toggleSet = (k, id, on) => { const s = setOf(k); on ? s.add(id) : s.delete(id); Store.set(k, [...s]); };
+  const labelHidden = (id) => !!(Store.get('apt.mapLabel.v1', {})[`map:${id}`] || {}).hide;
+  /** 라벨만 숨기기: 지도 라벨 저장값의 hide 표시를 켜거나 끔 (숨긴 라벨 보이기 버튼과 같은 값) */
+  function setLabelHidden(id, on) {
+    const a = Store.get('apt.mapLabel.v1', {}), k = `map:${id}`;
+    if (on) a[k] = { ...(a[k] || {}), hide: true };
+    else if (a[k]) { delete a[k].hide; if (!Object.keys(a[k]).length) delete a[k]; }
+    Store.set('apt.mapLabel.v1', a);
+  }
+  function fillViews() { $('pmViews').innerHTML = VIEWS.map(([k, n]) => `<button class="${k === view ? 'primary' : ''}" data-view="${k}">${n}</button>`).join(''); }
+  /** 지도만 다시 그림 (위치·가격은 다시 찾지 않음). 지도에서 숨긴 단지는 뺌 */
+  function refreshMap() {
+    const hid = setOf(HKEY), vis = baseItems.filter(i => !hid.has(i.id)).length;
+    if (ctrl) ctrl.set([...baseItems.filter(i => !hid.has(i.id)), ...userItems()]);
+    $('pmCount').textContent = `${vis}개 단지 표시 중` + (baseItems.length - vis ? ` (지도에서 숨긴 ${baseItems.length - vis}개)` : '') + notFound;
+  }
+  /** 개별 단지 목록: 체크(지도 전용 선택), 지도 보이기, 라벨 보이기, ★ 랜드마크 */
+  function renderList() {
+    const mc = setOf(MCKEY), hid = setOf(HKEY), lm = setOf(LKEY), sent = setOf(XKEY);
+    $('pmListTable').innerHTML = '<thead><tr><th>체크</th><th>지도</th><th>라벨</th><th>★</th><th class="l">단지</th><th>평형</th><th class="l">출처</th></tr></thead><tbody>' +
+      lastRows.map(r => `<tr><td><input type="checkbox" data-mc="${U.esc(r.id)}" ${mc.has(r.id) ? 'checked' : ''}></td>` +
+        `<td><input type="checkbox" data-mh="${U.esc(r.id)}" ${!hid.has(r.id) ? 'checked' : ''} ${r.pos ? '' : 'disabled'} title="끄면 지도에서 빠집니다"></td>` +
+        `<td><input type="checkbox" data-pl="${U.esc(r.id)}" ${!labelHidden(r.id) ? 'checked' : ''} ${r.pos ? '' : 'disabled'} title="끄면 이 단지의 라벨만 숨깁니다"></td>` +
+        `<td><button class="mini" data-lm="${U.esc(r.id)}" title="랜드마크로 지정하거나 해제">${lm.has(r.id) ? '★' : '☆'}</button></td>` +
+        `<td class="l">${U.esc(r.name)}${r.pos ? '' : ' <small>(위치 없음)</small>'}</td><td>${r.g}㎡</td>` +
+        `<td class="l">${[r.tracked ? '시세트래킹' : '', sent.has(r.id) ? '전수조사' : '', lm.has(r.id) ? '랜드마크' : ''].filter(Boolean).join(' · ') || '-'}</td></tr>`).join('') + '</tbody>';
+  }
 
   /** 라벨에 쓸 글자 */
   function textOf(r, dup) {
@@ -60,7 +91,8 @@ const PriceMap = (() => {
     const sentIds = new Set(Store.get(XKEY, []));
     let list = await Kit.records(true);                                                       // 시세트래킹 단지
     const have = new Set(list.map(x => x.id)), regs = await Kit.regions();
-    for (const id of sentIds) if (!have.has(id)) {                                            // + 전수조사에서 보낸 단지 (호가는 전수조사에 적은 값)
+    const lmSet = setOf(LKEY);
+    for (const id of new Set([...sentIds, ...lmSet])) if (!have.has(id)) {                    // + 전수조사에서 보낸 단지·랜드마크 (호가는 전수조사에 적은 값)
       const q = Kit.parseId(id), reg = regs.get(q.code);
       list.push({ ...q, sido: reg?.[1] || '', sgg: reg?.[2] || '', rec: Tracking.rec(id) || { quotes: {} }, tracked: false });
     }
@@ -68,6 +100,12 @@ const PriceMap = (() => {
     else if (folder) list = list.filter(x => x.tracked && (x.rec.folders || []).includes(folder));
     $('pmEmpty').hidden = list.length > 0; $('pmBody').hidden = !list.length;
     if (!list.length) return;
+    const mcSet = setOf(MCKEY), tcSet = setOf(TCKEY);
+    if (view === 'trk') list = list.filter(x => x.tracked);
+    else if (view === 'lm') list = list.filter(x => lmSet.has(x.id));
+    else if (view === 'sent') list = list.filter(x => sentIds.has(x.id));
+    else if (view === 'chk') list = list.filter(x => mcSet.has(x.id) || tcSet.has(x.id));
+    if (!list.length) { baseItems = []; lastRows = []; renderList(); refreshMap(); $('pmCount').textContent = ''; return say('이 보기에 해당하는 단지가 없습니다.'); }
     if (!KMap.ready()) return say(KMap.needKeyHtml);
     say(`가격을 불러오는 중… (${list.length}개 단지)`);
     await Real.load(list);
@@ -108,12 +146,16 @@ const PriceMap = (() => {
     });
     map.relayout();
     baseItems = items;
-    ctrl.set([...items, ...userItems()]);
+    lastRows = rows;
+    renderList();
+    refreshMap();
+    const hidNow = setOf(HKEY), shownRows = ok.filter(r => !hidNow.has(r.id));
+    notFound = ok.length < rows.length ? ` · 위치를 못 찾은 ${rows.length - ok.length}개 제외` : '';
     $('pmTable').innerHTML = '<thead><tr><th class="l">지역</th><th class="l">단지</th><th>평형</th><th>매매</th><th>매매 기준</th><th>전세</th><th>전세 기준</th><th>매-전</th><th>전세가율</th><th>전고 대비</th><th>구분</th></tr></thead><tbody>' +
-      ok.map(r => `<tr><td class="l">${U.esc(r.sgg)} ${U.esc(r.dong)}</td><td class="l">${U.esc(r.name)}</td><td>${r.g}㎡</td><td>${r.s == null ? '-' : U.price(r.s)}</td><td>${r.s == null ? '' : r.sQ ? '호가' : '실거래'}</td><td>${r.r == null ? '-' : U.price(r.r)}</td><td>${r.r == null ? '' : r.rQ ? '호가' : '실거래'}</td>` +
+      shownRows.map(r => `<tr><td class="l">${U.esc(r.sgg)} ${U.esc(r.dong)}</td><td class="l">${U.esc(r.name)}</td><td>${r.g}㎡</td><td>${r.s == null ? '-' : U.price(r.s)}</td><td>${r.s == null ? '' : r.sQ ? '호가' : '실거래'}</td><td>${r.r == null ? '-' : U.price(r.r)}</td><td>${r.r == null ? '' : r.rQ ? '호가' : '실거래'}</td>` +
         `<td>${r.gap == null ? '-' : U.price(r.gap)}</td><td>${r.ratio == null ? '-' : r.ratio.toFixed(0) + '%'}</td><td>${U.pct(r.drop)}</td><td>${r.tracked ? '시세트래킹' : '전수조사'}</td></tr>`).join('') + '</tbody>';
     if (ok.length > 1) KMap.fit(map, ok.map(r => r.pos)); else { map.setCenter(KMap.LL(ok[0].pos)); map.setLevel(5); }
-    $('pmCount').textContent = `${ok.length}개 단지` + (ok.length < rows.length ? ` (위치를 못 찾은 ${rows.length - ok.length}개 제외)` : '');
+    refreshMap();
     if (!$('pmCard').innerHTML) card(ok[0]);
   }
 
@@ -158,15 +200,27 @@ const PriceMap = (() => {
     renderAdded();
     if (o.show) $('pmShow').value = o.show;
     if (o.name) $('pmName').value = o.name;
+    if (o.view) view = o.view;
+    fillViews();
+    $('pmViews').onclick = (e) => { const b = e.target.closest('button[data-view]'); if (!b) return; view = b.dataset.view; fillViews(); draw(); };
+    $('pmListTable').onchange = (e) => {
+      const t = e.target;
+      if (t.dataset.mc != null) { toggleSet(MCKEY, t.dataset.mc, t.checked); if (view === 'chk') return draw(); return renderList(); }
+      if (t.dataset.mh != null) { toggleSet(HKEY, t.dataset.mh, !t.checked); renderList(); return refreshMap(); }
+      if (t.dataset.pl != null) { setLabelHidden(t.dataset.pl, !t.checked); return refreshMap(); }
+    };
+    $('pmListTable').onclick = (e) => { const id = e.target.closest('button[data-lm]')?.dataset.lm; if (id == null) return; toggleSet(LKEY, id, !setOf(LKEY).has(id)); draw(); };
+    $('btnPmMapAllOn').onclick = () => { const s = setOf(HKEY); lastRows.forEach(r => s.delete(r.id)); Store.set(HKEY, [...s]); renderList(); refreshMap(); };
+    $('btnPmMapAllOff').onclick = () => { const s = setOf(HKEY); lastRows.forEach(r => { if (r.pos) s.add(r.id); }); Store.set(HKEY, [...s]); renderList(); refreshMap(); };
     $('pmFolder').onchange = $('pmMonth').onchange = draw;
     $('btnPmClearSent').onclick = () => { if (!confirm('직접 추가·전수조사에서 보낸 단지를 시세지도에서 모두 뺄까요? (원래 기록은 그대로입니다)')) return; Store.set(XKEY, []); fillFolders(); renderAdded(); draw(); };
     // 저장함: 라벨 위치·모양·메모 라벨·보낸 단지·표시 설정을 통째로 (예: "2026-11 평촌 지도")
     Saves.register('map', { name: '시세지도', hint: '라벨 위치·크기·글씨체·모양, 직접 추가한 메모 라벨, 표시 설정(폴더·기준 달)을 저장합니다. 달마다 한 번씩 저장해 두면 그때의 지도를 다시 볼 수 있습니다.',
       note: () => `${$('pmFolder').value || '전체'} · ${$('pmMonth').selectedOptions[0]?.text || '최신 호가'} · ${$('pmCount').textContent}`,
       get: () => { const all = Store.get('apt.mapLabel.v1', {}), mine = {}; Object.keys(all).filter(k => k.startsWith('map:')).forEach(k => { mine[k] = all[k]; });
-        return { opts: Store.get(SKEY, {}), labels: mine, user: Store.get(UKEY, []), sent: Store.get(XKEY, []) }; },
+        return { opts: Store.get(SKEY, {}), labels: mine, user: Store.get(UKEY, []), sent: Store.get(XKEY, []), lm: Store.get(LKEY, []), hid: Store.get(HKEY, []), chk: Store.get(MCKEY, []) }; },
       set: (d) => { const all = Store.get('apt.mapLabel.v1', {}); Object.keys(all).filter(k => k.startsWith('map:')).forEach(k => delete all[k]); Object.assign(all, d.labels || {});
-        Store.set('apt.mapLabel.v1', all); Store.set(SKEY, d.opts || {}); Store.set(UKEY, d.user || []); Store.set(XKEY, d.sent || []);
+        Store.set('apt.mapLabel.v1', all); Store.set(SKEY, d.opts || {}); Store.set(UKEY, d.user || []); Store.set(XKEY, d.sent || []); Store.set(LKEY, d.lm || []); Store.set(HKEY, d.hid || []); Store.set(MCKEY, d.chk || []);
         sessionStorage.setItem('apt.openTab', 'map'); setTimeout(() => location.reload(), 400); } });
     $('pmShow').onchange = $('pmName').onchange = () => { saveOpts(); if (map) draw(); };
     $('btnPmRefresh').onclick = draw;

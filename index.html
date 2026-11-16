@@ -299,6 +299,7 @@
     <div class="filters findbar" style="margin-top:12px">
       <label class="findlab">🔎 단지 검색해서 추가 <input type="search" id="trkFind" placeholder="단지 이름이나 별칭 (예: 헬리오, 평촌 래미안)" autocomplete="off"></label>
       <label>평형 <select id="trkFindArea"></select></label>
+      <input type="number" id="trkFindCustom" min="1" step="0.01" placeholder="㎡ 예: 59" hidden style="width:110px" title="실거래가 없는 평형도 직접 입력해서 담을 수 있습니다">
       <button class="primary" id="btnTrkFindAdd">이 폴더에 추가</button>
       <button id="btnTrkFindTrades" title="시세트래킹에 담지 않고 이 단지의 매매·전세 실거래를 바로 봅니다">실거래 바로 보기</button>
       <button id="btnTrkStage" title="지금 고른 단지·평형을 아래 대기 목록에 쌓아 둡니다 (여러 개 가능)">목록에 담기</button>
@@ -778,6 +779,7 @@
       <div id="pmAdded" style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;max-height:160px;overflow:auto"></div>
     </details>
   </section>
+  <section class="panel"><div class="chips" id="pmViews"></div></section>
   <div id="pmBody">
     <section class="panel" id="pmPanel">
       <div class="bar"><strong>시세지도</strong>
@@ -792,6 +794,9 @@
       <div id="pmCtl"></div>
       <div class="kmap tallmap" id="pmMap"><p class="empty" id="pmMapMsg"></p></div>
       <div class="cards" id="pmCard" style="margin-top:10px"></div>
+      <details id="pmListBox" style="margin-top:10px"><summary style="cursor:pointer">단지 목록 — 체크 · 지도 보이기 · 라벨 보이기 · ★ 랜드마크</summary>
+        <div class="bar" style="margin:8px 0"><button id="btnPmMapAllOn">지도에 모두 보이기</button><button id="btnPmMapAllOff">지도에서 모두 숨기기</button><span class="hint" style="margin:0">아래 목록은 위의 보기 칩에 맞춰 나옵니다.</span></div>
+        <div class="tablewrap short"><table id="pmListTable"></table></div></details>
       <details open style="margin-top:10px"><summary>지도에 올라간 단지 표 (엑셀로 받을 수 있습니다)</summary>
         <div class="tablewrap short"><table id="pmTable" data-title="시세지도 단지"></table></div></details>
     </section>
