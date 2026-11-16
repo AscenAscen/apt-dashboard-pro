@@ -12,8 +12,10 @@ const TradePanel = (() => {
   const ymText = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   const inst = new Map();
 
-  function create(host) {
-    host.innerHTML = `<div class="bar"><strong data-tp="title"></strong><span class="grow"></span><button data-tp="close">닫기 ✕</button></div>
+  function create(host, opts = {}) {
+    const collapsible = !!opts.collapsible;
+    host.innerHTML = `<div class="bar"><strong data-tp="title"></strong><span class="grow"></span><button data-tp="close">${collapsible ? '숨기기 ▲' : '닫기 ✕'}</button><button data-tp="expand" hidden aria-expanded="false">펼치기 ▼</button></div>
+      <div data-tp="body">
       <div class="filters">
         <div class="presets" data-tp="presets"><button data-y="1">1년</button><button data-y="3">3년</button><button data-y="5">5년</button><button data-y="10">10년</button><button data-y="20">전체</button></div>
         <label>시작 <input type="month" data-tp="from"></label>
@@ -24,9 +26,21 @@ const TradePanel = (() => {
       <p class="hint" data-tp="note"></p>
       <div class="cards" data-tp="cards"></div>
       <div class="chartbox tall"><canvas data-tp="chart"></canvas></div>
-      <div class="tablewrap"><table class="tp" data-tp="table"></table></div>`;
+      <div class="tablewrap"><table class="tp" data-tp="table"></table></div>
+      </div>`;
     const q = (s) => host.querySelector(`[data-tp="${s}"]`);
     let items = [], trades = [], chart = null, seq = 0;
+    let armed = false, armT = null;          // 숨기기 두 번 누르기 상태
+    const body = q('body'), hideBtn = q('close'), expandBtn = q('expand');
+    /** 접힘 상태 바꾸기: 접으면 제목 한 줄만 남고, 펼치면 차트·표가 다시 보임 */
+    function setCollapsed(on) {
+      if (!collapsible) return;
+      clearTimeout(armT); armed = false;
+      body.hidden = on;
+      hideBtn.hidden = on; hideBtn.textContent = '숨기기 ▲';
+      expandBtn.hidden = !on; expandBtn.setAttribute('aria-expanded', String(!on));
+      if (!on && chart) setTimeout(() => chart && chart.resize(), 0);
+    }
 
     const range = () => {
       let a = ymInt(q('from').value), b = ymInt(q('to').value);
@@ -128,6 +142,11 @@ const TradePanel = (() => {
 
     host.onclick = (e) => {
       const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.tp === 'expand') return setCollapsed(false);
+      if (b.dataset.tp === 'close' && collapsible) {       // 시세트래킹: 한 번 더 눌러야 숨김 (2초 안에)
+        if (!armed) { armed = true; b.textContent = '한 번 더 누르면 숨김'; armT = setTimeout(() => { armed = false; b.textContent = '숨기기 ▲'; }, 2000); return; }
+        return setCollapsed(true);
+      }
       if (b.dataset.tp === 'close') { host.hidden = true; if (chart) { chart.destroy(); chart = null; } return; }
       if (b.dataset.tp === 'csv') return csv();
       const y = +b.dataset.y;
@@ -143,6 +162,7 @@ const TradePanel = (() => {
       q('title').textContent = `${title || '실거래 조회'} · ${items.length}개` + (list.length > MAX ? ` (앞 ${MAX}개만 표시)` : '');
       if (!q('from').value || !q('to').value) setPreset(5);
       host.hidden = false;
+      setCollapsed(false);                      // 새로 조회하면 항상 펼쳐서 보여 줌
       load();
       host.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -150,8 +170,8 @@ const TradePanel = (() => {
   }
 
   /** 화면 칸 id 로 패널을 한 번만 만들고 돌려줌 */
-  function get(id) {
-    if (!inst.has(id)) inst.set(id, create(document.getElementById(id)));
+  function get(id, opts) {
+    if (!inst.has(id)) inst.set(id, create(document.getElementById(id), opts));
     return inst.get(id);
   }
   return { get };

@@ -306,7 +306,8 @@
       <label>기록할 달 <input type="month" id="trkNewMonth"></label>
       <button class="primary" id="btnTrkAddMonth">시세 추가</button>
       <button id="btnTrkLoad" title="표에서 체크한 단지가 있으면 그 단지만, 없으면 지금 보이는 범위 전체의 최근 실거래를 불러옵니다">실거래 불러오기 (체크한 단지만)</button>
-      <button id="btnTrkTrades" class="primary" title="체크한 단지의 매매·전세 실거래를 아래에서 기간 골라 봅니다">선택 단지 실거래 조회</button>
+      <button id="btnTrkTrades" class="primary" title="체크한 단지의 매매·전세 실거래를 표 아래에서 기간 골라 봅니다">선택 단지 실거래 조회</button>
+      <button id="btnTrkGoTrades" hidden title="표 아래의 실거래 조회 결과로 이동">▼ 결과 보기</button>
       <span class="sep"></span>
       <label>지역 <select id="trkRegion"><option value="">전체</option></select></label>
       <label>상태 <select id="trkStatus"></select></label>
@@ -339,7 +340,6 @@
         <select id="trkFormat"><option value="xlsx">엑셀(.xlsx)</option><option value="csv">CSV</option></select><button id="btnTrkTradesDl">실거래 내역 다운로드</button></div>
     </details>
   </section>
-  <section class="panel" id="tpTrack" hidden></section>
   <section class="panel">
     <div class="bar">
       <button id="btnTrkInfo">단지 정보 펼치기</button>
@@ -360,6 +360,7 @@
     <div class="tablewrap"><table id="trkTable"></table></div>
     <p class="empty" id="trkEmpty">담아 둔 단지가 없습니다. [실거래 조회]나 [전수조사]에서 단지를 체크하고 <b>트래킹에 담기</b>를 누르세요.</p>
   </section>
+  <section class="panel" id="tpTrack" hidden></section>
 </main>
 
 <!-- ═══════════════ 2-1. 단지 비교 ═══════════════ -->

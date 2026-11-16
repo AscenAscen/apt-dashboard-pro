@@ -83,12 +83,15 @@ const Tracking = (() => {
       const sel = visible().filter(it => checked.has(it.id));
       const list = sel.length ? sel : visible();
       if (!list.length) return U.toast('보이는 단지가 없습니다.');
-      TradePanel.get('tpTrack').open(list, '시세트래킹 실거래');
+      TradePanel.get('tpTrack', { collapsible: true }).open(list, '시세트래킹 실거래');
+      $('btnTrkGoTrades').hidden = false;
     };
+    $('btnTrkGoTrades').onclick = () => $('tpTrack').scrollIntoView({ behavior: 'smooth', block: 'start' });
     $('btnTrkFindTrades').onclick = () => {            // 담지 않고 바로 실거래 보기
       const g = +$('trkFindArea').value;
       if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');
-      TradePanel.get('tpTrack').open([{ id: `${found.code}|${found.key}#${g}`, code: found.code, sido: found.sido, sgg: found.sgg, dong: found.dong, jibun: found.jibun, key: found.key, name: found.name, g }], `${found.name} 실거래`);
+      TradePanel.get('tpTrack', { collapsible: true }).open([{ id: `${found.code}|${found.key}#${g}`, code: found.code, sido: found.sido, sgg: found.sgg, dong: found.dong, jibun: found.jibun, key: found.key, name: found.name, g }], `${found.name} 실거래`);
+      $('btnTrkGoTrades').hidden = false;
     };
     $('btnTrkFindAdd').onclick = async () => {
       const g = +$('trkFindArea').value;
