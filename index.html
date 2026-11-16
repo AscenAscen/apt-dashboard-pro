@@ -301,7 +301,10 @@
       <label>평형 <select id="trkFindArea"></select></label>
       <button class="primary" id="btnTrkFindAdd">이 폴더에 추가</button>
       <button id="btnTrkFindTrades" title="시세트래킹에 담지 않고 이 단지의 매매·전세 실거래를 바로 봅니다">실거래 바로 보기</button>
+      <button id="btnTrkStage" title="지금 고른 단지·평형을 아래 대기 목록에 쌓아 둡니다 (여러 개 가능)">목록에 담기</button>
     </div>
+    <div class="filters" id="trkStageRow" style="margin-top:6px"><span class="hint" style="margin:0">대기 목록:</span><span id="trkStaged"></span><button class="primary" id="btnTrkStageAll" disabled>대기 0개 한꺼번에 추가</button></div>
+    <div class="filters" style="margin-top:12px"><span class="hint" style="margin:0">체크한 단지 <b id="trkSelCount">0개</b></span><button id="btnTrkSelAll" title="지금 표에 보이는 단지를 모두 체크합니다">보이는 단지 전체 선택</button><button id="btnTrkSelNone" title="체크를 모두 풉니다">선택 해제</button></div>
     <div class="filters" style="margin-top:12px">
       <label>기록할 달 <input type="month" id="trkNewMonth"></label>
       <button class="primary" id="btnTrkAddMonth">시세 추가</button>

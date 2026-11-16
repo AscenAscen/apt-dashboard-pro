@@ -20,7 +20,8 @@ const Tracking = (() => {
   let months = Store.get(MKEY, null);          // 기록한 달 목록, 최신이 앞 [202611, 202610, …]
   let survey = Store.get(SKEY, {});            // 전수조사에서 적었지만 아직 담지 않은 단지의 기록 { id: {…} }
   const real = new Map();                       // id → { sale, rent, peak, trough } (실거래)
-  const checked = new Set();
+  const CKEY = 'apt.trkChecked.v1';
+  const checked = new Set(Store.get(CKEY, []));   // 체크한 단지 (새로고침해도 유지)
   let curFolder = Store.get('apt.curFolder', '');
   let ui = Store.get('apt.trkUi', { info: false, card: null });
 
@@ -70,6 +71,31 @@ const Tracking = (() => {
   function init() {
     // 전국 단지 검색 → 평형 고르기 → 지금 보는 폴더에 추가
     let found = null;
+    let staged = [];                              // 여러 개 골라 담을 대기 목록 [{id, name, g, rec}]
+    const renderStaged = () => {
+      $('trkStaged').innerHTML = staged.map((s, i) => `<span class="tag">${U.esc(s.name)} ${s.g}㎡ <button class="mini" data-unstage="${i}" title="대기 목록에서 빼기">✕</button></span>`).join('') || '<span class="hint" style="margin:0">아직 없음</span>';
+      $('btnTrkStageAll').disabled = !staged.length;
+      $('btnTrkStageAll').textContent = `대기 ${staged.length}개 한꺼번에 추가`;
+    };
+    $('btnTrkStage').onclick = async () => {
+      const g = +$('trkFindArea').value;
+      if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');
+      const id = `${found.code}|${found.key}#${g}`;
+      if (staged.some(s => s.id === id)) return U.toast('이미 대기 목록에 있습니다.');
+      const idx = await Data.index(found.code), last = found.areas?.lastSale(g);
+      staged.push({ id, name: found.name, g, rec: { id, code: found.code, sido: found.sido, sgg: found.sgg, dong: found.dong, jibun: found.jibun, key: found.key, name: found.name, g,
+        buildYear: idx.c[found.key] || '', st: { last } } });
+      renderStaged();
+    };
+    $('btnTrkStageAll').onclick = () => {
+      if (!staged.length) return;
+      add(staged.map(s => s.rec)); staged = []; renderStaged(); render();
+    };
+    $('trkStaged').onclick = (e) => { const b = e.target.closest('button[data-unstage]'); if (!b) return; staged.splice(+b.dataset.unstage, 1); renderStaged(); };
+    renderStaged();
+    // 체크 일괄 선택 / 해제
+    $('btnTrkSelAll').onclick = () => { visible().forEach(it => checked.add(it.id)); render(); };
+    $('btnTrkSelNone').onclick = () => { checked.clear(); render(); };
     Finder.attach($('trkFind'), async (x) => {
       found = x; $('trkFindArea').innerHTML = '<option>불러오는 중…</option>';
       const a = await Finder.areas(x.code, x.key);
@@ -169,6 +195,7 @@ const Tracking = (() => {
       items.filter(it => checked.has(it.id)).forEach(it => { const keep = {}; CARRY.forEach(f => { if (it[f] != null && it[f] !== '') keep[f] = it[f]; }); survey[it.id] = keep; });
       items = items.filter(it => !checked.has(it.id)); checked.clear(); save(); fillSelects(); render();
     };
+    for (const id of [...checked]) if (!items.some(it => it.id === id)) checked.delete(id);   // 삭제된 단지의 체크는 정리
     if (window.innerWidth < 760) $('trkManage').open = false;
     save(); fillSelects();
   }
@@ -316,6 +343,8 @@ const Tracking = (() => {
   const cardMode = () => (ui.card == null ? window.innerWidth < 760 : ui.card);
 
   function render() {
+    Store.set(CKEY, [...checked]);                                   // 체크 상태 기억
+    const selN = items.filter(it => checked.has(it.id)).length; const sc = $('trkSelCount'); if (sc) sc.textContent = `${selN}개`;
     const list = visible(), scope = inScope(), m0 = months[0];
     $('trkEmpty').hidden = items.length > 0;
     $('trkNoMonth').hidden = !(items.length && !months.length);
