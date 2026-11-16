@@ -35,9 +35,9 @@ const Guide = (() => {
       add(r.error ? (/없어 건너뜀/.test(r.error) ? 'warn' : 'bad') : 'ok', 'R-ONE 통계', r.error ? U.esc(r.error) : `기준 ${U.esc(r.asOf || '-')} · ` + ['sale', 'rent'].map(x => (r.tables?.[x] ? `${x === 'sale' ? '매매' : '전세'}지수 ${r.tables[x].regions}개 지역 (${U.esc(r.tables[x].name || r.tables[x].id)})` : `${x === 'sale' ? '매매' : '전세'}지수 없음`)).join(' · '));
     }
     add(CONFIG.KAKAO_JS_KEY ? 'ok' : 'warn', '카카오 지도 키', CONFIG.KAKAO_JS_KEY ? '설정됨 (지도가 안 보이면 카카오디벨로퍼스의 사이트 도메인 등록을 확인)' : 'js/config.js 에 KAKAO_JS_KEY 가 비어 있습니다.');
-    let bytes = 0; try { for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key.startsWith('apt.')) bytes += (key.length + localStorage.getItem(key).length) * 2; } } catch (e) { /* 무시 */ }
+    const use = Store.usage(), bytes = use.bytes;
     const recs = Tracking.allRecords(), bk = Store.get('apt.lastBackup', 0), bd = bk ? Math.floor((Date.now() - bk) / 864e5) : null;
-    add(bytes > 4e6 ? 'warn' : 'ok', '내 기록', `시세트래킹 ${Tracking.all().length}개 · 전수조사 기록 ${recs.filter(x => !x.tracked).length}개 · 기록한 달 ${Tracking.getMonths().length}개 · 저장 공간 ${(bytes / 1048576).toFixed(2)}MB 사용 (브라우저 한도 약 5~10MB)`);
+    add(!use.big && bytes > 4e6 ? 'warn' : 'ok', '내 기록', `시세트래킹 ${Tracking.all().length}개 · 전수조사 기록 ${recs.filter(x => !x.tracked).length}개 · 기록한 달 ${Tracking.getMonths().length}개 · 저장 공간 ${(bytes / 1048576).toFixed(2)}MB 사용 · ${use.big ? '큰 저장소(IndexedDB) 사용 중 — 용량 걱정 없이 쓸 수 있습니다' : '예전 저장소 사용 중 (한도 약 5MB)'}`);
     add(bd == null || bd > 14 ? 'warn' : 'ok', '마지막 백업', bd == null ? '아직 백업한 적이 없습니다. 시세트래킹 → 관리에서 백업 파일을 받아 두세요.' : `${bd}일 전`);
     add('ok', '지역 목록', `${regs.length}개 시군구`);
     const icon = { ok: '✅', warn: '⚠️', bad: '❌' };

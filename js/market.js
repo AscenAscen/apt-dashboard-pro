@@ -46,13 +46,13 @@ const Market = (() => {
     $('mkScope').onchange = () => { Store.set('apt.mkScope', $('mkScope').value); render(); };
     $('mkKind').onclick = (e) => { const k = e.target.dataset.k; if (!k) return; kind = k; $('mkKind').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === k)); alerts(); };
     $('mkMetric').onchange = heat;
-    $('mkIdxRegion').onchange = indexChart;
+    ['mkIdxRegion', 'mkIdxNames', 'mkIdxKind', 'mkIdxSpan', 'mkIdxBase'].forEach(id => { $(id).onchange = indexChart; });
     $('btnMkExcel').onclick = excel;
     $('mkAlert').onclick = (e) => { const tr = e.target.closest('tr[data-code]'); if (tr) { App.showTab('search'); Search.openRegion(tr.dataset.code); } };
     $('kbFile').onchange = kbRead;
     $('kbSheet').onchange = kbPickSheet;
     $('kbCol').onchange = () => { const kb = Store.get(KBKEY, null); if (kb) { kb.sel = $('kbCol').value; Store.set(KBKEY, kb); } indexChart(); };
-    $('btnKbClear').onclick = () => { if (!confirm('올려 둔 KB 자료를 지울까요?')) return; localStorage.removeItem(KBKEY); kbBook = null; $('kbSheet').innerHTML = ''; kbFill(); indexChart(); };
+    $('btnKbClear').onclick = () => { if (!confirm('올려 둔 KB 자료를 지울까요?')) return; Store.remove(KBKEY); kbBook = null; $('kbSheet').innerHTML = ''; kbFill(); indexChart(); };
   }
 
   async function open() {
@@ -161,16 +161,31 @@ const Market = (() => {
     const cur = $('mkIdxRegion').value, list = scoped();
     $('mkIdxRegion').innerHTML = '<option value="">(R-ONE 지역 고르기)</option>' + list.map(r => `<option value="${r[0]}">${U.esc(SHORT[r[1]] || r[1])} ${U.esc(r[2])}</option>`).join('');
     $('mkIdxRegion').value = list.some(r => r[0] === cur) ? cur : (list[0]?.[0] || '');
+    // R-ONE 에 있는 지역 이름을 그대로 고르기 (전국·시도·권역 포함). 여러 개를 Ctrl/⌘ 로 함께 고를 수 있음
+    const names = [...new Set([...Object.keys(rone?.sale || {}), ...Object.keys(rone?.rent || {})])].sort((a, b) => a.split('>').length - b.split('>').length || a.localeCompare(b, 'ko'));
+    const keep = new Set([...$('mkIdxNames').selectedOptions].map(o => o.value));
+    $('mkIdxNames').innerHTML = names.map(n => `<option value="${U.esc(n)}" ${keep.has(n) ? 'selected' : ''}>${U.esc(n.replace(/>/g, ' '))}</option>`).join('');
   }
   function indexChart() {
     const css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
     const reg = regions.find(r => r[0] === $('mkIdxRegion').value), sets = [], notes = [];
     const toX = (ym, day = 15) => Math.floor(ym / 100) * 12 + (ym % 100 - 1) + day / 31;
+    const want = $('mkIdxKind').value, span = +$('mkIdxSpan').value, rebase = $('mkIdxBase').checked;
+    const kinds = [['sale', '매매지수', '--accent'], ['rent', '전세지수', '--rent']].filter(k => want === 'both' || want === k[0]);
+    const nowYm = new Date().getFullYear() * 100 + new Date().getMonth() + 1, fromYm = span ? (Math.floor(nowYm / 100) * 12 + nowYm % 100 - 1 - span) : 0;
+    const cut = (arr) => { const a = arr.filter(([ym]) => !span || Math.floor(ym / 100) * 12 + ym % 100 - 1 >= fromYm); const b0 = a[0]?.[1]; return a.map(([ym, v]) => ({ x: toX(ym), y: rebase && b0 ? +(v / b0 * 100).toFixed(2) : v })); };
+    const picked = [...$('mkIdxNames').selectedOptions].map(o => o.value), PAL = ['#ff9500', '#af52de', '#5ac8fa', '#ff2d55', '#ffcc00', '#30d158', '#64d2ff', '#bf5af2'];
+    let pi = 0;
+    if (rone) for (const n of picked) for (const [k, name] of kinds) {             // 직접 고른 지역들
+      if (!rone[k]?.[n]) continue; const c = PAL[pi++ % PAL.length];
+      sets.push({ label: `${n.replace(/>/g, ' ')} ${name}`, data: cut(rone[k][n]), borderColor: c, backgroundColor: c, borderWidth: 2, pointRadius: 0, tension: 0.2, borderDash: k === 'rent' ? [6, 3] : [] });
+    }
     if (reg && rone) {
-      for (const [k, name, c] of [['sale', '매매지수', '--accent'], ['rent', '전세지수', '--rent']]) {
+      for (const [k, name, c] of kinds) {
         const n = roneName(reg, k);
-        if (n) sets.push({ label: `R-ONE ${name} (${n})`, data: rone[k][n].map(([ym, v]) => ({ x: toX(ym), y: v })), borderColor: col(c), backgroundColor: col(c), borderWidth: 2, pointRadius: 0, tension: 0.2 });
+        if (n && !picked.includes(n)) sets.push({ label: `R-ONE ${name} (${n})`, data: cut(rone[k][n]), borderColor: col(c), backgroundColor: col(c), borderWidth: 2, pointRadius: 0, tension: 0.2 });
       }
+      if (rebase) notes.push('기간의 첫 달을 100으로 맞춰 견줍니다');
       if (!sets.length) notes.push(`R-ONE 에서 "${reg[2]}" 지역을 찾지 못했습니다. (R-ONE 은 시·구 단위 일부만 제공합니다)`);
     } else if (!rone) notes.push('R-ONE 자료가 아직 없습니다. 점검 화면(가이드·설정)에서 상태를 볼 수 있습니다.');
     const kb = Store.get(KBKEY, null);

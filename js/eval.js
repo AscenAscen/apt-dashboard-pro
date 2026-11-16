@@ -34,7 +34,7 @@ const Eval = (() => {
      scope: 'metro' | 'local' | 'both'.  kind: auto(자동·✎ 고치기) | check(자동 + 있음/없음) | input(직접) | est(직접 입력, 비면 추정 표시) | links | price(현재가) */
   const ROWS = [
     { group: '📍 위치' },
-    { k: 'hub', kind: 'auto', scope: 'metro', label: '3대 업무지구 직선거리', auto: (a) => a.loc.hubs.map(h => `${esc(h.name.split(' ')[0])} <b>${h.km.toFixed(1)}km</b>`).join(' · ') },
+    { k: 'hub', kind: 'auto', scope: 'metro', label: '역 직선거리', auto: (a) => a.loc.hubs.map(h => `${esc(h.name.split(' ')[0])} <b>${h.km.toFixed(1)}km</b>`).join(' · ') },
     { k: 'anchor', kind: 'input', scope: 'local', label: '도심 기준점 (검색어)', ph: '예: 부산 서면역, 천안 터미널' },
     { k: 'anchorKm', kind: 'auto', scope: 'local', label: '기준점까지 직선거리', auto: (a) => (a.anchorKm == null ? '<small>기준점 검색어를 적으면 계산</small>' : `<b>${a.anchorKm.toFixed(1)}km</b> <small>${esc(a.anchorName)}</small>`) },
     { group: '🚇 교통' },
@@ -169,6 +169,8 @@ const Eval = (() => {
   }
 
   function init() {
+    Saves.register('eval', { name: '비교 평가', keys: [KEY, 'apt.evalTables.v1'], hint: '비교하는 단지 목록·항목 구성·직접 만든 표를 저장합니다.', note: () => state().list.map(c => c.name).join(' · ') });
+    UserTables.mount($('evUserTables'), 'apt.evalTables.v1');
     // 기준 버튼
     $('evMode').onclick = (e) => { const m = e.target.dataset.m; if (!m) return; const s = state(); s.mode = m; save(s); draw(); };
     // 전국 검색
@@ -233,5 +235,6 @@ const Eval = (() => {
   }
 
   function open() { draw(); }
+  Stations.onChange(() => { cache.clear(); if (!document.getElementById('tab-eval').hidden) draw(); });
   return { init, open };
 })();

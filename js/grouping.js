@@ -60,6 +60,17 @@ const Grouping = (() => {
       board().bands = bands; save(); render();
     };
     $('btnGrpAuto').onclick = autoPlace;
+    $('btnGrpAutoSv').onclick = autoSurvey;
+    const fillSv = async () => {           // 전수조사 기록이 있는 지역 목록
+      const recs = (await Kit.records(false)).filter(x => { const q = Kit.quote(x.rec); return q && q.s != null; }), m = new Map();
+      recs.forEach(x => m.set(x.code, `${x.sido} ${x.sgg}`.trim()));
+      const cur = $('grpSvRegion').value;
+      $('grpSvRegion').innerHTML = `<option value="">호가를 적은 단지 전체 (${recs.length}개)</option>` + [...m.entries()].map(([c, n]) => `<option value="${c}">${U.esc(n)} (${recs.filter(x => x.code === c).length}개)</option>`).join('');
+      if (m.has(cur)) $('grpSvRegion').value = cur;
+    };
+    $('grpSvRegion').onfocus = () => fillSv();        // 누를 때마다 최신 기록으로 다시 채움
+    $('btnGrpAutoSv').onmouseenter = () => fillSv();
+    fillSv();
     initSearch();
     $('btnGrpExcel').onclick = excel;
   }
@@ -113,6 +124,24 @@ const Grouping = (() => {
     }
     save(); render();
     U.toast(`${list.length}개 단지를 배치했습니다.` + (skipped ? ` (생활권·시세가 없는 ${skipped}개 제외)` : ''));
+  }
+
+  /** 전수조사(·시세트래킹)에 매매 호가를 적은 단지를 가격대 칸에 자동 배치. 기준 = 가장 최근 매매 호가, 세로 칸 = 생활권(없으면 동 이름) */
+  async function autoSurvey() {
+    const b = board();
+    if (!b.bands.length) return U.toast('가격대를 먼저 만들어 주세요.');
+    const code = $('grpSvRegion').value, by = $('grpSvZone').value;
+    const recs = (await Kit.records(false)).filter(x => !code || x.code === code);
+    let n = 0, skip = 0;
+    for (const x of recs) {
+      const q = Kit.quote(x.rec);
+      if (!q || q.s == null) { skip++; continue; }
+      const z = ensureZone(by === 'sgg' ? x.sgg : by === 'dong' ? x.dong : (x.rec.zone || x.dong));
+      put(z, `${x.name} ${CONFIG.toPyeong(x.g)}평`, q.s / 10000); n++;
+    }
+    if (!n) return U.toast('매매 호가를 적은 단지가 없습니다. 전수조사 탭에서 호가를 먼저 적어 주세요.');
+    save(); render();
+    U.toast(`${n}개 단지를 매매 호가 기준으로 배치했습니다.` + (skip ? ` (호가가 없는 ${skip}개 제외)` : '') + ' 칸 안의 글자는 직접 고쳐서 옮길 수 있습니다.');
   }
 
   /** 생활권 z 의 가격대 칸에 "단지 평형 가격" 한 줄 넣기 (같은 단지가 이미 있으면 옮김) */

@@ -6,6 +6,7 @@ const App = (() => {
 
   function showTab(name) {
     document.querySelectorAll('.tab').forEach(el => { el.hidden = el.id !== 'tab-' + name; });
+    TabTools.open(name);
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     if (name === 'tracking') Tracking.open();
     if (name === 'map') PriceMap.open();
@@ -131,10 +132,17 @@ const App = (() => {
     await Search.init();
     await Promise.all([My.init(), Land.init()]);
     Settings.init();           // 탭 순서·보이기, 업무지구 — 다른 탭이 모두 준비된 뒤에 적용해야 첫 화면이 바뀌어도 안전합니다
+    // 저장함: 값이 Store 에 그대로 들어 있는 탭들 (단지 비교·입지 분석·비교 평가·시세지도는 각 파일에서 등록)
+    Saves.register('survey', { name: '전수조사', keys: ['apt.survey.v1', 'apt.surveyMeta.v1'], hint: '전수조사에 적은 호가 기록 전체를 통째로 저장합니다. 불러오면 지금의 전수조사 기록 전체가 저장 당시 내용으로 바뀌니, 먼저 지금 화면도 저장해 두세요.' });
+    Saves.register('grouping', { name: '시세그룹핑', keys: ['apt.grouping.v1'], hint: '그룹핑 판(생활권·가격대·배치) 전체를 저장합니다.' });
+    const xa = $('btnXlAll'); if (xa) xa.onclick = () => Xl.all();
     showStatus();
+    const back = sessionStorage.getItem('apt.openTab');       // 저장함에서 불러온 뒤 다시 열린 경우 그 탭으로
+    if (back) { sessionStorage.removeItem('apt.openTab'); if (document.querySelector(`#tabs button[data-tab="${back}"]`)) showTab(back); }
+    else { const cur = document.querySelector('#tabs button.on')?.dataset.tab; if (cur) TabTools.open(cur); }
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
   // 휴대폰 홈 화면에 앱처럼 설치할 수 있게 (PWA)
   if ('serviceWorker' in navigator) window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
   return { showMap, showTab };

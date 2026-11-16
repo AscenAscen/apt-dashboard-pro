@@ -180,12 +180,68 @@ const U = {
 };
 
 /* 브라우저 저장소 (트래킹 목록·그룹핑 표 보관) */
-const Store = {
-  get(key, fallback) {
-    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
-  },
-  set(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); return true; }
-    catch (e) { U.toast('브라우저 저장에 실패했습니다. 백업 파일로 저장해 두세요.'); return false; }
-  },
-};
+/* ─────────────────────────────────────────────────────────
+   Store — 이 브라우저에 적어 두는 모든 값의 저장소
+   · 큰 저장소(IndexedDB)를 씁니다. 예전 저장소(localStorage, 약 5MB 한도)에 있던 값은 처음 열 때 자동으로 옮겨집니다.
+   · 쓰는 법은 예전과 같습니다: Store.get(이름, 없을 때 값) / Store.set(이름, 값) / Store.remove(이름)
+   · 화면을 시작하기 전에 Store.ready() 가 한 번 끝나야 합니다 (index.html 맨 아래에서 처리).
+   · saves 칸: 탭별 "저장함"(js/common.js 의 Saves)이 쓰는 별도 공간
+   ───────────────────────────────────────────────────────── */
+const Store = (() => {
+  const cache = new Map();          // 이름 → JSON 글자
+  let db = null, started = null;
+  const MIRROR_MAX = 200000;        // 이보다 작은 값은 예전 저장소에도 같이 적어 둠 (큰 저장소를 못 쓰는 브라우저 대비)
+  const req = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  function openDb() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('apt-dashboard', 1);
+      r.onupgradeneeded = () => { const d = r.result; if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv'); if (!d.objectStoreNames.contains('saves')) d.createObjectStore('saves', { keyPath: 'id' }); };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); r.onblocked = () => rej(new Error('blocked'));
+    });
+  }
+  const put = (k, v) => { if (!db) return; try { db.transaction('kv', 'readwrite').objectStore('kv').put(v, k); } catch (e) { console.error(e); } };
+  function ready() {
+    if (started) return started;
+    started = (async () => {
+      try {
+        db = await Promise.race([openDb(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4000))]);
+        const os = db.transaction('kv').objectStore('kv');
+        const [keys, vals] = await Promise.all([req(os.getAllKeys()), req(os.getAll())]);
+        keys.forEach((k, i) => cache.set(k, vals[i]));
+      } catch (e) { console.warn('큰 저장소(IndexedDB)를 쓸 수 없어 예전 저장소를 씁니다.', e); db = null; }
+      try {                          // 예전 저장소에만 있는 값 옮기기
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('apt.') && !cache.has(k)) { const v = localStorage.getItem(k); cache.set(k, v); put(k, v); }
+        }
+      } catch (e) { /* 무시 */ }
+    })();
+    return started;
+  }
+  function get(key, fallback) {
+    try { const v = cache.has(key) ? cache.get(key) : null; return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
+  }
+  function set(key, value) {
+    let v; try { v = JSON.stringify(value); } catch (e) { return false; }
+    cache.set(key, v);
+    let mirrored = false;
+    try { if (v.length <= MIRROR_MAX) { localStorage.setItem(key, v); mirrored = true; } else localStorage.removeItem(key); } catch (e) { /* 예전 저장소가 가득 참 → 큰 저장소에만 */ }
+    if (db) put(key, v);
+    else if (!mirrored) { U.toast('브라우저 저장에 실패했습니다. 백업 파일로 저장해 두세요.'); return false; }
+    return true;
+  }
+  function remove(key) {
+    cache.delete(key);
+    try { localStorage.removeItem(key); } catch (e) { /* 무시 */ }
+    if (db) try { db.transaction('kv', 'readwrite').objectStore('kv').delete(key); } catch (e) { /* 무시 */ }
+  }
+  /** 쓰고 있는 용량(바이트)과 저장소 종류 */
+  function usage() { let n = 0; for (const [k, v] of cache) if (k.startsWith('apt.')) n += (k.length + v.length) * 2; return { bytes: n, big: !!db }; }
+  /* 저장함(saves) 전용 */
+  const saves = {
+    async all() { if (!db) return get('apt.saves.fallback', []); return req(db.transaction('saves').objectStore('saves').getAll()); },
+    async put(rec) { if (!db) { const a = get('apt.saves.fallback', []).filter(x => x.id !== rec.id); a.push(rec); return set('apt.saves.fallback', a); } return req(db.transaction('saves', 'readwrite').objectStore('saves').put(rec)); },
+    async del(id) { if (!db) return set('apt.saves.fallback', get('apt.saves.fallback', []).filter(x => x.id !== id)); return req(db.transaction('saves', 'readwrite').objectStore('saves').delete(id)); },
+  };
+  return { ready, get, set, remove, usage, saves };
+})();

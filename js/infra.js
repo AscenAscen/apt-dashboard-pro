@@ -30,6 +30,10 @@ const Infra = (() => {
       $('inApt').value = x.key;
       run();
     });
+    Saves.register('infra', { name: '입지 분석', hint: '분석한 단지를 저장합니다. 불러오면 그 단지를 다시 분석합니다. (그때 화면의 표는 [엑셀]로 따로 받을 수 있습니다)',
+      get: () => ({ code: $('inSgg').value, key: $('inApt').value }), note: () => $('inApt').selectedOptions[0]?.text || '',
+      set: async (st) => { const reg = regions.find(r => r[0] === st.code); if (!reg || !st.key) return; $('inSido').value = reg[1]; await fillSgg(st.code); $('inFind').value = ''; await fillApt(false); $('inApt').value = st.key; run(); } });
+    Stations.onChange(() => { if (cur) run(); });
     $('inView').onclick = (e) => { if (e.target.dataset.v && cur) view(e.target.dataset.v); };
     $('inHybrid').onclick = () => {
       if (!map) return;

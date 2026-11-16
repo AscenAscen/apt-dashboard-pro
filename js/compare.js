@@ -51,6 +51,10 @@ const Compare = (() => {
     $('cmpFrom').onchange = $('cmpTo').onchange = () => { markPreset(0); if (last) run(); };
     $('cmpKind').onchange = $('cmpMode').onchange = () => { if (last) run(); };
     $('btnCompare').onclick = run;
+    fillStations();
+    $('cmpStations').onchange = () => { Store.set(SKEY, [...$('cmpStations').querySelectorAll('input:checked')].map(x => x.value)); if (last) place(last); };
+    Stations.onChange(async () => { await fillStations(); if (last) place(last); });
+    Saves.register('compare', { name: '단지 비교', get: getState, set: setState, note: noteOf, hint: '고른 단지·기간·역을 저장합니다. 불러오면 그 단지로 다시 비교합니다.' });
     // 전국 검색: 이름을 치면 고른 단지를 빈 칸(또는 고른 칸)에 넣어 줌
     Finder.attach($('cmpNat'), async (x) => {
       const want = $('cmpNatSlot').value;
@@ -322,35 +326,73 @@ const Compare = (() => {
   const isCapital = (r) => /^(서울|경기|인천)/.test(r.sido);
 
   /* ── 카카오맵: 단지 위치(빨간 점), 단지 간·강남역까지 직선거리(점선) ── */
+  /* ── 위치와 역 직선거리 (역은 [역 관리] 목록에서 골라 체크) ── */
+  const SKEY = 'apt.cmpStations.v1';
+  let stList = [];
+  async function fillStations() {
+    stList = await Stations.hubs();
+    let on = Store.get(SKEY, null);
+    if (!on || !stList.some(h => on.includes(h.name))) on = stList.slice(0, 1).map(h => h.name);
+    $('cmpStations').innerHTML = stList.map(h => `<label class="chk"><input type="checkbox" value="${U.esc(h.name)}" ${on.includes(h.name) ? 'checked' : ''}> <span style="color:${h.color}">●</span> ${U.esc(h.name)}</label>`).join('') ||
+      '<span class="hint" style="margin:0">체크된 역이 없습니다. [역 관리]에서 역을 체크하세요.</span>';
+  }
+  const pickedStations = () => { const on = [...$('cmpStations').querySelectorAll('input:checked')].map(x => x.value); return stList.filter(h => on.includes(h.name)); };
+  const route = (r, h) => `https://map.kakao.com/link/from/${encodeURIComponent(r.name)},${r.pos.lat},${r.pos.lng}/to/${encodeURIComponent(h.name)},${h.lat},${h.lng}`;
   async function place(res) {
-    const seq = ++placeSeq, hub = CONFIG.HUB, msg = $('cmpMapMsg'), cards = $('cmpDist');
-    const say = (html) => { msg.innerHTML = html; msg.hidden = false; cards.innerHTML = ''; shapes.forEach(x => x.remove()); shapes = []; };
-    const cap = res.filter(isCapital);
+    const seq = ++placeSeq, msg = $('cmpMapMsg'), cards = $('cmpDist');
+    const say = (html) => { msg.innerHTML = html; msg.hidden = false; cards.innerHTML = ''; $('cmpStTable').innerHTML = ''; shapes.forEach(x => x.remove()); shapes = []; };
     if (!KMap.ready()) return say(KMap.needKeyHtml);
-    if (!cap.length) return say('서울·경기·인천 단지를 고르면 지도와 거리가 표시됩니다.');
+    if (!res.length) return say('단지를 고르면 지도와 거리가 표시됩니다.');
     try {
       await KMap.load();
-      for (const r of cap) r.pos = await KMap.geocode(r);
+      if (!stList.length) await fillStations();
+      for (const r of res) r.pos = await KMap.geocode(r);
     } catch (e) { return say(U.esc(e.message || String(e))); }
     if (seq !== placeSeq) return;
-    const ok = cap.filter(r => r.pos);
+    const ok = res.filter(r => r.pos), hubs = pickedStations();
     if (!ok.length) return say('단지 위치를 찾지 못했습니다.');
     msg.hidden = true;
-    if (!kmap) kmap = KMap.create($('cmpMap'), hub, 8);
+    if (!kmap) kmap = KMap.create($('cmpMap'), hubs[0] || ok[0].pos, 8);
     shapes.forEach(x => x.remove()); shapes = [];
-    shapes.push(KMap.dot(kmap, hub, hub.name, '#1c1c1e'));
+    hubs.forEach(h => shapes.push(KMap.dot(kmap, h, h.name, h.color || '#1c1c1e')));
     ok.forEach(r => {
       shapes.push(KMap.dot(kmap, r.pos, `${NAMES[r.i]} ${r.name}`, '#ff3b30'));
-      const l = KMap.line(kmap, r.pos, hub, '#ff3b30'); r.hubKm = l.km; shapes.push(l);
+      r.km = {};
+      hubs.forEach(h => { const l = KMap.line(kmap, r.pos, h, h.color || '#ff3b30'); r.km[h.name] = l.km; shapes.push(l); });
     });
     let between = null;
     if (ok.length === 2) { between = KMap.line(kmap, ok[0].pos, ok[1].pos, '#1c1c1e'); shapes.push(between); }
     kmap.relayout();
-    KMap.fit(kmap, [hub, ...ok.map(r => r.pos)]);
-    cards.innerHTML = ok.map(r => `<div class="card"><div class="k">${NAMES[r.i]} · ${U.esc(r.name)} → ${hub.name}</div><div class="v">${r.hubKm.toFixed(1)}km</div>` +
-      `<div class="s">직선거리${r.pos.exact ? '' : ' (동 중심 기준)'} · <a class="btn mini" target="_blank" rel="noopener" href="https://map.kakao.com/link/from/${encodeURIComponent(r.name)},${r.pos.lat},${r.pos.lng}/to/${encodeURIComponent(hub.name)},${hub.lat},${hub.lng}">카카오맵 길찾기</a></div></div>`).join('') +
-      (between ? `<div class="card"><div class="k">단지 간 직선거리 (A ↔ B)</div><div class="v">${between.km.toFixed(1)}km</div><div class="s">${hub.name}까지 거리 차이 ${Math.abs(ok[0].hubKm - ok[1].hubKm).toFixed(1)}km</div></div>` : '');
+    KMap.fit(kmap, [...hubs, ...ok.map(r => r.pos)]);
+    // 표: 단지(가로) × 역(세로) 직선거리 + 카카오맵 길찾기(새 창)
+    $('cmpStTable').innerHTML = hubs.length ? '<thead><tr><th class="l">역 (직선거리)</th>' + ok.map(r => `<th>${NAMES[r.i]} · ${U.esc(r.name)}${r.pos.exact ? '' : '<small>동 중심 기준</small>'}</th>`).join('') + '</tr></thead><tbody>' +
+      hubs.map(h => { const min = Math.min(...ok.map(r => r.km[h.name])); return `<tr><td class="l"><span style="color:${h.color}">●</span> ${U.esc(h.name)}</td>` +
+        ok.map(r => `<td>${ok.length > 1 && r.km[h.name] === min ? '<b>' : ''}${r.km[h.name].toFixed(1)}km${ok.length > 1 && r.km[h.name] === min ? '</b>' : ''} <a class="btn mini" target="_blank" rel="noopener" href="${route(r, h)}" title="카카오맵 길찾기 화면이 새 창으로 열립니다 (대중교통·자동차 소요시간 확인)">길찾기</a></td>`).join('') + '</tr>'; }).join('') + '</tbody>' : '';
+    cards.innerHTML = (hubs.length ? '' : '<p class="hint">위에서 역을 체크하면 직선거리와 길찾기 버튼이 나옵니다.</p>') +
+      (between ? `<div class="card"><div class="k">단지 간 직선거리 (A ↔ B)</div><div class="v">${between.km.toFixed(1)}km</div><div class="s">${hubs[0] ? `${U.esc(hubs[0].name)}까지 거리 차이 ${Math.abs(ok[0].km[hubs[0].name] - ok[1].km[hubs[0].name]).toFixed(1)}km` : ''}</div></div>` : '');
   }
 
-  return { init };
+  /* ── 저장함용: 지금 고른 단지·기간을 값으로 / 값을 화면으로 ── */
+  function getState() {
+    return { slots: slots.map(s => ({ code: s.q('.cSgg').value, key: s.q('.cApt').value, g: s.q('.cArea').value })), from: $('cmpFrom').value, to: $('cmpTo').value, kind: $('cmpKind').value, mode: $('cmpMode').value,
+      stations: [...$('cmpStations').querySelectorAll('input:checked')].map(x => x.value), opt: { ...opt } };
+  }
+  async function setState(st) {
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i], v = st.slots?.[i];
+      if (!v || !v.key) { s.q('.cApt').value = ''; s.q('.cArea').innerHTML = ''; continue; }
+      const reg = regions.find(r => r[0] === v.code); if (!reg) continue;
+      if (i >= 2) $('cmpMore').open = true;
+      s.q('.cSido').value = reg[1]; await fillSgg(s, v.code);
+      s.q('.cFind').value = ''; s.q('.cApt').value = v.key; await fillArea(s);
+      if (v.g) s.q('.cArea').value = v.g;
+    }
+    if (st.from) $('cmpFrom').value = st.from; if (st.to) $('cmpTo').value = st.to; markPreset(0);
+    if (st.kind) $('cmpKind').value = st.kind; if (st.mode) $('cmpMode').value = st.mode;
+    if (st.stations) { Store.set(SKEY, st.stations); await fillStations(); }
+    await run();
+  }
+  function noteOf() { return slots.map(s => s.q('.cApt').selectedOptions[0]?.text).filter(t => t && !/선택하세요|검색 결과|자료 없음/.test(t)).join(' · ').slice(0, 80); }
+
+  return { init, getState, setState, noteOf };
 })();

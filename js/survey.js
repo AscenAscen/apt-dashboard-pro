@@ -53,6 +53,12 @@ const Survey = (() => {
       if (!sel.length) return U.toast('먼저 표에서 단지를 체크하세요.');
       Tracking.add(sel); checked.clear(); render();
     };
+    $('btnSvToMap').onclick = () => {
+      const sel = rows.filter(r => checked.has(r.id));
+      if (!sel.length) return U.toast('먼저 표에서 단지를 체크하세요.');
+      const n = PriceMap.send(sel.map(r => r.id));
+      U.toast(`${sel.length}개 단지를 시세지도로 보냈습니다. (새로 ${n}개) 시세지도 탭에서 확인하세요.`);
+    };
     $('btnSvSame').onclick = sameAsLast;
     $('btnSvSeen').onclick = () => { rows.forEach(r => { const rc = Tracking.rec(r.id); if (rc && r.sale) rc.seenSale = r.sale.d; }); Tracking.save(); render(); U.toast('새 거래 표시를 지웠습니다.'); };
     $('btnSvExcel').onclick = excel;

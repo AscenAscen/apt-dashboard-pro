@@ -10,7 +10,7 @@ const Vault = (() => {
   const $ = (id) => document.getElementById(id);
   const BK = 'apt.lastBackup', REMIND_DAYS = 14;
   // 함께 옮기는 그 밖의 저장 항목 (시세그룹핑 표, 입지 메모, 조사 이름·메모, 대중교통 메모)
-  const EXTRA = ['apt.grouping.v1', 'apt.loc.v1', 'apt.surveyMeta.v1', 'apt.alias.v1', 'apt.pins.v1', 'apt.land.v1', 'apt.landMonths.v1', 'apt.imjang.v1', 'apt.my.v1', 'apt.tabs.v1', 'apt.hubs.v1', 'apt.mapLabel.v1', 'apt.cmpPrice.v1', 'apt.eval.v1'];
+  const EXTRA = ['apt.grouping.v1', 'apt.loc.v1', 'apt.surveyMeta.v1', 'apt.alias.v1', 'apt.pins.v1', 'apt.land.v1', 'apt.landMonths.v1', 'apt.imjang.v1', 'apt.my.v1', 'apt.tabs.v1', 'apt.hubs.v1', 'apt.mapLabel.v1', 'apt.cmpPrice.v1', 'apt.eval.v1', 'apt.stations.v1', 'apt.cmpStations.v1', 'apt.saveFolders.v1', 'apt.sizes.v1', 'apt.tabZoom.v1', 'apt.pmLabels.v1', 'apt.pmExtra.v1', 'apt.evalTables.v1', 'apt.pmOpts.v1'];
   let locked = Store.get('apt.lock', false);
 
   /* ── 묶기 / 풀기 ── */
@@ -19,7 +19,10 @@ const Vault = (() => {
     EXTRA.forEach(k => { const v = Store.get(k, null); if (v) extra[k] = v; });
     return { type: 'apt-tracking', v: 2, savedAt: new Date().toISOString(), ...Tracking.exportAll(), extra };
   }
+  /** 저장함(큰 저장소)까지 담은 묶음 */
+  async function packAll() { const o = pack(); try { o.saves = await Saves.exportAll(); } catch (e) { console.error(e); } return o; }
   function apply(obj, merge) {
+    if (obj && obj.saves) Saves.importAll(obj.saves, merge).catch(console.error);
     if (!obj || obj.type !== 'apt-tracking' || !Array.isArray(obj.items)) throw new Error('형식이 맞지 않습니다.');
     (obj.items || []).forEach(it => { it.quotes = it.quotes || {}; });
     const extra = obj.extra || (obj.grouping ? { 'apt.grouping.v1': obj.grouping } : {});
@@ -85,7 +88,7 @@ const Vault = (() => {
   }
   async function copyCode() {
     if (!hasData()) return U.toast('내보낼 기록이 없습니다.');
-    const code = await toCode(pack());
+    const code = await toCode(await packAll());
     openModal('out', code);
     try { await navigator.clipboard.writeText(code); U.toast(`복사했습니다. (${code.length.toLocaleString()}자) 다른 기기의 [코드 가져오기]에 붙여 넣으세요.`); } catch (e) { /* 창에서 직접 복사 */ }
     touch();
@@ -101,8 +104,8 @@ const Vault = (() => {
   }
 
   /* ── 백업 파일 ── */
-  function backupFile() {
-    const blob = new Blob([JSON.stringify(pack(), null, 1)], { type: 'application/json' });
+  async function backupFile() {
+    const blob = new Blob([JSON.stringify(await packAll(), null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = `실거래대시보드_백업_${U.stamp()}.json`;
     document.body.appendChild(a); a.click(); a.remove();

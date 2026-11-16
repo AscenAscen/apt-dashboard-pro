@@ -55,6 +55,7 @@ const Search = (() => {
     };
     $('listFilter').oninput = renderList;
     Finder.attach($('findSearch'), openComplex);
+    initRecent();
     $('btnExcelList').onclick = excelList;
     $('btnAddTrackSel').onclick = () => {
       const sel = rows.filter(r => checked.has(r.id));
@@ -454,6 +455,34 @@ const Search = (() => {
     $('selSido').value = reg[1]; fillSgg(code);
     await fillDong();
     run();
+  }
+
+  /* ── 가장 최근 실거래 (고른 지역, 매매/전세 전환) ── */
+  let recentKind = 'sale', recentRows = [];
+  async function recent() {
+    const code = $('selSgg').value, reg = regions.find(r => r[0] === code), dong = $('selDong').value;
+    if (!reg) return;
+    const btn = $('btnRecent'); btn.disabled = true;
+    try {
+      const y = new Date().getFullYear(), data = await Data.loadYears(code, y - 1, y), out = [], noDirect = $('recentNoDirect').checked;
+      Data.eachTrade(data[recentKind], null, (key, t) => { if (noDirect && t.direct) return; const p = Data.parseKey(key); if (dong && p.dong !== dong) return; out.push({ code, key, ...p, t }); });
+      out.sort((a, b) => b.t.d - a.t.d || b.t.price - a.t.price);
+      recentRows = out.slice(0, +$('recentN').value);
+      $('recentPanel').hidden = false;
+      $('recentTitle').textContent = `${reg[1]} ${reg[2]}${dong ? ' ' + dong : ''} — 가장 최근 ${recentKind === 'sale' ? '매매' : '전세'} 실거래 (${recentRows.length}건 / 최근 2년 ${out.length.toLocaleString()}건)`;
+      $('recentTable').innerHTML = `<thead><tr><th>계약일</th><th class="l">동</th><th class="l">단지</th><th>전용㎡</th><th>평</th><th>층</th><th>${recentKind === 'sale' ? '매매가' : '전세 보증금'}</th><th>구분</th></tr></thead><tbody>` +
+        (recentRows.length ? recentRows.map((r, i) => `<tr data-i="${i}" style="cursor:pointer"><td>${U.date(r.t.d)}${Kit.badge(r.t.d)}</td><td class="l">${U.esc(r.dong)}</td><td class="l"><b>${U.esc(r.name)}</b></td><td>${r.t.area ?? r.t.g}</td><td>${CONFIG.toPyeong(r.t.g)}</td><td>${r.t.floor ?? ''}</td><td class="${recentKind}">${U.price(r.t.price)}</td><td>${r.t.direct ? '직거래' : ''}</td></tr>`).join('')
+          : '<tr><td colspan="8" style="color:var(--sub);padding:18px">최근 2년 안에 수집된 거래가 없습니다. 수집이 아직 이 지역까지 오지 않았을 수 있습니다.</td></tr>') + '</tbody>';
+      $('recentPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } finally { btn.disabled = false; }
+  }
+  function initRecent() {
+    $('btnRecent').onclick = recent;
+    $('recentKind').onclick = (e) => { const k = e.target.dataset.k; if (!k) return; recentKind = k; $('recentKind').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === k)); recent(); };
+    $('recentN').onchange = $('recentNoDirect').onchange = recent;
+    $('btnRecentClose').onclick = () => { $('recentPanel').hidden = true; };
+    $('btnRecentExcel').onclick = () => { if (!recentRows.length) return U.toast('받을 거래가 없습니다.'); U.download(`최근실거래_${recentKind === 'sale' ? '매매' : '전세'}_${U.stamp()}`, [{ name: '최근 실거래', rows: Xl.tableRows($('recentTable')) }]); };
+    $('recentTable').onclick = (e) => { const r = recentRows[+e.target.closest('tr')?.dataset.i]; if (r) openComplex(r); };
   }
 
   /** 전국 단지 검색에서 고른 단지를 바로 엶 */

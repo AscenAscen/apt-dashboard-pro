@@ -127,19 +127,19 @@ const My = (() => {
     const btn = $('btnBudget'); btn.disabled = true;
     let src = rows;
     try { if (fromRegion) src = await regionRows($('bgSgg').value); } finally { btn.disabled = false; }
-    const have = mode === 'gap' ? cash : cash + loan;
+    const have = mode === 'live' ? cash + loan : cash;          // 기준 3가지: gap = 투자금(매매−전세), live = 매매가, rent = 전세가
     const out = [];
     for (const r of src) {
-      if (r.s == null || (mode === 'gap' && r.r == null)) continue;
-      const need = (mode === 'gap' ? r.s - r.r : r.s) + r.s * cost;
+      if (mode === 'rent' ? r.r == null : (r.s == null || (mode === 'gap' && r.r == null))) continue;
+      const need = mode === 'rent' ? r.r : (mode === 'gap' ? r.s - r.r : r.s) + r.s * cost;
       if (need > have) continue;
       if (!isNaN(minRatio) && !(r.ratio >= minRatio)) continue;
       if (!isNaN(minHouse) && !(r.hh >= minHouse)) continue;
       out.push({ r, need, left: have - need });
     }
-    out.sort((a, b) => b.r.s - a.r.s);
-    $('bgNote').innerHTML = `${src.length.toLocaleString()}개 중 <b>${out.length.toLocaleString()}개</b>가 조건에 맞습니다. 쓸 수 있는 돈 ${Kit.eok(have)} · 필요 자금 = ${mode === 'gap' ? '매매 − 전세' : '매매가'} + 부대비용(매매가의 ${(cost * 100).toFixed(1)}%)` +
-      (fromRegion ? ' · 최근 3년 실거래 기준(직접 적은 호가가 있으면 호가)' : '') + (mode === 'gap' ? ' · 전세가 없는 단지는 빠집니다' : '');
+    out.sort((a, b) => (mode === 'rent' ? b.r.r - a.r.r : b.r.s - a.r.s));
+    $('bgNote').innerHTML = `${src.length.toLocaleString()}개 중 <b>${out.length.toLocaleString()}개</b>가 조건에 맞습니다. 쓸 수 있는 돈 ${Kit.eok(have)} · 필요 자금 = ${mode === 'rent' ? '전세가 (부대비용 제외' : (mode === 'gap' ? '매매 − 전세' : '매매가') + ` + 부대비용(매매가의 ${(cost * 100).toFixed(1)}%`})` +
+      (fromRegion ? ' · 최근 3년 실거래 기준(직접 적은 호가가 있으면 호가)' : '') + ' · 적어 둔 호가가 없는 값은 최근 실거래로 대신하고 <span class="star">실</span> 로 표시합니다' + (mode !== 'live' ? ' · 전세 호가·실거래가 모두 없는 단지는 빠집니다' : '');
     $('bgTable').innerHTML = '<thead><tr><th class="l">단지</th><th>평형</th><th>매매</th><th>전세</th><th>갭</th><th>전세가율</th><th>필요 자금</th><th>남는 돈</th><th>세대수</th><th>연식</th><th class="c">트래킹</th></tr></thead><tbody>' +
       (out.length ? out.slice(0, 500).map(({ r, need, left }, i) => `<tr><td class="l">${U.esc(r.dong)} <b>${U.esc(r.name)}</b></td><td>${r.g}㎡<small>${CONFIG.toPyeong(r.g)}평</small></td>` +
         `<td class="sale">${U.price(r.s)}${real(r.sQ)}</td><td class="rent">${r.r == null ? '-' : U.price(r.r) + real(r.rQ)}</td><td>${r.gap == null ? '-' : U.price(r.gap)}</td><td>${r.ratio == null ? '-' : r.ratio.toFixed(0) + '%'}</td>` +

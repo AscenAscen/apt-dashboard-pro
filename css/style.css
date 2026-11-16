@@ -397,8 +397,9 @@ label.findlab input { width: 100%; }
 .ml-capturing { position: fixed !important; inset: 0; z-index: 3000; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: var(--bg); }
 .ml-capturing > :not(.kmap):not(.ml-exit) { display: none !important; }
 .ml-capturing .kmap { height: 100vh !important; height: 100dvh !important; border: 0; border-radius: 0; }
-.ml-capturing .ml-exit { display: block; position: absolute; top: 6px; left: 6px; z-index: 3100; width: 30px; min-height: 0; height: 30px; padding: 0; border-radius: 50%; opacity: .22; }
-.ml-capturing .ml-exit:hover, .ml-capturing .ml-exit:focus { opacity: .9; }
+.ml-capturing .ml-exit { display: block; position: absolute; top: 10px; left: 10px; z-index: 3100; min-height: 0; padding: 8px 14px; border-radius: 20px; background: #111; color: #fff; border: 1px solid #fff; font-weight: 700; font-size: 14px; opacity: .95; transition: opacity .6s; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+.ml-capturing .ml-exit.dim { opacity: .12; }
+.ml-capturing .ml-exit:hover, .ml-capturing .ml-exit:focus { opacity: 1; }
 body.map-capture { overflow: hidden; }
 .kmap.tallmap { height: min(72vh, 680px); }
 .tabrow, .hubrow { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
@@ -434,3 +435,32 @@ table.ev tr.group td { background: var(--line); font-weight: 700; font-size: 13p
 table.ev .autoval { display: block; color: var(--sub); margin-top: 3px; }
 table.ev .ovbox { display: flex; gap: 4px; align-items: center; }
 table.ev .ovbox input { flex: 1; min-width: 0; }
+
+/* ───────── 공통 기능 (js/common.js): 저장함 · 엑셀 · 크기 조절 · 역 관리 ───────── */
+.tabtools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; }
+.tabtools button { min-height: 0; padding: 6px 10px; font-size: 13px; }
+.cmodal { position: fixed; inset: 0; z-index: 4000; background: rgba(0,0,0,.6); display: flex; align-items: flex-start; justify-content: center; padding: 5vh 12px; overflow: auto; }
+.cmodal[hidden] { display: none; }
+.cbox { width: min(880px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.xlcover { position: fixed; inset: 0; z-index: 5000; background: rgba(0,0,0,.75); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+.sizable .sz { resize: both; overflow: auto; max-width: 100%; }
+.sizable .kmap.sz { resize: vertical; }
+.sizable .tablewrap table { zoom: var(--tz, 1); }
+.chks { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 6px; }
+.chks .chk { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; cursor: pointer; }
+.strows { display: grid; gap: 6px; }
+.strow { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--panel2); border-radius: 8px; flex-wrap: wrap; }
+.strow small { color: var(--sub); }
+.utable input.utcell { width: 100%; min-width: 90px; background: transparent; color: var(--text); border: 0; padding: 4px 6px; font: inherit; }
+.utable th input.utcell { font-weight: 700; text-align: center; }
+.utable input.utcell:focus { outline: 2px solid var(--accent); border-radius: 4px; }
+
+/* 지도 라벨 모양 (시세지도·랜드마크 공통) */
+.mllabel.ds-dark { background: #16181d; color: #fff; border-color: rgba(255,255,255,.25); }
+.mllabel.ds-fill { color: #fff; border-left-width: 1px; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+.mllabel.ds-pill { border-radius: 999px; border-width: 2px; border-left-width: 2px; padding: 2px 10px; }
+.mllabel.ds-line { background: rgba(255,255,255,.88); border-width: 2px; border-left-width: 2px; }
+.mllabel.ds-text { background: transparent; border-color: transparent !important; box-shadow: none; font-weight: 800; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 4px #fff; }
+.mllabel.hid { opacity: .35; text-decoration: line-through; }
+.mlctl select { min-height: 0; padding: 4px 6px; }
+.mlctl button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }

@@ -27,7 +27,9 @@ const Trends = (() => {
     $('btnTrendsExcel').onclick = excel;
   }
 
-  const inSize = (g, size) => size === 'all' || (size === 's' ? g < 60 : size === 'm' ? g >= 60 && g <= 85 : g > 85);
+  const inSize = (g, size) => size === 'all' || (size === 'p59' ? g >= 55 && g <= 62 : size === 'p84' ? g >= 80 && g <= 86 : size === 'p114' ? g >= 100 : size === 's' ? g < 60 : size === 'm' ? g >= 60 && g <= 85 : g > 85);
+  const median = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  let chart2 = null;
 
   async function run() {
     const code = $('trSgg').value;
@@ -46,23 +48,28 @@ const Trends = (() => {
       // 월별 거래량
       const vol = new Map();   // ym → [매매, 전세]
       const bump = (t, i) => { const ym = Math.floor(t.d / 100); if (!vol.has(ym)) vol.set(ym, [0, 0]); vol.get(ym)[i]++; };
+      const per = new Map();   // ym → { s:[매매 ㎡당], r:[전세 ㎡당], n: 이전 최고가가 있는 매매 수, h: 그중 신고가 수 }
+      const mon = (ym) => { if (!per.has(ym)) per.set(ym, { s: [], r: [], n: 0, h: 0 }); return per.get(ym); };
+      const unit = (t, i) => { const a = t.area || t.g; if (a > 0) mon(Math.floor(t.d / 100))[i ? 'r' : 's'].push(t.price / a); };
       // 단지·평형별 매매(직거래 제외) 날짜순
       const groups = new Map();
       Data.eachTrade(data.sale, null, (key, t) => {
         if (!inSize(t.g, size) || t.d < CONFIG.PEAK_FROM) return;
         bump(t, 0);
+        if (!t.direct) unit(t, 0);
         if (t.direct) return;
         const id = key + '#' + t.g;
         if (!groups.has(id)) groups.set(id, { key, g: t.g, list: [] });
         groups.get(id).list.push(t);
       });
-      Data.eachTrade(data.rent, null, (key, t) => { if (inSize(t.g, size) && t.d >= CONFIG.PEAK_FROM) bump(t, 1); });
+      Data.eachTrade(data.rent, null, (key, t) => { if (inSize(t.g, size) && t.d >= CONFIG.PEAK_FROM) { bump(t, 1); unit(t, 1); } });
 
       const highs = [], lows = [];
       for (const grp of groups.values()) {
         grp.list.sort((a, b) => a.d - b.d);
         let peak = null;
         for (const t of grp.list) {
+          if (peak) { const mm = mon(Math.floor(t.d / 100)); mm.n++; if (t.price > peak.price) mm.h++; }
           if (peak && t.d >= from) {
             const pct = (t.price / peak.price - 1) * 100;
             const row = { ...Data.parseKey(grp.key), key: grp.key, g: grp.g, t, peak, pct, buildYear: idx.c[grp.key] || null, code, sido: reg[1], sgg: reg[2] };
@@ -96,9 +103,57 @@ const Trends = (() => {
       drawChart(vol);
       table('trHigh', highs, true);
       table('trLow', lows, false);
+      extras({ reg, code, per, groups, from, fromD, months });
     } finally {
       btn.disabled = false; btn.textContent = '보기';
     }
+  }
+
+  /* ── 추가 분석: 전세가율·신고가 비율 추이, 오른·내린 단지, 구별 비교 ── */
+  async function extras({ reg, code, per, groups, from, fromD, months }) {
+    const css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
+    // ① 월별 추이 (최근 36개월)
+    const yms = [...per.keys()].sort((a, b) => a - b).slice(-36);
+    const rowsM = yms.map(ym => { const m = per.get(ym), ms = median(m.s), mr = median(m.r); return { ym, ratio: ms && mr && m.s.length >= 3 && m.r.length >= 3 ? mr / ms * 100 : null, high: m.n >= 5 ? m.h / m.n * 100 : null, ns: m.s.length, nr: m.r.length, h: m.h, n: m.n }; });
+    const lab = (ym) => `${String(ym).slice(2, 4)}.${String(ym).slice(4)}`;
+    if (chart2) chart2.destroy();
+    chart2 = new Chart($('trChart2'), { type: 'line', data: { labels: rowsM.map(r => lab(r.ym)), datasets: [
+      { label: '전세가율 (%)', data: rowsM.map(r => r.ratio == null ? null : +r.ratio.toFixed(1)), borderColor: col('--rent'), backgroundColor: col('--rent'), borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true, yAxisID: 'y' },
+      { label: '신고가 비율 (%)', data: rowsM.map(r => r.high == null ? null : +r.high.toFixed(1)), borderColor: col('--accent'), backgroundColor: col('--accent'), borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true, yAxisID: 'y2' }] },
+      options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+        scales: { x: { ticks: { color: col('--sub') }, grid: { color: col('--line') } }, y: { position: 'left', title: { display: true, text: '전세가율 %', color: col('--sub') }, ticks: { color: col('--sub') }, grid: { color: col('--line') } },
+          y2: { position: 'right', min: 0, title: { display: true, text: '신고가 비율 %', color: col('--sub') }, ticks: { color: col('--sub') }, grid: { drawOnChartArea: false } } },
+        plugins: { legend: { labels: { color: col('--text') } } } } });
+    $('trMonthly').innerHTML = '<thead><tr><th>월</th><th>매매 건수</th><th>전세 건수</th><th>전세가율</th><th>신고가 수</th><th>신고가 비율</th></tr></thead><tbody>' +
+      [...rowsM].reverse().map(r => `<tr><td>${lab(r.ym)}</td><td>${r.ns}</td><td>${r.nr}</td><td>${r.ratio == null ? '-' : r.ratio.toFixed(1) + '%'}</td><td>${r.h}</td><td>${r.high == null ? '-' : r.high.toFixed(0) + '%'}</td></tr>`).join('') + '</tbody>';
+    // ② 오른 단지 · 내린 단지: 최근 N개월 중간값 vs 그 앞 N개월 중간값 (같은 단지·평형)
+    const prevD = new Date(fromD.getFullYear(), fromD.getMonth() - months, fromD.getDate()), prev = prevD.getFullYear() * 10000 + (prevD.getMonth() + 1) * 100 + prevD.getDate();
+    const mv = [];
+    for (const g of groups.values()) {
+      const a = g.list.filter(t => t.d >= from).map(t => t.price), b = g.list.filter(t => t.d < from && t.d >= prev).map(t => t.price);
+      if (!a.length || !b.length) continue;
+      const ma = median(a), mb = median(b);
+      mv.push({ ...Data.parseKey(g.key), g: g.g, now: ma, was: mb, pct: (ma / mb - 1) * 100, na: a.length, nb: b.length });
+    }
+    const up = mv.filter(x => x.pct > 1).length, down = mv.filter(x => x.pct < -1).length, flat = mv.length - up - down;
+    const card = (k, v, s2 = '', cls = '') => `<div class="card"><div class="k">${k}</div><div class="v ${cls}">${v}</div><div class="s">${s2}</div></div>`;
+    $('trMoveNote').textContent = `— 최근 ${months}개월과 그 앞 ${months}개월에 모두 매매가 있는 단지·평형 ${mv.length}개 비교 (직거래 제외, ±1% 안은 보합)`;
+    $('trMoveCards').innerHTML = mv.length ? [card('오른 단지', `${up}개`, `${Math.round(up / mv.length * 100)}%`, 'up'), card('내린 단지', `${down}개`, `${Math.round(down / mv.length * 100)}%`, 'down'), card('보합', `${flat}개`, `${Math.round(flat / mv.length * 100)}%`),
+      card('중간 변동률', U.pct(median(mv.map(x => x.pct))), '단지별 변동률의 중간값', U.cls(median(mv.map(x => x.pct))))].join('') : '';
+    mv.sort((x, y) => y.pct - x.pct);
+    $('trMove').innerHTML = '<thead><tr><th class="l">동</th><th class="l">단지</th><th>평형</th><th>앞 기간 중간값</th><th>최근 중간값</th><th>변동</th><th>거래 수 (앞 → 최근)</th></tr></thead><tbody>' +
+      (mv.length ? mv.slice(0, 200).map(x => `<tr><td class="l">${U.esc(x.dong)}</td><td class="l"><b>${U.esc(x.name)}</b></td><td>${x.g}㎡<small>${CONFIG.toPyeong(x.g)}평</small></td><td>${U.price(Math.round(x.was))}</td><td>${U.price(Math.round(x.now))}</td><td class="${U.cls(x.pct)}">${U.pct(x.pct)}</td><td>${x.nb} → ${x.na}</td></tr>`).join('')
+        : '<tr><td colspan="7" style="color:var(--sub);padding:18px">두 기간에 모두 거래가 있는 단지가 없습니다. "최근 기간"을 늘려 보세요.</td></tr>') + '</tbody>';
+    // ③ 구별 비교 (시장 신호 자료)
+    const sig = await Data.signals();
+    if (!sig || !sig.regions) { $('trCmp').innerHTML = '<tbody><tr><td style="color:var(--sub);padding:18px">시장 신호 자료가 아직 없습니다. 자동 수집이 한 번 돌면 채워집니다.</td></tr></tbody>'; return; }
+    const sum = (a) => a.reduce((s, v) => s + (v || 0), 0), lastOf = (a) => { for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return a[i]; return null; };
+    const cmp = regions.filter(r => r[1] === reg[1] && sig.regions[r[0]]).map(r => { const x = sig.regions[r[0]], v = x.v || [], rv = x.rv || [], p = x.p || [];
+      const v3 = sum(v.slice(-3)), v3b = sum(v.slice(-6, -3)), pNow = lastOf(p), pOld = lastOf(p.slice(0, Math.max(0, p.length - 12)));
+      return { r, v3, vchg: v3b ? (v3 / v3b - 1) * 100 : null, r3: sum(rv.slice(-3)), high: x.n90 ? x.nh90 / x.n90 * 100 : null, nh: x.nh90 || 0, p: pNow, pchg: pNow && pOld ? (pNow / pOld - 1) * 100 : null, full: x.full };
+    }).sort((a, b) => b.v3 - a.v3);
+    $('trCmp').innerHTML = '<thead><tr><th class="l">지역</th><th>최근 3개월 매매</th><th>앞 3개월 대비</th><th>최근 3개월 전세</th><th>90일 신고가 수</th><th>신고가 비율</th><th>㎡당 매매가(만원)</th><th>1년 전 대비</th></tr></thead><tbody>' +
+      cmp.map(c => `<tr${c.r[0] === code ? ' style="font-weight:700"' : ''}><td class="l">${U.esc(c.r[2])}${c.full ? '' : ' <span class="tag prov">수집 중</span>'}</td><td>${c.v3.toLocaleString()}</td><td class="${U.cls(c.vchg)}">${U.pct(c.vchg)}</td><td>${c.r3.toLocaleString()}</td><td>${c.nh}</td><td>${c.high == null ? '-' : c.high.toFixed(0) + '%'}</td><td>${c.p == null ? '-' : Math.round(c.p).toLocaleString()}</td><td class="${U.cls(c.pchg)}">${U.pct(c.pchg)}</td></tr>`).join('') + '</tbody>';
   }
 
   function drawChart(vol) {

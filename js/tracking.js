@@ -85,6 +85,11 @@ const Tracking = (() => {
       if (!list.length) return U.toast('보이는 단지가 없습니다.');
       TradePanel.get('tpTrack').open(list, '시세트래킹 실거래');
     };
+    $('btnTrkFindTrades').onclick = () => {            // 담지 않고 바로 실거래 보기
+      const g = +$('trkFindArea').value;
+      if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');
+      TradePanel.get('tpTrack').open([{ id: `${found.code}|${found.key}#${g}`, code: found.code, sido: found.sido, sgg: found.sgg, dong: found.dong, jibun: found.jibun, key: found.key, name: found.name, g }], `${found.name} 실거래`);
+    };
     $('btnTrkFindAdd').onclick = async () => {
       const g = +$('trkFindArea').value;
       if (!found || !g) return U.toast('단지 이름을 검색해 고른 뒤 평형을 선택하세요.');
@@ -107,7 +112,7 @@ const Tracking = (() => {
     $('trkFolders').onclick = (e) => { const b = e.target.closest('button[data-folder]'); if (!b) return; curFolder = b.dataset.folder; Store.set('apt.curFolder', curFolder); checked.clear(); fillSelects(); render(); };
     $('btnTrkLoad').onclick = () => load(true);
     $('btnTrkExcel').onclick = excel;
-    $('btnTrkTrades').onclick = downloadTrades;
+    $('btnTrkTradesDl').onclick = downloadTrades;
     $('btnTrkInfo').onclick = () => { ui.info = !ui.info; Store.set('apt.trkUi', ui); render(); };
     $('btnTrkCard').onclick = () => { ui.card = !cardMode(); Store.set('apt.trkUi', ui); render(); };
     $('btnTrkSame').onclick = sameAsLast;
@@ -197,8 +202,10 @@ const Tracking = (() => {
 
   /** 실거래 읽기 — 최근 매매·전세 실거래, 전고점·전저점. popup=true 면 결과 창을 띄움 */
   async function load(popup) {
-    const list = inScope();
+    const scope = inScope(), picked = popup ? scope.filter(it => checked.has(it.id)) : [];
+    const list = picked.length ? picked : scope;            // 체크한 단지가 있으면 그 단지만 (없으면 지금 범위 전체)
     if (!list.length) { if (popup) U.toast('불러올 단지가 없습니다.'); return; }
+    if (popup && picked.length) U.toast(`체크한 ${picked.length}개 단지만 불러옵니다.`);
     const btn = $('btnTrkLoad');
     btn.disabled = true; btn.textContent = '불러오는 중…';
     try {
@@ -483,7 +490,7 @@ const Tracking = (() => {
     const sel = visible().filter(it => checked.has(it.id));
     const list = sel.length ? sel : visible();
     if (!list.length) return U.toast('내려받을 단지가 없습니다.');
-    const btn = $('btnTrkTrades');
+    const btn = $('btnTrkTradesDl');
     btn.disabled = true; btn.textContent = '불러오는 중…';
     try {
       const nowY = new Date().getFullYear();

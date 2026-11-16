@@ -21,7 +21,7 @@ const Loc = (() => {
   const SECTIONS = [
     { id: 'traffic', name: '🚇 교통', rows: [
       { key: 'subway', label: '가까운 지하철역', auto: (a) => (a.subway.length ? a.subway.slice(0, 3).map(s => `<b>${U.esc(s.name)}</b> ${meters(s.m)} <small>도보 약 ${walk(s.m)}분</small>`).join('<br>') : '1.5km 안에 없음') },
-      { key: 'hubs', label: '업무지구 직선거리', auto: (a) => a.hubs.map(h => `${U.esc(h.name.split(' ')[0])} <b>${h.km.toFixed(1)}km</b>`).join(' · ') },
+      { key: 'hubs', label: '역 직선거리', auto: (a) => a.hubs.map(h => `${U.esc(h.name.split(' ')[0])} <b>${h.km.toFixed(1)}km</b>`).join(' · ') },
       { input: 'transit', label: '강남역 대중교통', ph: '예: 35분, 환승 1회' },
       { input: 'trafficMemo', label: '교통 메모', ph: '버스, 도로, 신설 노선 등' },
     ] },
