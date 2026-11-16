@@ -43,9 +43,16 @@ const Survey = (() => {
     };
     $('svMonth').onchange = apply;
     $('svStatus').innerHTML = '<option value="*">전체</option>' + Tracking.STATUSES.map(s => `<option value="${s}">${s || '(상태 없음)'}</option>`).join('');
-    ['svDong', 'svSize', 'svSort', 'svZone', 'svStatus', 'svOnlyQuoted', 'svUnfilled', 'svCand', 'svRecent'].forEach(id => { $(id).onchange = apply; });
+    ['svDong', 'svSort', 'svZone', 'svStatus', 'svOnlyQuoted', 'svUnfilled', 'svCand', 'svRecent', 'svHouseNa'].forEach(id => { $(id).onchange = apply; });
+    // 평형: 체크박스 직접 고르기 + 소형·중형·대형 빠른 고르기
+    $('svAreaList').onchange = () => { areaFromBox(); apply(); };
+    $('svAreaBox').onclick = (e) => {
+      const q = e.target.closest('button[data-area-q]')?.dataset.areaQ; if (!q) return;
+      $('svAreaList').querySelectorAll('input[data-g]').forEach(b => { const g = +b.dataset.g; b.checked = q === 'all' || (q === 's' ? g < 60 : q === 'm' ? g >= 60 && g <= 85 : g > 85); });
+      areaFromBox(); apply();
+    };
     let timer;
-    ['svFind', 'svMin', 'svMax', 'svYear', 'svHouse'].forEach(id => { $(id).oninput = () => { clearTimeout(timer); timer = setTimeout(apply, 300); }; });
+    ['svFind', 'svMin', 'svMax', 'svYear', 'svHouse', 'svHouseMax'].forEach(id => { $(id).oninput = () => { clearTimeout(timer); timer = setTimeout(apply, 300); }; });
     $('btnSvMore').onclick = () => { shown += PAGE; render(); };
     $('btnSvInfo').onclick = () => { ui.info = !ui.info; Store.set('apt.svUi', ui); render(); };
     $('btnSvTrack').onclick = () => {
@@ -157,8 +164,8 @@ const Survey = (() => {
     await load(true);
     fillMonths(ym);
     $('svDong').value = dong || ''; $('svOnlyQuoted').checked = true; $('svUnfilled').checked = false; $('svCand').checked = false; $('svRecent').checked = false;
-    ['svFind', 'svMin', 'svMax', 'svYear', 'svHouse'].forEach(id => { $(id).value = ''; });
-    $('svSize').value = 'all'; $('svZone').value = ''; $('svStatus').value = '*';
+    ['svFind', 'svMin', 'svMax', 'svYear', 'svHouse', 'svHouseMax'].forEach(id => { $(id).value = ''; });
+    fillAreas(true); $('svHouseNa').checked = false; $('svZone').value = ''; $('svStatus').value = '*';
     apply();
     $('svBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -290,6 +297,7 @@ const Survey = (() => {
       const dongs = [...new Set(rows.map(r => r.dong))].sort((a, b) => a.localeCompare(b, 'ko'));
       $('svDong').innerHTML = '<option value="">전체</option>' + dongs.map(d => `<option>${U.esc(d)}</option>`).join('');
       checked.clear();
+      fillAreas(false);
       $('svEmpty').hidden = true; $('svBody').hidden = false;
       fillMonths(); if (!quiet) apply();
     } finally {
@@ -325,14 +333,38 @@ const Survey = (() => {
     };
   }
 
+  /* ── 평형 고르기: 지역 안에 실제로 있는 평형만 체크박스로 보여 줌. areaSel = null 이면 전체 ── */
+  let areaSel = null;
+  function fillAreas(reset) {
+    if (reset) areaSel = null;
+    const cnt = new Map();
+    rows.forEach(r => cnt.set(r.g, (cnt.get(r.g) || 0) + 1));
+    const gs = [...cnt.keys()].sort((a, b) => a - b);
+    $('svAreaList').innerHTML = gs.map(g => `<label><input type="checkbox" data-g="${g}" ${!areaSel || areaSel.has(g) ? 'checked' : ''}> ${g}㎡ · ${CONFIG.toPyeong(g)}평 <small>${cnt.get(g).toLocaleString()}개</small></label>`).join('')
+      || '<span class="hint" style="margin:0">불러온 단지가 없습니다.</span>';
+    updateAreaSum();
+  }
+  function areaFromBox() {
+    const boxes = [...$('svAreaList').querySelectorAll('input[data-g]')];
+    const picked = boxes.filter(b => b.checked).map(b => +b.dataset.g);
+    areaSel = picked.length === boxes.length ? null : new Set(picked);
+    updateAreaSum();
+  }
+  function updateAreaSum() {
+    const boxes = [...$('svAreaList').querySelectorAll('input[data-g]')], n = boxes.filter(b => b.checked).length;
+    $('svAreaSum').textContent = !areaSel ? '전체' : n ? `${n}개 평형 선택` : '선택 없음';
+  }
+
   /** 조건으로 좁히고 정렬 (정렬은 이때 한 번만 — 입력 중에는 줄이 움직이지 않음) */
   function apply() {
     if (!rows.length) return;
-    const dong = $('svDong').value, size = $('svSize').value, find = $('svFind').value.trim().toLowerCase();
-    const min = parseFloat($('svMin').value), max = parseFloat($('svMax').value), year = parseInt($('svYear').value, 10), house = parseInt($('svHouse').value, 10);
+    const dong = $('svDong').value, find = $('svFind').value.trim().toLowerCase();
+    const min = parseFloat($('svMin').value), max = parseFloat($('svMax').value), year = parseInt($('svYear').value, 10);
+    const hMin = parseInt($('svHouse').value, 10), hMax = parseInt($('svHouseMax').value, 10), hNa = $('svHouseNa').checked;
+    const houseOn = !isNaN(hMin) || !isNaN(hMax);
     const onlyQ = $('svOnlyQuoted').checked, unfilled = $('svUnfilled').checked, cand = $('svCand').checked, recent = $('svRecent').checked, st = $('svStatus').value;
     const t = new Date(); const from = (t.getFullYear() - 3) * 10000 + (t.getMonth() + 1) * 100 + t.getDate();
-    const inSize = (g) => size === 'all' || (size === '59' ? g >= 55 && g < 62 : size === '84' ? g >= 80 && g < 86 : size === 's' ? g < 60 : size === 'm' ? g >= 60 && g <= 85 : g > 85);
+    const inSize = (g) => !areaSel || areaSel.has(g);
     // 생활권 목록 (이 지역에서 적어 둔 값)
     const zones = [...new Set(rows.map(r => (Tracking.rec(r.id) || {}).zone).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
     const zv = $('svZone').value;
@@ -358,7 +390,11 @@ const Survey = (() => {
       if (cand && !c.rc.cand) return false;
       if (!isNaN(min) && !(c.base >= min * 10000)) return false;
       if (!isNaN(max) && !(c.base != null && c.base <= max * 10000)) return false;
-      if (!isNaN(house) && !((parseInt(c.rc.households, 10) || r.hh) >= house)) return false;
+      if (houseOn) {                                              // 세대수 범위 (이상·이하). 모르는 단지는 체크해야 포함
+        const hh = parseInt(c.rc.households, 10) || r.hh || null;
+        if (hh == null) { if (!hNa) return false; }
+        else if ((!isNaN(hMin) && hh < hMin) || (!isNaN(hMax) && hh > hMax)) return false;
+      }
       return true;
     });
     const by = $('svSort').value, num = (v, none) => (v == null || isNaN(v) ? none : v);

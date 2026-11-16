@@ -221,16 +221,27 @@
   <div id="svBody" hidden>
     <section class="panel filters">
       <label>읍/면/동 <select id="svDong"><option value="">전체</option></select></label>
-      <label>평형
-        <select id="svSize">
-          <option value="all">전체</option><option value="59">전용 59㎡대</option><option value="84">전용 84㎡대</option>
-          <option value="s">소형 (60㎡ 미만)</option><option value="m">중형 (60~85㎡)</option><option value="l">대형 (85㎡ 초과)</option>
-        </select>
-      </label>
+      <div class="flab">평형
+        <details class="areabox" id="svAreaBox">
+          <summary id="svAreaSum">전체</summary>
+          <div class="areapick">
+            <div class="presets" style="margin-bottom:6px">
+              <button type="button" data-area-q="all">전체</button>
+              <button type="button" data-area-q="s">소형 (60㎡ 미만)</button>
+              <button type="button" data-area-q="m">중형 (60~85㎡)</button>
+              <button type="button" data-area-q="l">대형 (85㎡ 초과)</button>
+            </div>
+            <div id="svAreaList"></div>
+          </div>
+        </details>
+      </div>
       <label>단지명 <input type="search" id="svFind" placeholder="단지명 검색"></label>
       <label>매매 가격대 (억)<span class="row"><input type="number" id="svMin" step="0.5" min="0" placeholder="최소"> ~ <input type="number" id="svMax" step="0.5" min="0" placeholder="최대"></span></label>
       <label>준공 연도 <span class="row"><input type="number" id="svYear" placeholder="예: 2000"> 년 이후</span></label>
-      <label>세대수 <span class="row"><input type="number" id="svHouse" placeholder="예: 300"> 이상</span></label>
+      <div class="flab">세대수
+        <span class="row"><input type="number" id="svHouse" min="0" placeholder="최소"> ~ <input type="number" id="svHouseMax" min="0" placeholder="최대"> 세대</span>
+        <label class="inline"><input type="checkbox" id="svHouseNa"> 세대수 모르는 단지도 포함</label>
+      </div>
       <label>생활권 <select id="svZone"><option value="">전체</option></select></label>
       <label>상태 <select id="svStatus"></select></label>
       <div class="checks">

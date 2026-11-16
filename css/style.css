@@ -464,3 +464,11 @@ table.ev .ovbox input { flex: 1; min-width: 0; }
 .mllabel.hid { opacity: .35; text-decoration: line-through; }
 .mlctl select { min-height: 0; padding: 4px 6px; }
 .mlctl button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+
+/* ── 전수조사 필터: 평형 고르기 · 세대수 범위 ── */
+.flab { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: var(--sub); }
+details.areabox { position: relative; display: inline-block; }
+details.areabox > summary { cursor: pointer; list-style: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; color: var(--text); background: var(--panel); white-space: nowrap; }
+details.areabox > summary::-webkit-details-marker { display: none; }
+details.areabox .areapick { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 280px; max-height: 320px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); }
+#svAreaList label { display: block; margin: 4px 0; color: var(--text); }
