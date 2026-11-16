@@ -554,3 +554,4 @@ tr.flash td { animation: flashrow 2.4s ease; }
 #tpFolders tr.sel td { background: var(--sel, var(--panel2)); }
 #tpFolders button.on { background: var(--accent); border-color: var(--accent); }
 #tpFolders a { color: var(--text); text-decoration: none; font-weight: 600; }
+#trkTable input.auto, #trkCards input.auto { color: var(--sub); font-style: italic; }

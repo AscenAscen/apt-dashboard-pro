@@ -34,6 +34,9 @@ const Guide = (() => {
         k.error ? U.esc(k.error) : `지역 ${k.regionsDone ?? 0}/${k.regionsTotal ?? 0} 완료 · 세대수 연결 ${(k.matched ?? 0).toLocaleString()}/${(k.complexes ?? 0).toLocaleString()}단지` + (k.stop ? ` · ${U.esc(k.stop)}` : '') + (k.warnings?.length ? `<br><small>${k.warnings.slice(0, 3).map(U.esc).join('<br>')}</small>` : ''));
       add(r.error ? (/없어 건너뜀/.test(r.error) ? 'warn' : 'bad') : 'ok', 'R-ONE 통계', r.error ? U.esc(r.error) : `기준 ${U.esc(r.asOf || '-')} · ` + ['sale', 'rent'].map(x => (r.tables?.[x] ? `${x === 'sale' ? '매매' : '전세'}지수 ${r.tables[x].regions}개 지역 (${U.esc(r.tables[x].name || r.tables[x].id)})` : `${x === 'sale' ? '매매' : '전세'}지수 없음`)).join(' · '));
     }
+    const kf = await Data.kaptFile();
+    if (!kf) add('warn', '세대수 (K-apt 엑셀)', '아직 없습니다. 공공데이터포털에서 「국토교통부_공동주택 단지 면적 정보」 엑셀을 받아 저장소 kapt 폴더에 올리면 세대수가 자동으로 채워집니다.');
+    else add(kf.matched ? 'ok' : 'warn', '세대수 (K-apt 엑셀)', `${U.esc(kf.file)} · ${U.esc(kf.updated)} · 엑셀 ${(kf.rows || 0).toLocaleString()}행 → 세대수 연결 ${(kf.matched || 0).toLocaleString()}단지 (${kf.regions || 0}개 지역)` + (kf.unmatched ? ` · 짝을 못 지은 ${kf.unmatched.toLocaleString()}행은 직접 적어 주세요` : ''));
     const kbS = await Data.kbWeekly(), kbL = Store.get('apt.kbw.v1', null), ymd = (d) => d ? `${String(d).slice(0, 4)}-${String(d).slice(4, 6)}-${String(d).slice(6, 8)}` : '';
     if (!kbS && !kbL) add('warn', 'KB 주간 시계열', '아직 없습니다. 시장 신호 탭에서 KB 주간 엑셀을 올린 뒤 [저장소용 파일 받기]로 받은 kb_weekly.json 을 저장소 data 폴더에 올려 주세요.');
     else {

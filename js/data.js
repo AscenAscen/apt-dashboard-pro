@@ -115,8 +115,9 @@ const Data = (() => {
   const monthly = () => getJson('monthly_summary.json', null);   // 월간 요약 (scripts/monthly_summary.py)
   const kbWeekly = () => getJson('kb_weekly.json', null);    // KB 주간 시계열 (kb/ 폴더 엑셀을 자동 변환)            // 한국부동산원 가격지수
   const extraStatus = () => getJson('extra_status.json', null);
+  const kaptFile = () => getJson('kapt_file_status.json', null);   // K-apt 엑셀 → 세대수 변환 결과 (scripts/kapt_file.py)
 
-  return { regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, names };
+  return { regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, names };
 })();
 
 /* ───────────── 공통 도구 ───────────── */

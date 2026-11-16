@@ -134,6 +134,7 @@ const TrkPlus = (() => {
     $('btnTpBulk').onclick = () => { $('tpBulk').hidden = !$('tpBulk').hidden; };
     $('btnTpApply').onclick = apply;
     $('btnTpCheck').onclick = check;
+    $('btnTpHH').onclick = async () => { const b = $('btnTpHH'); b.disabled = true; try { await Tracking.fillHH(); } finally { b.disabled = false; } };
     $('btnTpHist').onclick = hist;
     $('btnTpGap').onclick = () => { $('trkShow').value = 'gap'; T.checked.clear(); T.render(); drawer(false); };
     $('btnTrkDrawer').onclick = () => drawer();
