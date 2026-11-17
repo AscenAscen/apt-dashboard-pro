@@ -23,15 +23,15 @@ import re
 import sys
 import time
 import urllib.parse
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 
 # ───────────────────────────── 설정 ─────────────────────────────
 # 주소가 바뀌면 여기만 고치면 됩니다. 앞의 것부터 차례로 시도합니다.
-POP_URLS = [
-    "https://apis.data.go.kr/1741000/stdgPpltnHhStus/selectStdgPpltnHhStus",
-    "https://apis.data.go.kr/1741000/stdgPpltnHhStus",
-]
+BASE = "https://apis.data.go.kr/1741000/stdgPpltnHhStus"
+OPS = ["selectStdgPpltnHhStus", "getStdgPpltnHhStus", ""]      # 상세기능 이름 후보 ("" = 주소 그대로)
+LVS = ["2", "6", "3"]          # 2: 시군구 목록 · 6: 단일 시군구 · 3: 읍면동(합쳐서 씀)
 TIMEOUT_SEC = 25
 DELAY_SEC = 0.2
 ROWS = 100
@@ -65,7 +65,7 @@ def write_json(path, obj):
 
 def key():
     k = (os.environ.get("POP_API_KEY") or os.environ.get("MOLIT_API_KEY") or "").strip()
-    return urllib.parse.unquote(k) if "%" in k else k
+    return k if "%" in k else urllib.parse.quote(k, safe="")      # collect.py 와 같은 방식
 
 
 def ym_add(ym, d):
@@ -73,10 +73,23 @@ def ym_add(ym, d):
     return f"{y}{m + 1:02d}"
 
 
+class ApiError(Exception):
+    pass
+
+
 def http(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "apt-dashboard"})
-    with urllib.request.urlopen(req, timeout=TIMEOUT_SEC) as r:
-        return r.read().decode("utf-8", "replace")
+    req = urllib.request.Request(url, headers={"User-Agent": "apt-dashboard", "Accept": "*/*"})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT_SEC) as r:
+            return r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:   # 400 등: 서버가 보낸 오류 문장을 함께 남김
+        body = ""
+        try:
+            body = e.read().decode("utf-8", "replace")
+        except Exception:
+            pass
+        body = re.sub(r"\s+", " ", body)[:300]
+        raise ApiError(f"HTTP {e.code} · {body}")
 
 
 # ── 응답 읽기 (JSON 이든 XML 이든, 칸 이름이 무엇이든 최대한 알아서 찾음) ──
@@ -146,21 +159,67 @@ def pick(item):
     return code, name, pop, hh
 
 
-def fetch_sido(url, k, sd, ym):
-    """시도 하나의 시군구 목록"""
-    out, page = [], 1
-    while True:
-        q = {"serviceKey": k, "stdgCd": f"{sd}00000000", "srchFrYm": ym, "srchToYm": ym,
-             "lv": "2", "regSeCd": "1", "type": "JSON", "numOfRows": str(ROWS), "pageNo": str(page)}
-        body = http(url + "?" + urllib.parse.urlencode(q, safe=""))
-        rows, meta = items_of(body)
-        if page == 1 and not rows:
-            return None, body[:400]
-        out.extend(rows)
-        if len(rows) < ROWS or page >= 20:
-            return out, body[:400]
-        page += 1
+def call(url, k, stdg, ym, lv, page=1, reg=True):
+    q = {"stdgCd": stdg, "srchFrYm": ym, "srchToYm": ym, "lv": lv, "type": "JSON", "numOfRows": str(ROWS), "pageNo": str(page)}
+    if reg:
+        q["regSeCd"] = "1"
+    body = http(url + "?serviceKey=" + k + "&" + urllib.parse.urlencode(q))
+    low = body[:600]
+    m = re.search(r"(SERVICE_KEY_IS_NOT_REGISTERED_ERROR|NO_OPENAPI_SERVICE_ERROR|INVALID_REQUEST_PARAMETER_ERROR|LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR|UNREGISTERED_IP_ERROR|SERVICE ERROR|returnAuthMsg>[^<]+)", low)
+    if m:
+        raise ApiError(m.group(1) + " · " + re.sub(r"\s+", " ", low)[:250])
+    rows, _ = items_of(body)
+    return rows, body
+
+
+def probe(k, ym):
+    """강남구 하나로 주소·조회 방식을 차례로 시험 → (url, lv, reg) 또는 None. 시험 기록을 함께 돌려줌"""
+    log = []
+    for op in OPS:
+        url = BASE + ("/" + op if op else "")
+        for lv in LVS:
+            for reg in (True, False):
+                try:
+                    rows, body = call(url, k, "1168000000", ym, lv, reg=reg)
+                    ok = [r for r in rows if pick(r)[2] is not None]
+                    log.append({"url": url, "lv": lv, "regSeCd": reg, "rows": len(rows), "usable": len(ok), "head": re.sub(r"\s+", " ", body)[:160]})
+                    if ok:
+                        return (url, lv, reg), log
+                except Exception as e:  # noqa: BLE001
+                    msg = str(e)
+                    log.append({"url": url, "lv": lv, "regSeCd": reg, "error": msg[:260]})
+                    if "NO_OPENAPI_SERVICE_ERROR" in msg or "HTTP 404" in msg:
+                        break                          # 이 주소는 없음 → 다음 주소
+                    if "SERVICE_KEY_IS_NOT_REGISTERED" in msg or "HTTP 401" in msg or "HTTP 403" in msg:
+                        return None, log               # 키 문제 → 더 해 봐야 소용없음
+                time.sleep(DELAY_SEC)
+    return None, log
+
+
+def fetch_sgg(way, k, c5, ym):
+    """시군구 하나의 인구·세대수 (lv 3 이면 읍면동을 합침)"""
+    url, lv, reg = way
+    total_p = total_h = 0
+    name = ""
+    got = False
+    for page in range(1, 30):
+        rows, _ = call(url, k, c5 + "00000", ym, lv, page, reg)
+        for it in rows:
+            code, nm, p, h = pick(it)
+            if p is None:
+                continue
+            if lv in ("2", "6"):
+                if code and code[:5] != c5:
+                    continue
+                return {"n": nm or "", "pop": p, "hh": h}
+            total_p += p
+            total_h += h or 0
+            name = name or nm or ""
+            got = True
+        if len(rows) < ROWS:
+            break
         time.sleep(DELAY_SEC)
+    return {"n": name, "pop": total_p, "hh": total_h} if got else None
 
 
 def run(force=False):
@@ -168,66 +227,53 @@ def run(force=False):
     today = now().strftime("%Y-%m-%d")
     cur = read_json(OUT, {})
     target = ym_add(now().strftime("%Y%m"), -1)           # 지난달 (말일 집계라 이번 달은 아직 없음)
+    manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"   # [Run workflow] 로 직접 돌리면 언제든 다시 시도
     if not force and cur.get("ym") == target:
         print(f"인구: {target} 자료가 이미 있음 — 건너뜀"); return 0
-    if not force and st.get("lastTry") == today:
-        print("인구: 오늘 이미 시도함 — 내일 다시 시도"); return 0
+    if not force and not manual and st.get("lastTry") == today:
+        print("인구: 오늘 이미 시도함 — 내일 다시 시도 (Actions 의 Run workflow 로는 바로 다시 시도됨)"); return 0
     k = key()
     if not k:
         write_json(STATUS, {"lastTry": today, "ok": False, "stop": "인증키(MOLIT_API_KEY 또는 POP_API_KEY)가 없습니다."})
         print("인구: 인증키 없음"); return 0
 
     regions = read_json(os.path.join(DATA, "regions.json"), [])
-    codes = {r[0] for r in regions}
-    sidos = sorted({c[:2] for c in codes})
-    tried, last_err = [], ""
+    codes = sorted({r[0] for r in regions})
+    tries = []
     for ym in (target, ym_add(target, -1)):                # 지난달이 아직 없으면 그 전 달
-        for url in POP_URLS:
-            by, samples, fail = {}, [], 0
-            for sd in sidos:
-                try:
-                    rows, head = fetch_sido(url, k, sd, ym)
-                except Exception as e:  # noqa: BLE001
-                    rows, head = None, f"{type(e).__name__}: {e}"
-                if rows is None:
-                    fail += 1
-                    last_err = head
-                    if fail >= 3 and not by:
-                        break
-                    continue
-                for it in rows:
-                    code, name, pop, hh = pick(it)
-                    if not samples:
-                        samples.append(it)
-                    if not code or pop is None:
-                        continue
-                    c5 = code[:5]
-                    if c5.endswith("000"):                 # 시도 합계 줄은 건너뜀
-                        continue
-                    by[c5] = {"n": name or "", "pop": pop, "hh": hh}
-                time.sleep(DELAY_SEC)
-            tried.append({"url": url, "ym": ym, "regions": len(by), "fail": fail})
-            if by:
-                matched = sum(1 for c in by if c in codes)
-                # 일반구가 있는 시(수원시 등)는 시 전체 합계도 만들어 둠 (예: 41110 = 41111+41113+…)
-                sums = {}
-                for c, v in by.items():
-                    parent = c[:4] + "0"
-                    if parent != c and parent not in by:
-                        s = sums.setdefault(parent, {"n": "", "pop": 0, "hh": 0})
-                        s["pop"] += v["pop"] or 0
-                        s["hh"] += v["hh"] or 0
-                for c, v in sums.items():
-                    by.setdefault(c, v)
-                write_json(OUT, {"ym": ym, "updatedAt": now().strftime("%Y-%m-%d %H:%M"),
-                                 "source": "행정안전부 주민등록 인구 및 세대현황", "byCode": dict(sorted(by.items()))})
-                write_json(STATUS, {"lastTry": today, "ok": True, "ym": ym, "regions": len(by), "matched": matched,
-                                    "url": url, "sample": samples[:1]})
-                print(f"인구: {ym} 시군구 {len(by)}곳 저장 (지역 목록과 맞은 곳 {matched})")
-                return 0
-    write_json(STATUS, {"lastTry": today, "ok": False, "stop": "인구 자료를 받지 못했습니다. 활용신청이 승인됐는지, 주소가 바뀌지 않았는지 확인하세요.",
-                        "tried": tried, "response": last_err[:400]})
-    print("인구: 실패 —", last_err[:200])
+        way, log = probe(k, ym)
+        tries.append({"ym": ym, "tests": log})
+        if not way:
+            if any("SERVICE_KEY" in (t.get("error") or "") or "HTTP 401" in (t.get("error") or "") or "HTTP 403" in (t.get("error") or "") for t in log):
+                break
+            continue
+        by, fails = {}, []
+        for c5 in codes:
+            try:
+                v = fetch_sgg(way, k, c5, ym)
+                if v:
+                    by[c5] = v
+                else:
+                    fails.append(c5)
+            except Exception as e:  # noqa: BLE001
+                fails.append(f"{c5}: {str(e)[:80]}")
+            time.sleep(DELAY_SEC)
+        if by:
+            write_json(OUT, {"ym": ym, "updatedAt": now().strftime("%Y-%m-%d %H:%M"),
+                             "source": "행정안전부 법정동별 주민등록 인구 및 세대현황", "byCode": dict(sorted(by.items()))})
+            write_json(STATUS, {"lastTry": today, "ok": True, "ym": ym, "regions": len(by), "missing": fails[:30],
+                                "url": way[0], "lv": way[1], "regSeCd": way[2]})
+            print(f"인구: {ym} 시군구 {len(by)}곳 저장 (못 받은 곳 {len(fails)})")
+            return 0
+    errs = " ".join(t.get("error", "") for x in tries for t in x["tests"])
+    if "SERVICE_KEY_IS_NOT_REGISTERED" in errs or "HTTP 401" in errs or "HTTP 403" in errs:
+        why = "인증키가 이 API 에 등록되지 않았습니다. 공공데이터포털에서 '행정안전부_법정동별(행정동 통반단위) 주민등록 인구 및 세대현황' 활용신청이 승인됐는지 확인하세요. (승인 직후 1~2시간은 안 될 수 있음)"
+    elif "NO_OPENAPI_SERVICE_ERROR" in errs:
+        why = "API 주소를 찾지 못했습니다. 포털 활용신청 상세 화면의 '요청주소'와 '상세기능'을 알려 주세요."
+    else:
+        why = "인구 자료를 받지 못했습니다. 아래 tests 의 오류 문장을 확인하세요."
+    write_json(STATUS, {"lastTry": today, "ok": False, "stop": why, "tries": tries})
+    print("인구: 실패 —", why)
     return 0
 
 
