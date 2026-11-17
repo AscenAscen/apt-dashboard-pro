@@ -1,32 +1,41 @@
 {
  "lastTry": "2026-11-17",
- "ok": false,
- "stop": "인구 자료를 받지 못했습니다. 활용신청이 승인됐는지, 주소가 바뀌지 않았는지 확인하세요.",
- "tried": [
-  {
-   "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus/selectStdgPpltnHhStus",
-   "ym": "202610",
-   "regions": 0,
-   "fail": 3
-  },
-  {
-   "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus",
-   "ym": "202610",
-   "regions": 0,
-   "fail": 3
-  },
-  {
-   "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus/selectStdgPpltnHhStus",
-   "ym": "202609",
-   "regions": 0,
-   "fail": 3
-  },
-  {
-   "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus",
-   "ym": "202609",
-   "regions": 0,
-   "fail": 3
-  }
+ "ok": true,
+ "ym": "202610",
+ "regions": 211,
+ "missing": [
+  "11140: The read operation timed out",
+  "11290: The read operation timed out",
+  "11620: The read operation timed out",
+  "26290: The read operation timed out",
+  "27710: The read operation timed out",
+  "28110",
+  "28140",
+  "28237: The read operation timed out",
+  "28260",
+  "29110",
+  "29140",
+  "29155",
+  "29170",
+  "29200",
+  "41220: The read operation timed out",
+  "43720: The read operation timed out",
+  "43745: The read operation timed out",
+  "44800: The read operation timed out",
+  "46110",
+  "46130",
+  "46150",
+  "46170",
+  "46230: The read operation timed out",
+  "46710: The read operation timed out",
+  "46720",
+  "46730",
+  "46770",
+  "46780",
+  "46790",
+  "46800"
  ],
- "response": "HTTPError: HTTP Error 400: Bad Request"
+ "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus/selectStdgPpltnHhStus",
+ "lv": "6",
+ "regSeCd": false
 }
