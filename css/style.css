@@ -732,3 +732,59 @@ button.colf.on.so{background:#2563eb;color:#fff}
   #tab-home .hmsum{align-items:flex-start}
   #tab-home .hmsum .hmwait{display:none}
 }
+/* ── 공급 탭 ── */
+#tab-supply .hmcond{position:sticky;top:0;z-index:20;padding-top:8px;padding-bottom:8px}
+#tab-supply .hmcond summary{cursor:pointer;font-size:13.5px;list-style:none;display:flex;gap:8px;align-items:center}
+#tab-supply .hmcond summary::-webkit-details-marker{display:none}
+#tab-supply .hmcond details[open] summary{margin-bottom:6px;opacity:.75}
+#tab-supply .hmchg{color:var(--accent);font-size:12.5px}
+#tab-supply .hmrow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:5px 0}
+#tab-supply .hmk{font-size:12.5px;color:var(--sub);min-width:30px}
+#tab-supply .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+#tab-supply .seg button{border:0;border-radius:0;background:transparent;padding:5px 11px;font-size:13px;color:var(--text);cursor:pointer}
+#tab-supply .seg button+button{border-left:1px solid var(--line)}
+#tab-supply .seg button.on{background:var(--c-sale);color:#fff}
+#tab-supply .hmchips{display:inline-flex;flex-wrap:wrap;gap:5px}
+#tab-supply .hmchip{display:inline-flex;align-items:center;gap:3px;padding:3px 4px 3px 10px;border-radius:14px;background:color-mix(in srgb,var(--c-sale) 16%,transparent);font-size:13px}
+#tab-supply .hmchip button{border:0;background:transparent;color:var(--sub);cursor:pointer;padding:0 5px;font-size:12px}
+#tab-supply .hmaddwrap{position:relative}
+#tab-supply .hmregpop{position:absolute;left:0;top:calc(100% + 4px);z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:min(620px,92vw);box-shadow:0 6px 24px rgba(0,0,0,.25)}
+#tab-supply .hmpr{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:4px 0}
+#tab-supply .hmpr button.on{background:var(--c-sale);color:#fff;border-color:var(--c-sale)}
+#tab-supply .hmgus{max-height:180px;overflow:auto;padding:4px 0 4px 34px}
+#tab-supply .hmload{margin:6px 0 0}
+#tab-supply .spbarbox{position:relative;height:260px}
+#tab-supply .spsum{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;margin-top:8px;font-size:13.5px}
+#tab-supply .spsumi small{color:var(--sub)}
+#tab-supply .spsumi em{font-style:normal;color:var(--sub);margin-left:4px}
+#tab-supply .spsumi em.over{color:#e34948;font-weight:600}
+#tab-supply .spsumi em.under{color:#2a78d6;font-weight:600}
+#tab-supply .sphelp{flex-basis:100%;font-size:12.5px;color:var(--sub)}
+#tab-supply .sphelp summary{cursor:pointer;color:var(--accent)}
+#tab-supply .sphelp ol{margin:6px 0 0 18px;padding:0;line-height:1.7}
+#tab-supply .spmap{height:420px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+#tab-supply .splg{font-size:12px;color:var(--sub);display:inline-flex;gap:8px;align-items:center}
+#tab-supply .splg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:2px;vertical-align:-1px}
+#tab-supply .splg i.past,.spdot.past{background:rgba(137,135,129,.75)}
+#tab-supply .splg i.soon,.spdot.soon{background:var(--c-sale)}
+#tab-supply .splg i.later,.spdot.later{background:var(--c-quote)}
+.spdot{border-radius:50%;border:2px solid #fff;opacity:.85;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.spdot.soon{background:#d95926}.spdot.later{background:#3987e5}
+#tab-supply .hmtable td,#tab-supply .hmtable th{white-space:nowrap}
+#tab-supply .hmtable td{text-align:right;font-variant-numeric:tabular-nums}
+#tab-supply .hmtable td.l{text-align:left}
+#tab-supply .hmtable td.name a{color:inherit;font-weight:600}
+#tab-supply .hmtable td small{color:var(--sub);margin-left:3px}
+#tab-supply .hmtable td.sale b{color:var(--c-sale)}
+#tab-supply .hmtable tr.old td{opacity:.55}
+#tab-supply .hmtable tr.click{cursor:pointer}
+#tab-supply .hmtable tr.flash td{background:color-mix(in srgb,var(--c-sale) 25%,transparent)}
+#tab-supply .hmtable tr.hmsub td{font-size:12.5px;color:var(--sub);text-align:left;background:rgba(127,127,127,.06);white-space:normal;line-height:1.7}
+#tab-supply .hmtable .tg.low{background:rgba(127,127,127,.18);color:var(--sub);font-size:11px;border-radius:4px;padding:0 4px}
+#tab-supply .hmcardlist{display:flex;flex-direction:column;gap:7px}
+#tab-supply .hmrc{border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px}
+#tab-supply .hmrc a{font-weight:600;color:inherit}
+#tab-supply .hmrc small{color:var(--sub)}
+#tab-supply .hmrc2{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;color:var(--sub)}
+#tab-supply .spsteps{line-height:1.9;margin:6px 0 0 18px}
+@media (max-width:760px){#tab-supply .spbarbox{height:190px}#tab-supply .spmap{height:300px}#tab-supply .hmregpop{position:fixed;left:4vw;top:12vh;max-height:76vh;overflow:auto}}

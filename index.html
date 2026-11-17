@@ -29,6 +29,7 @@
     <button data-tab="map">시세지도</button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
+    <button data-tab="supply">공급</button>
     <button data-tab="invest">투자금</button>
     <button data-tab="market">시장 신호</button>
     <button data-tab="my">내 분석</button>
@@ -761,6 +762,68 @@
 
 <!-- 지도 창 -->
 <!-- ═══════════════ 투자금 (월별 전용 84·59 평균 매매·전세·투자금) ═══════════════ -->
+<!-- ═══════════════ 공급 (입주 물량 · 분양가 vs 주변 시세) ═══════════════ -->
+<main id="tab-supply" class="tab" hidden>
+  <section class="panel hmcond" id="spCondPanel">
+    <details id="spCond" open>
+      <summary><span id="spCondSum">조건</span> <span class="hmchg">바꾸기 ▾</span></summary>
+      <div class="hmrow">
+        <span class="hmk">지역</span>
+        <span id="spChips" class="hmchips"></span>
+        <span class="hmaddwrap"><button id="spAddReg" class="mini">+ 지역 추가 ▾</button>
+          <div id="spRegPop" class="hmregpop" hidden></div></span>
+      </div>
+      <div class="hmrow">
+        <span class="hmk">단위</span>
+        <span class="seg" id="spUnit"><button data-u="y" class="on">연도별</button><button data-u="h">반기별</button></span>
+        <label class="inline"><input type="checkbox" id="spNoReb"> 정비사업(재건축·재개발) 빼기</label>
+      </div>
+    </details>
+    <div id="spInfo" class="hint hmload"></div>
+  </section>
+
+  <section class="panel" id="spSetup" hidden></section>
+
+  <div id="spBody">
+  <section class="panel">
+    <div class="bar"><strong id="spBarTitle">입주 물량</strong><span class="grow"></span><button id="spPeriodClear" class="mini" hidden>기간 선택 풀기</button></div>
+    <div class="spbarbox"><canvas id="spBarChart" role="img" aria-label="기간별 입주 예정 세대수 막대그래프와 적정 수요선"></canvas></div>
+    <p class="hint" id="spBarHint">막대를 누르면 그 기간 단지만 지도·표에 나옵니다. 세대수는 청약홈 모집공고의 공급 세대(일반분양) 기준이라 재건축·재개발은 실제 입주보다 적게 잡힐 수 있습니다.</p>
+    <div id="spSummary" class="spsum"></div>
+  </section>
+
+  <section class="panel">
+    <div class="bar"><strong id="spMapTitle">입주 단지 지도</strong><span class="grow"></span>
+      <span class="splg"><i class="past"></i>이미 입주 <i class="soon"></i>1년 안 <i class="later"></i>그 이후</span></div>
+    <div id="spMap" class="spmap"></div>
+    <p class="hint" id="spMapMsg"></p>
+  </section>
+
+  <section class="panel">
+    <div class="bar"><strong id="spListTitle">입주 예정 단지</strong><span class="grow"></span><button id="spExcel1" class="mini">엑셀</button></div>
+    <div id="spCfBar1" class="cfbar"></div>
+    <div class="tablewrap"><table id="spTable1" class="hmtable"></table></div>
+    <div id="spCards1" class="hmcardlist" hidden></div>
+    <p class="empty" id="spEmpty1" hidden></p>
+  </section>
+
+  <section class="panel">
+    <div class="bar"><strong id="spCmpTitle">분양가 vs 주변 시세</strong><span class="grow"></span><button id="spExcel2" class="mini">엑셀</button></div>
+    <div class="hmrow">
+      <span class="hmk">공고</span><select id="spPubYears"><option value="1">최근 1년</option><option value="2" selected>최근 2년</option><option value="3">최근 3년</option><option value="7">전체</option></select>
+      <span class="hmk">비교 범위</span><span class="seg" id="spScope"><button data-s="dong" class="on">같은 동</button><button data-s="gu">같은 구</button></span>
+      <span class="hmk">비교 대상</span><span class="seg" id="spAge"><button data-a="new" class="on">신축 10년 이내</button><button data-a="all">전체</button></span>
+      <span class="hmk">평형</span><span class="seg" id="spPy"><button data-p="" class="on">전체</button><button data-p="s">소형</button><button data-p="59">59</button><button data-p="74">74</button><button data-p="84">84</button><button data-p="L">대형</button></span>
+    </div>
+    <div id="spCfBar2" class="cfbar"></div>
+    <div class="tablewrap tall"><table id="spTable2" class="hmtable"></table></div>
+    <div id="spCards2" class="hmcardlist" hidden></div>
+    <p class="empty" id="spEmpty2" hidden></p>
+    <p class="hint">분양가 = 주택형별 최고 분양가(발코니 확장·옵션 제외). 주변 시세 = 비교 범위 안 비슷한 평형(±3㎡) 단지들의 최근 12개월 매매 실거래 평균(직거래 제외). 주변 대비 − 는 주변보다 싸게 분양, + 는 비싸게 분양. 비교 단지가 3곳 미만이면 흐리게 보입니다. 줄을 누르면 비교에 쓴 단지가 펼쳐집니다.</p>
+  </section>
+  </div>
+</main>
+
 <main id="tab-invest" class="tab" hidden>
   <section class="panel filters">
     <label>시/도 <select id="ivSido"></select></label>
@@ -1177,7 +1240,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

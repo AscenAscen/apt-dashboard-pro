@@ -542,5 +542,15 @@ const Home = (() => {
     await refresh();
   }
 
-  return { init, refresh, BANDS, pyClass, _st: () => st };
+  /* 다른 탭(공급)에서 같이 쓰는 도구: 지역 고르기·실거래 자료 */
+  async function regReady() { if (!regions.length) { regions = await Data.regions(); regBy = new Map(regions.map(r => [r[0], r])); } return regions; }
+  const kit = {
+    GRP, METRO, CITY, shortSido, metroOf, cityOf, regReady,
+    regions: () => regions, reg: (c) => regBy.get(c),
+    codesOf: (tok) => codesOf(tok), tokLabel: (tok) => tokLabel(tok),
+    /** 실거래(매매) 자료 → Map(단지·평형 id → {code,key,g,area,tr}) 를 지역마다 */
+    async sale(cs, onTick) { let i = 0; for (const c of cs) { await loadKind(c, 'sale'); onTick && onTick(++i, cs.length); } return built.sale; },
+    meta: (c) => meta.get(c),
+  };
+  return { init, refresh, BANDS, pyClass, pyName, kit, _st: () => st };
 })();

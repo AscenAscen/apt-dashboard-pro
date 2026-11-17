@@ -1,623 +1,338 @@
 /* ─────────────────────────────────────────────────────────
-   supply.js — [공급] 탭: 부동산지인 입주물량 엑셀 → 요약 · 공급 그래프 · 공급 지도 · 단지 표
-   · 자료 넣기: 부동산지인에서 내려받은 엑셀을 그대로 올림 (칸 이름으로 찾으므로 칸 순서가 바뀌어도 됨)
-       같은 시도 자료가 이미 있으면 [바꾸기 / 합치기]를 고름. 입주시기가 바뀐 단지는 표시해 둠.
-       자료는 이 브라우저에만 저장 (공개 저장소에 올리지 않음). 전체 백업·코드 내보내기에 함께 들어감.
-   · 그래프: 연도별 ↔ 월별, 적정 수요선 = 인구 × 비율(기본 0.5%). 인구는 data/population.json (매월 자동 수집)
-   · 지도: 멀리 보면 구별 합계, 가까이 보면 단지 라벨. 라벨 모양은 [🎨 라벨 꾸미기]에서 고름.
-       위치는 카카오 주소 검색으로 그때그때 찾고(카카오 정책상 좌표는 저장하지 않음),
-       못 찾은 단지를 지도에서 직접 찍은 위치만 저장합니다 (apt.supplyPins.v1).
-   저장: apt.supply.v1(자료) · apt.supplyOpts.v1(필터·라벨 설정) · apt.supplyPins.v1(직접 찍은 위치) · apt.supplyStyles.v1(내 스타일)
+   supply.js — [공급] 탭: 입주 물량(막대 + 적정 수요선) · 입주 단지 지도 · 입주 예정 표 · 분양가 vs 주변 시세
+   자료: data/supply.json (scripts/supply.py · 매주 자동), data/population.json (인구 CSV 를 올렸을 때)
+         주변 시세는 실거래 파일(data/sale)로 화면에서 계산
    ───────────────────────────────────────────────────────── */
 const Supply = (() => {
   const $ = (id) => document.getElementById(id);
-  const KD = 'apt.supply.v1', KO = 'apt.supplyOpts.v1', KP = 'apt.supplyPins.v1', KS = 'apt.supplyStyles.v1';
-  const SMALL = 100;            // 이 세대수 미만 = 소규모 (지도에서 기본 숨김)
-  const ZLV = 7;                // 카카오 지도 레벨이 이 값 이상(멀리 봄)이면 구별 합계 라벨
-  const CHANGED_DAYS = 120;     // 입주시기 변경 표시를 이 기간 동안 보여 줌
-  const KN = ['올해 입주', '내년 입주', '내후년 이후', '입주 완료'];
-  // 입주시기 색: 0 올해 · 1 내년 · 2 내후년 이후 · 3 입주 완료  (a = 진한 색, f = 옅은 바탕, t = 옅은 바탕 위 글자)
-  const PAL = {
-    light: [{ a: '#E24B4A', f: '#FCEBEB', t: '#791F1F' }, { a: '#EF9F27', f: '#FAEEDA', t: '#633806' }, { a: '#7F77DD', f: '#EEEDFE', t: '#3C3489' }, { a: '#888780', f: '#F1EFE8', t: '#5F5E5A' }],
-    dark: [{ a: '#F09595', f: '#501313', t: '#F7C1C1' }, { a: '#FAC775', f: '#412402', t: '#FAEEDA' }, { a: '#AFA9EC', f: '#26215C', t: '#CECBF6' }, { a: '#9a9993', f: '#2C2C2A', t: '#B4B2A9' }],
-  };
-  const SURF = { light: { s: '#FFFFFF', ink: '#2C2C2A', sub: '#5F5E5A', bd: '#D3D1C7' }, dark: { s: '#2C2C2A', ink: '#F1EFE8', sub: '#B4B2A9', bd: '#4a4a47' } };
-  const DEF_LABEL = { n: 1, y: 1, h: 1, sty: 'twotone', col: 'period', one: '#1D9E75', size: 'm', byHh: 1, op: 100, rad: 'md', wt: 'b',
-    yf: 'dot', hf: 'full', sep: ' · ', shadow: 1, hover: 1, avoid: 1, map: 'auto' };
-  const PRESETS = [
-    { k: 'modern', name: '모던', v: { sty: 'twotone', col: 'period', map: 'dark' } },
-    { k: 'info', name: '정보형', v: { sty: 'card', col: 'period', map: 'light' } },
-    { k: 'clean', name: '깔끔', v: { sty: 'mini', col: 'outline', map: 'light' } },
-    { k: 'glance', name: '한눈에', v: { sty: 'pin', col: 'period', map: 'dark' } },
-  ];
-  const STYLES = [['twotone', '투톤'], ['card', '아이콘 카드'], ['pin', '핀'], ['tag', '태그'], ['mini', '미니멀']];
-  const DEF = { sido: '', sggs: [], dong: '', noRent: 0, small: 0, view: 'year', ratio: 0.5, mapH: 560, sortK: 'ym', sortD: 1, label: { ...DEF_LABEL } };
+  const SK = 'apt.supply.v1';
+  const DEMAND = 0.005;                                    // 적정 수요 = 인구 × 0.5% (1년)
+  let st = {}, items = [], status = null, pop = null, K = null;
+  let chart = null, map = null, marks = [], f1 = null, f2 = null, rows1 = [], rows2 = [], open2 = new Set(), drawn = false, cmpSeq = 0;
+  const geo = new Map();                                    // 이번 접속 동안만 기억 (카카오 정책)
+  const eok = (v) => (v == null ? '-' : (v / 10000).toFixed(2) + '억');
+  const nowYm = () => { const t = new Date(); return t.getFullYear() * 100 + t.getMonth() + 1; };
+  const ymTxt = (m) => (m ? `${Math.floor(m / 100)}.${String(m % 100).padStart(2, '0')}` : '-');
+  const save = () => Store.set(SK, st);
+  const DEF = () => ({ regs: ['g:seoul'], unit: 'y', noReb: false, period: null, pubYears: 2, scope: 'dong', age: 'new', py: '' });
 
-  let data = Store.get(KD, { rows: [], files: [] });
-  let opts = { ...DEF, ...Store.get(KO, {}) }; opts.label = { ...DEF_LABEL, ...(opts.label || {}) };
-  let pins = Store.get(KP, {});
-  let regions = [], pop = null, chart = null, map = null, overlays = [], mode = '', pickId = null, geoSeq = 0, inited = false;
-  const geoMemo = new Map();      // 주소 → {lat,lng} | null  (이번 접속 동안만)
-  const pos = new Map();          // 단지 id → {lat,lng,manual}
+  /* ── 지역 ── */
+  const codes = () => new Set(st.regs.flatMap(t => K.codesOf(t)));
+  const perKey = (mv) => { const y = Math.floor(mv / 100); return st.unit === 'h' ? `${y}-${mv % 100 <= 6 ? 1 : 2}` : String(y); };
+  const perLabel = (k) => (k.includes('-') ? `${k.slice(0, 4)} ${k.endsWith('1') ? '상' : '하'}반기` : `${k}년`);
+  const perEnd = (k) => (k.includes('-') ? +k.slice(0, 4) * 100 + (k.endsWith('1') ? 6 : 12) : +k * 100 + 12);
+  const perStart = (k) => (k.includes('-') ? +k.slice(0, 4) * 100 + (k.endsWith('1') ? 1 : 7) : +k * 100 + 1);
+  const inScope = () => { const cs = codes(); return items.filter(it => it.c && cs.has(it.c) && !(st.noReb && it.reb)); };
+  function siGu(it) { const r = K.reg(it.c); return r ? U.siGu(r[1], r[2]) : [it.sd, it.sg]; }
 
-  const saveData = () => Store.set(KD, data);
-  const saveOpts = () => Store.set(KO, opts);
-  const esc = (s) => U.esc(s);
-  const fmtN = (n) => (n == null ? '-' : Math.round(n).toLocaleString());
-
-  /* ═══ 이름·날짜 정리 ═══ */
-  const clean = (s) => String(s ?? '').replace(/[　 ]/g, ' ').replace(/\s+/g, ' ').trim();
-  const nosp = (s) => clean(s).replace(/\s/g, '');
-  function sidoShort(s) {
-    const t = nosp(s);
-    const M = [['충청북', '충북'], ['충청남', '충남'], ['전라북', '전북'], ['전북', '전북'], ['전라남', '전남'], ['경상북', '경북'], ['경상남', '경남'], ['강원', '강원'], ['제주', '제주'], ['세종', '세종'], ['경기', '경기']];
-    for (const [a, b] of M) if (t.startsWith(a)) return b;
-    return t.slice(0, 2);
-  }
-  /** 입주시기 → 'YYYY-MM' */
-  function toYm(v) {
-    if (v == null || v === '') return '';
-    if (v instanceof Date && !isNaN(v)) return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}`;
-    if (typeof v === 'number' && v > 20000 && v < 80000) { const d = new Date(Math.round((v - 25569) * 864e5)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`; }
-    const m = String(v).match(/(\d{4})\D{0,3}(\d{1,2})/);
-    if (m) return `${m[1]}-${m[2].padStart(2, '0')}`;
-    const m2 = String(v).match(/^(\d{4})(\d{2})/);
-    return m2 ? `${m2[1]}-${m2[2]}` : '';
-  }
-  const num = (v) => { const n = parseFloat(String(v ?? '').replace(/[^\d.-]/g, '')); return isFinite(n) ? n : 0; };
-  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-  const nowYm = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; };
-  /** 입주시기 구분 0 올해 · 1 내년 · 2 내후년 이후 · 3 입주 완료 */
-  function period(ym) {
-    if (!ym) return 2;
-    const y = +ym.slice(0, 4), cy = new Date().getFullYear();
-    if (ym < nowYm()) return 3;
-    return y <= cy ? 0 : y === cy + 1 ? 1 : 2;
-  }
-  const isRent = (r) => /임대/.test(r.type || '');
-
-  /* ═══ 엑셀 읽기 ═══ */
-  const HEAD = { sido: ['시도'], sgg: ['시군구'], dong: ['읍면동', '법정동'], type: ['주택유형', '유형'], name: ['단지명', '아파트명'], addr: ['소재지', '주소'],
-    ym: ['입주시기', '입주예정', '입주년월'], hh: ['총세대수', '세대수'], price: ['분양가'], builder: ['시공사', '건설사'] };
-  function parseSheet(aoa) {
-    const hi = aoa.findIndex(r => r.some(c => nosp(c) === '단지명') && r.some(c => /입주/.test(nosp(c))));
-    if (hi < 0) throw new Error('"단지명"과 "입주시기" 칸을 찾지 못했습니다. 부동산지인에서 내려받은 파일이 맞는지 확인하세요.');
-    const head = aoa[hi].map(nosp), col = {};
-    for (const k in HEAD) col[k] = head.findIndex(h => HEAD[k].some(t => h === t || h.startsWith(t)));
-    if (col.sido >= 0 && col.sgg >= 0 && head[col.sido] === head[col.sgg]) col.sgg = -1;
-    const out = [];
-    for (const r of aoa.slice(hi + 1)) {
-      const g = (k) => (col[k] >= 0 ? r[col[k]] : '');
-      const name = clean(g('name')); if (!name) continue;
-      const addr = clean(g('addr'));
-      let sido = clean(g('sido')), sgg = clean(g('sgg')), dong = clean(g('dong'));
-      if ((!sido || !sgg) && addr) {            // 시도·시군구 칸이 없으면 주소에서 나눔
-        const p = addr.split(' ');
-        sido = sido || p[0];
-        if (!sgg) { if (/시$/.test(p[1] || '') && /구$/.test(p[2] || '')) { sgg = `${p[1]} ${p[2]}`; dong = dong || p[3] || ''; } else { sgg = p[1] || ''; dong = dong || p[2] || ''; } }
-      }
-      sido = sidoShort(sido);
-      const ym = toYm(g('ym'));
-      out.push({ id: `${sido}|${nosp(addr)}|${nosp(name)}`, sido, sgg, dong, type: clean(g('type')) || '아파트', name, addr: addr || `${sido} ${sgg} ${dong}`, ym, hh: Math.round(num(g('hh'))), price: Math.round(num(g('price'))), builder: clean(g('builder')).replace(/^없음$/, '') });
-    }
-    return out;
-  }
-  async function readFile(file) {
-    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
-    let last = null;
-    for (const nm of wb.SheetNames) {
-      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[nm], { header: 1, raw: true, defval: '' });
-      try { const rows = parseSheet(aoa); if (rows.length) return rows; } catch (e) { last = e; }
-    }
-    throw last || new Error('읽을 수 있는 줄이 없습니다.');
-  }
-  async function onFiles(e) {
-    const files = [...e.target.files]; e.target.value = '';
-    for (const f of files) {
-      try {
-        const rows = await readFile(f);
-        const sidos = [...new Set(rows.map(r => r.sido))];
-        const has = data.rows.some(r => sidos.includes(r.sido));
-        const replace = has ? confirm(`"${f.name}" — ${sidos.join('·')} 자료가 이미 있습니다.\n\n[확인] 바꾸기 — 새 파일로 바꿉니다. (새 파일에 없는 단지는 지움 · 입주시기가 바뀐 단지는 표시)\n[취소] 합치기 — 기존 자료에 더하고, 같은 단지는 새 값으로 고칩니다.`) : false;
-        const res = merge(rows, sidos, replace);
-        data.files = data.files.filter(x => !x.sidos.every(s => sidos.includes(s)));
-        data.files.push({ name: f.name, at: today(), sidos, n: rows.length });
-        saveData();
-        U.toast(`${f.name}: ${rows.length}개 단지를 넣었습니다.${res.changed ? ` 입주시기 바뀐 단지 ${res.changed}개.` : ''}${res.removed ? ` 빠진 단지 ${res.removed}개 지움.` : ''}`);
-      } catch (err) { console.error(err); U.toast(`${f.name}: ${err.message || '파일을 읽지 못했습니다.'}`); }
-    }
-    if (!opts.sido && data.rows.length) opts.sido = data.rows[0].sido;
-    saveOpts(); render();
-  }
-  function merge(rows, sidos, replace) {
-    const old = new Map(data.rows.map(r => [r.id, r]));
-    let changed = 0, removed = 0;
-    for (const r of rows) {
-      const o = old.get(r.id);
-      if (o && o.ym && r.ym && o.ym !== r.ym) { r.prev = o.ym; r.chAt = today(); changed++; }
-      else if (o && o.prev) { r.prev = o.prev; r.chAt = o.chAt; }
-    }
-    const ids = new Set(rows.map(r => r.id));
-    const keep = data.rows.filter(r => {
-      if (ids.has(r.id)) return false;
-      if (replace && sidos.includes(r.sido)) { removed++; return false; }
-      return true;
-    });
-    data.rows = [...keep, ...rows];
-    return { changed, removed };
-  }
-
-  /* ═══ 지역코드 · 인구 ═══ */
-  function codesOf(sido, sgg) {
-    const s = sidoShort(sido), k = nosp(sgg);
-    const inS = regions.filter(r => sidoShort(r[1]) === s);
-    let hit = inS.filter(r => nosp(r[2]) === k);
-    if (!hit.length) hit = inS.filter(r => nosp(r[2]).startsWith(k));
-    if (!hit.length) hit = inS.filter(r => nosp(r[2]).replace('시', '') === k);
-    return hit.map(r => r[0]);
-  }
-  function popOf(codes) {
-    if (!pop || !pop.byCode) return null;
-    let n = 0;
-    for (const c of codes) { const v = pop.byCode[c]; if (!v || v.pop == null) return null; n += v.pop; }
-    return codes.length ? n : null;
-  }
-  /** 지금 고른 범위의 인구 { n, label } (동 단위·자료 없음이면 n=null) */
-  function scopePop() {
-    if (opts.dong) return { n: null, why: '동 단위는 인구 기준이 없어 수요선을 그리지 않습니다.' };
-    let codes = [];
-    if (opts.sggs.length) codes = opts.sggs.flatMap(g => codesOf(opts.sido, g));
-    else {
-      const sidos = opts.sido ? [opts.sido] : [...new Set(data.rows.map(r => r.sido))];
-      codes = regions.filter(r => sidos.includes(sidoShort(r[1]))).map(r => r[0]);
-    }
-    codes = [...new Set(codes)];
-    if (!pop) return { n: null, why: '인구 자료가 아직 없습니다. 자동 수집이 한 번 돌면 채워집니다.' };
-    const n = popOf(codes);
-    return n == null ? { n: null, why: '고른 지역 중 인구 자료가 없는 곳이 있어 수요선을 그리지 않습니다.' } : { n, why: '' };
-  }
-
-  /* ═══ 필터 ═══ */
-  function rowsF() {
-    return data.rows.filter(r => (!opts.sido || r.sido === opts.sido) && (!opts.sggs.length || opts.sggs.includes(r.sgg)) && (!opts.dong || r.dong === opts.dong) && !(opts.noRent && isRent(r)));
-  }
-  function renderFilters() {
-    const sidos = [...new Set(data.rows.map(r => r.sido))].sort();
-    if (opts.sido && !sidos.includes(opts.sido)) { opts.sido = ''; opts.sggs = []; opts.dong = ''; }
-    $('spSido').innerHTML = `<option value="">전체</option>` + sidos.map(s => `<option${s === opts.sido ? ' selected' : ''}>${esc(s)}</option>`).join('');
-    const inS = data.rows.filter(r => (!opts.sido || r.sido === opts.sido) && !(opts.noRent && isRent(r)));
-    const cnt = new Map(); inS.forEach(r => cnt.set(r.sgg, (cnt.get(r.sgg) || 0) + 1));
-    opts.sggs = opts.sggs.filter(g => cnt.has(g));
-    const sggs = [...cnt.keys()].sort((a, b) => a.localeCompare(b, 'ko'));
-    $('spSggs').innerHTML = `<button type="button" data-g="" class="${opts.sggs.length ? '' : 'on'}">전체</button>` +
-      sggs.map(g => `<button type="button" data-g="${esc(g)}" class="${opts.sggs.includes(g) ? 'on' : ''}">${esc(g)}<small>${cnt.get(g)}</small></button>`).join('');
-    const one = opts.sggs.length === 1;
-    $('spDongWrap').hidden = !one;
-    if (one) {
-      const dongs = [...new Set(inS.filter(r => r.sgg === opts.sggs[0]).map(r => r.dong).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
-      if (opts.dong && !dongs.includes(opts.dong)) opts.dong = '';
-      $('spDong').innerHTML = `<option value="">전체</option>` + dongs.map(d => `<option${d === opts.dong ? ' selected' : ''}>${esc(d)}</option>`).join('');
-    } else opts.dong = '';
-    $('spNoRent').checked = !!opts.noRent; $('spSmall').checked = !!opts.small;
-    $('spRatio').value = opts.ratio;
-  }
-  function renderFiles() {
-    const f = data.files;
-    $('spFiles').innerHTML = f.length ? f.map((x, i) => `<span class="spfile"><b>${esc(x.sidos.join('·'))}</b> ${esc(x.at)} 기준 · ${x.n}단지 <button class="mini" data-delf="${i}" title="이 지역 자료 지우기">✕</button></span>`).join('') : '<span class="hint" style="margin:0">아직 올린 자료가 없습니다.</span>';
-  }
-
-  /* ═══ 요약 카드 ═══ */
-  function renderCards(rows) {
-    const cy = new Date().getFullYear(), ny = nowYm();
-    const sum = (f) => { const a = rows.filter(f); return { hh: a.reduce((s, r) => s + r.hh, 0), n: a.length }; };
-    const a = sum(r => r.ym >= ny && +r.ym.slice(0, 4) === cy), b = sum(r => +r.ym.slice(0, 4) === cy + 1), c = sum(r => +r.ym.slice(0, 4) >= cy + 2);
-    const sp = scopePop(), need = sp.n != null ? sp.n * opts.ratio / 100 : null;
-    const asOf = data.files.filter(x => !opts.sido || x.sidos.includes(opts.sido)).map(x => x.at).sort().pop() || '-';
-    const card = (k, v, s, cls = '') => `<div class="card ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
-    const vs = (x) => need ? `<em class="${x > need ? 'up' : 'down'}">수요 대비 ${Math.round(x / need * 100)}%</em>` : '';
-    $('spCards').innerHTML = card(`${cy}년 남은 입주`, `${fmtN(a.hh)}세대`, `${a.n}단지 ${vs(a.hh)}`, 'p0') + card(`${cy + 1}년 입주`, `${fmtN(b.hh)}세대`, `${b.n}단지 ${vs(b.hh)}`, 'p1') +
-      card(`${cy + 2}년 이후 입주`, `${fmtN(c.hh)}세대`, `${c.n}단지 · 분양 전 물량은 빠져 있음`, 'p2') +
-      card('적정 수요 (1년)', need ? `${fmtN(need)}세대` : '-', need ? `인구 ${fmtN(sp.n)}명 × ${opts.ratio}%` : esc(sp.why)) + card('자료 기준일', esc(asOf), `${rows.length}단지 · ${fmtN(rows.reduce((s, r) => s + r.hh, 0))}세대`);
-  }
-
-  /* ═══ 공급 그래프 ═══ */
-  function renderChart(rows) {
-    if (chart) { chart.destroy(); chart = null; }
-    const box = $('spChartBox');
-    if (!rows.length) { box.innerHTML = '<p class="empty">표시할 자료가 없습니다.</p>'; return; }
-    box.innerHTML = '<canvas id="spChart"></canvas>';
-    const monthly = opts.view === 'month', ny = nowYm(), cy = new Date().getFullYear();
-    const yms = rows.map(r => r.ym).filter(Boolean).sort();
+  /* ── ② 입주 물량 ── */
+  function drawBars() {
+    const list = inScope().filter(it => it.mv);
+    const y0 = Math.floor(nowYm() / 100) - 2, y1 = Math.floor(nowYm() / 100) + 5;
     const keys = [];
-    if (monthly) { let [y, m] = yms[0].split('-').map(Number); const [y2, m2] = yms[yms.length - 1].split('-').map(Number); while (y < y2 || (y === y2 && m <= m2)) { keys.push(`${y}-${String(m).padStart(2, '0')}`); if (++m > 12) { m = 1; y++; } } }
-    else for (let y = +yms[0].slice(0, 4); y <= +yms[yms.length - 1].slice(0, 4); y++) keys.push(String(y));
-    const bucket = new Map(keys.map(k => [k, []]));
-    rows.forEach(r => { const k = monthly ? r.ym : r.ym.slice(0, 4); if (bucket.has(k)) bucket.get(k).push(r); });
-    const vals = keys.map(k => bucket.get(k).reduce((s, r) => s + r.hh, 0));
-    const per = (k) => (monthly ? period(k) : (+k < cy ? 3 : +k === cy ? 0 : +k === cy + 1 ? 1 : 2));
-    const future = (k) => (monthly ? k > ny : +k > cy);
-    const pal = PAL.light;
-    const bg = keys.map(k => CK.alpha(pal[per(k)].a, future(k) ? 0.45 : 0.9));
-    const sp = scopePop(), need = sp.n != null ? sp.n * opts.ratio / 100 / (monthly ? 12 : 1) : null;
-    const sets = [{ type: 'bar', label: '입주 세대수', data: vals, backgroundColor: bg, borderColor: keys.map(k => pal[per(k)].a), borderWidth: keys.map(k => (future(k) ? 1.5 : 0)), borderDash: [4, 3], order: 2 }];
-    if (need) sets.push({ type: 'line', label: `적정 수요 (인구×${opts.ratio}%${monthly ? '÷12' : ''})`, data: keys.map(() => need), borderColor: CK.C.text(), borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, order: 1, ckNoEnd: true });
-    const lab = (k) => (monthly ? `${k.slice(2, 4)}.${k.slice(5)}` : `${k}년`);
-    chart = new Chart($('spChart'), {
-      data: { labels: keys.map(lab), datasets: sets },
-      options: { maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-        scales: { y: { beginAtZero: true, ticks: { callback: (v) => Number(v).toLocaleString() } }, x: { ticks: { autoSkip: true, maxRotation: 0 } } },
-        plugins: { ckCross: true, legend: { position: 'top' },
-          tooltip: { callbacks: {
-            label: (c) => `${c.dataset.label}: ${Math.round(c.raw).toLocaleString()}세대`,
-            afterBody: (items) => { const k = keys[items[0].dataIndex], a = [...bucket.get(k)].sort((x, y) => y.hh - x.hh);
-              if (!a.length) return ''; const top = a.slice(0, 8).map(r => `· ${r.name} (${r.sgg}) ${r.hh.toLocaleString()}세대${monthly ? '' : ' · ' + r.ym.slice(2).replace('-', '.')}`);
-              return ['', ...top, ...(a.length > 8 ? [`  외 ${a.length - 8}개 단지`] : []), future(k) ? '※ 예정 — 분양 전 물량은 더 늘 수 있음' : ''].filter(x => x !== ''); } } } } },
+    for (let y = y0; y <= y1; y++) { if (st.unit === 'h') keys.push(`${y}-1`, `${y}-2`); else keys.push(String(y)); }
+    const sum = new Map(keys.map(k => [k, { hh: 0, n: 0, reb: 0 }]));
+    list.forEach(it => { const k = perKey(it.mv); const s = sum.get(k); if (s) { s.hh += it.hh; s.n++; if (it.reb) s.reb += it.hh; } });
+    // 뒤쪽 빈 기간은 잘라냄
+    let last = keys.length - 1; while (last > 0 && !sum.get(keys[last]).hh && perStart(keys[last]) > nowYm()) last--;
+    const ks = keys.slice(0, Math.max(last + 1, keys.indexOf(String(Math.floor(nowYm() / 100))) + 2));
+    const cs = [...codes()];
+    const pk = pop && pop.pop ? cs.filter(c => pop.pop[c]) : [];
+    const people = pk.reduce((t, c) => t + pop.pop[c], 0);
+    const full = pk.length === cs.length && people > 0;
+    const demand = full ? people * DEMAND / (st.unit === 'h' ? 2 : 1) : null;
+    const now = nowYm();
+    const C = CK.C.sale(), Q = CK.C.quote(), G = CK.alpha(CK.C.sub(), 0.45);
+    const col = ks.map(k => {
+      const base = perEnd(k) < now ? G : perStart(k) <= now + 100 ? C : Q;
+      return st.period && st.period !== k ? CK.alpha(base.startsWith('#') ? base : '#999999', 0.25) : base;
     });
-    $('spChartNote').innerHTML = `흐린 막대 = 아직 입주 전(예정). 먼 미래일수록 분양 전 물량이 빠져 있어 적게 보입니다.${need ? '' : ` · ${esc(sp.why)}`}${pop?.ym ? ` · 인구: ${pop.ym.slice(0, 4)}.${pop.ym.slice(4)} 기준 (행정안전부)` : ''}`;
+    const data = ks.map(k => sum.get(k).hh);
+    $('spBarTitle').textContent = `입주 물량 · ${st.unit === 'h' ? '반기별' : '연도별'}${st.period ? ' · ' + perLabel(st.period) + ' 선택' : ''}`;
+    $('spPeriodClear').hidden = !st.period;
+    const ds = [{ type: 'bar', data, backgroundColor: col, borderRadius: { topLeft: 4, topRight: 4 }, maxBarThickness: 46, order: 2 }];
+    if (demand) ds.push({ type: 'line', data: ks.map(() => demand), borderColor: CK.C.text(), borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, order: 1, label: '적정 수요' });
+    const meta = { ks, sum, demand };
+    if (chart) { chart.data.labels = ks.map(perLabel); chart.data.datasets = ds; chart.$m = meta; chart.update('none'); }
+    else {
+      chart = new Chart($('spBarChart'), {
+        data: { labels: ks.map(perLabel), datasets: ds },
+        options: {
+          maintainAspectRatio: false, animation: false,
+          scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { maxTicksLimit: 5, callback: (v) => v.toLocaleString() } } },
+          plugins: {
+            legend: { display: false },
+            tooltip: { filter: (c) => c.dataset.type === 'bar', callbacks: { label: (c) => { const m = chart.$m, s = m.sum.get(m.ks[c.dataIndex]); return `${s.n}개 단지 · ${s.hh.toLocaleString()}세대${s.reb ? ` (정비사업 ${s.reb.toLocaleString()})` : ''}${m.demand ? ` · 적정 대비 ${Math.round(s.hh / m.demand * 100)}%` : ''}`; } } },
+          },
+          onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+          onClick: (e, els) => { const el = els.find(x => x.datasetIndex === 0) || els[0]; if (!el) return; const k = chart.$m.ks[el.index]; st.period = st.period === k ? null : k; save(); refresh(false); },
+        },
+      });
+      chart.$m = meta;
+    }
+    const y = Math.floor(now / 100);
+    const show = st.unit === 'h' ? ks.filter(k => perEnd(k) >= now).slice(0, 4) : [String(y), String(y + 1), String(y + 2)];
+    $('spSummary').innerHTML = show.map(k => { const s = sum.get(k) || { hh: 0, n: 0 }; const r = demand ? s.hh / demand * 100 : null;
+      return `<span class="spsumi"><b>${perLabel(k)}</b> ${s.hh.toLocaleString()}세대 <small>${s.n}곳</small>${r == null ? '' : ` <em class="${r > 120 ? 'over' : r < 80 ? 'under' : ''}">적정 대비 ${Math.round(r)}%${r > 120 ? ' 과잉' : r < 80 ? ' 부족' : ''}</em>`}</span>`; }).join('') +
+      (demand ? `<span class="hint" style="margin:0">적정 수요 ${Math.round(demand).toLocaleString()}세대 = 인구 ${people.toLocaleString()}명 × 0.5%${st.unit === 'h' ? ' ÷ 2' : ''} (${pop.ym ? ymTxt(pop.ym) + ' 기준' : ''})</span>`
+        : `<span class="hint" style="margin:0">적정 수요선은 인구 자료가 있어야 보입니다${pop && pop.pop ? ' (고른 지역 중 인구 자료가 없는 곳이 있음)' : ''}.</span>` + (pop && pop.pop ? '' : POPHELP));
   }
 
-  /* ═══ 라벨 ═══ */
-  const L = () => opts.label;
-  const isDarkTheme = () => (getComputedStyle(document.documentElement).getPropertyValue('--scheme').trim() || 'dark') === 'dark';
-  const darkMap = () => (L().map === 'auto' ? isDarkTheme() : L().map === 'dark');
-  const rgba = (hex, a) => { const h = String(hex).replace('#', ''); if (h.length !== 6) return hex; const n = parseInt(h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
-  function colorOf(k) {
-    const dk = darkMap();
-    if (L().col === 'single') { const a = L().one || '#1D9E75'; return { a, f: rgba(a, dk ? 0.28 : 0.14), t: dk ? '#ffffff' : a }; }
-    return PAL[dk ? 'dark' : 'light'][k];
-  }
-  function fmtYm(ym) {
-    if (!ym) return '-';
-    const [y, m] = ym.split('-');
-    return L().yf === 'full' ? `${y}.${m}` : L().yf === 'kor' ? `${y.slice(2)}년 ${+m}월` : `${y.slice(2)}.${m}`;
-  }
-  const fmtHh = (h) => (L().hf === 'k' ? (h >= 1000 ? `${(h / 1000).toFixed(1)}천` : `${h}`) : L().hf === 'num' ? h.toLocaleString() : `${h.toLocaleString()}세대`);
-  const SC = { s: 0.88, m: 1, l: 1.18 };
-  const RAD = { sq: '3px', md: '8px', round: '999px' };
-  function labelEl(r) {
-    const l = L(), dk = darkMap(), S = SURF[dk ? 'dark' : 'light'], c = colorOf(period(r.ym)), out = l.col === 'outline';
-    const grow = l.byHh ? 0.92 + Math.min(r.hh, 3000) / 3000 * 0.32 : 1;
-    const sc = SC[l.size] * grow, fs = Math.round(12 * sc), op = (l.op ?? 100) / 100, rad = RAD[l.rad] || '8px', wt = l.wt === 'n' ? 400 : 600;
-    const surf = rgba(S.s, op), brd = out ? c.a : S.bd;
-    const br = l.sep === 'br';
-    const join = (a) => a.filter(Boolean).join(br ? '<br>' : esc(l.sep));
-    const name = l.n ? esc(r.name) : '', yy = l.y ? esc(fmtYm(r.ym)) : '', hh = l.h ? esc(fmtHh(r.hh)) : '';
-    const any = name || yy || hh;
-    const el = document.createElement('div');
-    el.className = `splbl${l.shadow ? ' sh' : ''}${l.hover ? ' hv' : ''}${any ? '' : ' sp-dot sp-fixed'}`;
-    el.style.fontSize = fs + 'px'; el.style.fontWeight = wt;
-    const dotR = Math.round((5 + Math.min(r.hh, 3000) / 600) * SC[l.size]);
-    const dot = `<span class="spd" style="width:${dotR * 2}px;height:${dotR * 2}px;background:${c.a};border-color:${S.s}"></span>`;
-    let h = '';
-    if (l.sty === 'twotone') {
-      const left = yy ? `<span class="tt-l" style="background:${out ? 'transparent' : c.a};color:${out ? c.a : (dk ? '#1b1b1a' : '#fff')};${out ? `border-right:1px solid ${c.a}` : ''}">${yy}</span>` : '';
-      const right = join([name ? `<span style="color:${S.ink}">${name}</span>` : '', hh ? `<span class="tt-b" style="background:${out ? 'transparent' : c.f};color:${out ? c.a : c.t};${out ? `border:1px solid ${c.a}` : ''}">${hh}</span>` : '']);
-      h = `<div class="spbox tt" style="background:${surf};border:1px solid ${brd};border-radius:${l.rad === 'sq' ? '4px' : l.rad === 'md' ? '10px' : '999px'}">${left}${right ? `<span class="tt-r">${right}</span>` : ''}</div><div class="spstem" style="background:${c.a}"></div><div class="spfoot" style="background:${c.a};border-color:${S.s}"></div>`;
-    } else if (l.sty === 'card') {
-      const sub = join([yy ? `${yy} 입주` : '', hh]);
-      h = `<div class="spbox cd" style="background:${surf};border:1px solid ${brd};border-radius:${rad === '999px' ? '16px' : rad}"><span class="cd-i" style="background:${out ? 'transparent' : c.f};color:${c.a};${out ? `border:1px solid ${c.a}` : ''}">🏢</span><span>${name ? `<div style="color:${S.ink}">${name}</div>` : ''}${sub ? `<div class="cd-s" style="color:${S.sub}">${sub}</div>` : ''}</span></div><div class="sptail" style="border-top-color:${brd}"></div>`;
-    } else if (l.sty === 'pin') {
-      const pr = Math.round((14 + Math.min(r.hh, 3000) / 220) * SC[l.size]);
-      const inner = hh ? (r.hh >= 1000 ? `${(r.hh / 1000).toFixed(1)}천` : r.hh) : '🏢';
-      const cap = join([name, yy]);
-      h = `<div class="pinwrap">${cap ? `<div class="pin-c" style="background:${surf};color:${S.ink};border:1px solid ${S.bd};border-radius:${rad === '999px' ? '999px' : '6px'}">${cap}</div>` : ''}<div class="pin-h" style="width:${pr * 2}px;height:${pr * 2}px;background:${out ? S.s : c.a};border:2px solid ${out ? c.a : S.s}"><span style="color:${out ? c.a : (dk ? '#1b1b1a' : '#fff')}">${inner}</span></div></div>`;
-    } else if (l.sty === 'tag') {
-      const parts = [name ? `<b>${name}</b>` : '', yy, hh].filter(Boolean);
-      const sep = br ? '<br>' : `<span class="tg-s">${esc(l.sep.trim() || '·')}</span>`;
-      const tbg = out ? surf : (c.f.startsWith('#') ? rgba(c.f, op) : c.f);
-      h = `<div class="spbox tg" style="background:${tbg};color:${out ? S.ink : c.t};border:1px solid ${c.a};border-radius:${rad}"><span class="tg-d" style="background:${c.a}"></span><span>${parts.join(sep)}</span></div><div class="sptail" style="border-top-color:${c.a}"></div>`;
-    } else {
-      h = `<div class="spbox mn">${dot}<span class="mn-t" style="color:${S.ink};background:${rgba(S.s, Math.min(op, 0.82))};border-radius:${rad === '999px' ? '999px' : '4px'}">${join([name, yy, hh])}</span></div>`;
-    }
-    el.innerHTML = `<div class="spfull">${h}</div><div class="spdotonly">${dot}</div>`;
-    el.title = `${r.name} · ${fmtYm(r.ym)} 입주 · ${r.hh.toLocaleString()}세대`;
-    return el;
-  }
-  function guLabelEl(g) {
-    const dk = darkMap(), S = SURF[dk ? 'dark' : 'light'], cy = new Date().getFullYear();
-    const parts = [0, 1, 2].map(i => { const v = i < 2 ? g.y[cy + i] : Object.keys(g.y).filter(y => +y >= cy + 2).reduce((s, y) => s + g.y[y], 0); return v ? `<span><i style="background:${PAL[dk ? 'dark' : 'light'][i].a}"></i>${String(cy + i).slice(2)}년${i === 2 ? '~' : ''} ${v.toLocaleString()}</span>` : ''; }).filter(Boolean);
-    const el = document.createElement('div');
-    el.className = `splbl gu${L().shadow ? ' sh' : ''}${L().hover ? ' hv' : ''}`;
-    const tot = Object.keys(g.y).reduce((s, y) => s + g.y[y], 0);
-    el.innerHTML = `<div class="spfull"><div class="spbox gub" style="background:${rgba(S.s, (L().op ?? 100) / 100)};color:${S.ink};border:1px solid ${S.bd}"><b>${esc(g.name)}</b>${parts.length ? parts.join('') : `<span style="color:${S.sub}">예정 입주 없음</span>`}</div></div>` +
-      `<div class="spdotonly"><span class="gus" style="background:${rgba(S.s, 0.92)};color:${tot ? S.ink : S.sub};border:1px solid ${S.bd}">${esc(g.name)}${tot ? ` <b>${tot.toLocaleString()}</b>` : ''}</span></div>`;
-    return el;
-  }
+  const POPHELP = `<details class="sphelp"><summary>인구 자료 올리는 방법 (1년에 한 번이면 충분)</summary><ol>
+    <li><b>jumin.mois.go.kr</b> (행정안전부 주민등록 인구통계) → <b>주민등록 인구 및 세대현황</b></li>
+    <li>행정구역 <b>전국</b>, <b>전체 시군구 현황</b>(또는 시군구 단위) 체크 → 조회 → <b>CSV 파일 다운로드</b> (화면 이름은 조금 다를 수 있습니다)</li>
+    <li>GitHub 저장소에서 <b>Add file → Upload files</b> → 맨 위 칸에 <b>population/</b> 을 적고 CSV 를 올림 → <b>Commit changes</b></li>
+    <li>자동으로 변환되고 몇 분 뒤 이 화면에 적정 수요선이 생깁니다 (Ctrl+Shift+R)</li></ol></details>`;
 
-  /* ═══ 위치 찾기 (이번 접속 동안만 기억) ═══ */
-  function addrSearch(q) { const S = kakao.maps.services; return new Promise(res => new S.Geocoder().addressSearch(q, (l, st) => res(st === S.Status.OK && l.length ? { lat: +l[0].y, lng: +l[0].x } : null))); }
-  function kwSearch(q) { const S = kakao.maps.services; return new Promise(res => new S.Places().keywordSearch(q, (l, st) => res(st === S.Status.OK && l.length ? { lat: +l[0].y, lng: +l[0].x } : null))); }
-  async function locate(r) {
-    if (pins[r.id]) return { ...pins[r.id], manual: true };
-    if (geoMemo.has(r.id)) return geoMemo.get(r.id);
-    let p = r.addr ? await addrSearch(r.addr) : null;
-    if (!p) p = await kwSearch(`${r.sgg} ${r.dong} ${r.name}`);
-    geoMemo.set(r.id, p);
-    return p;
+  /* ── ③ 지도 / ④ 입주 예정 표 ── */
+  function listRows() {
+    const now = nowYm();
+    let l = inScope();
+    if (st.period) l = l.filter(it => it.mv && perKey(it.mv) === st.period);
+    else l = l.filter(it => it.mv && it.mv >= now);
+    return l.sort((a, b) => a.mv - b.mv || b.hh - a.hh);
   }
-  async function locateAll(rows) {
-    const seq = ++geoSeq, todo = rows.filter(r => !pos.has(r.id) || pins[r.id]);
-    let done = 0;
-    const show = () => { $('spGeo').textContent = todo.length && done < todo.length ? `위치 찾는 중… ${done}/${todo.length}` : ''; };
-    show();
-    const q = [...todo];
-    const worker = async () => { while (q.length) { if (seq !== geoSeq) return; const r = q.shift(); try { const p = await locate(r); if (p) pos.set(r.id, p); else pos.delete(r.id); } catch (e) { console.error(e); } done++; if (done % 10 === 0) show(); } };
-    await Promise.all(Array.from({ length: 5 }, worker));
-    if (seq === geoSeq) show();
-    return seq === geoSeq;
+  function cols1() {
+    const N = ColFilter.numCol, T = ColFilter.txtCol;
+    return {
+      si: T('시', it => siGu(it)[0]), gu: T('구', it => siGu(it)[1]), dong: T('동', it => it.dg), name: T('단지', it => it.nm),
+      mv: { label: '입주 예정', get: it => ymTxt(it.mv), num: it => it.mv }, hh: N('세대수', it => it.hh, 'n'),
+      reb: T('정비사업', it => (it.reb ? '정비사업' : '일반')), bd: T('시공사', it => it.bd),
+      pub: { label: '공고일', get: it => (it.pub ? `${it.pub.slice(0, 4)}.${it.pub.slice(4, 6)}` : ''), num: it => +it.pub || null },
+      cr: N('1순위 경쟁률', it => it.cr, 'n'),
+    };
   }
-
-  /* ═══ 지도 ═══ */
-  function clearOverlays() { overlays.forEach(o => o.ov.setMap(null)); overlays = []; }
-  function mapRows() { return rowsF().filter(r => opts.small || r.hh >= SMALL); }
-  async function renderMap(fit) {
-    const box = $('spMap');
-    box.style.height = opts.mapH + 'px';
-    box.classList.toggle('spdark', darkMap());
-    if (!KMap.ready()) { box.innerHTML = `<p class="empty">${KMap.needKeyHtml}</p>`; return; }
-    try { await KMap.load(); } catch (e) { box.innerHTML = `<p class="empty">${esc(e.message)}</p>`; return; }
-    if (!map) {
-      box.innerHTML = '';
-      map = KMap.create(box, { lat: 37.5547, lng: 126.9707 }, 8);
-      kakao.maps.event.addListener(map, 'zoom_changed', () => { const m = map.getLevel() >= ZLV ? 'gu' : 'apt'; if (m !== mode) drawOverlays(); });
-      kakao.maps.event.addListener(map, 'idle', () => avoid());
-      kakao.maps.event.addListener(map, 'click', (e) => {
-        if (!pickId) return;
-        pins[pickId] = { lat: e.latLng.getLat(), lng: e.latLng.getLng() }; Store.set(KP, pins);
-        pos.set(pickId, { ...pins[pickId], manual: true }); pickId = null; box.classList.remove('picking');
-        U.toast('위치를 저장했습니다.'); drawOverlays(); renderUnfound(); renderTable();
+  const F1 = () => f1 || (f1 = ColFilter.create({ key: 'sup1', cols: cols1, bar: 'spCfBar1', onChange: drawList }));
+  function drawList() {
+    const l = F1().apply(rows1);
+    const tot = l.reduce((t, it) => t + it.hh, 0);
+    $('spListTitle').textContent = `${st.period ? perLabel(st.period) + ' ' : ''}입주 예정 단지 (${l.length.toLocaleString()}곳 · ${tot.toLocaleString()}세대)`;
+    $('spEmpty1').hidden = l.length > 0; $('spEmpty1').textContent = rows1.length ? '필터에 맞는 단지가 없습니다.' : '고른 지역·기간에 입주 예정 단지가 없습니다.';
+    const b = (k) => F1().btn(k), c = cols1();
+    const th = (k, cls = '') => `<th class="${cls}">${c[k].label}${b(k)}</th>`;
+    $('spTable1').innerHTML = `<thead><tr>${th('si', 'l')}${th('gu', 'l')}${th('dong', 'l')}${th('name', 'l name')}${th('mv')}${th('hh')}${th('reb')}${th('bd', 'l')}${th('pub')}${th('cr')}</tr></thead><tbody>` +
+      l.map(it => { const [si, gu] = siGu(it);
+        return `<tr data-id="${U.esc(it.id)}"><td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(it.dg)}</td><td class="l name">${it.url ? `<a href="${U.esc(it.url)}" target="_blank" rel="noopener">${U.esc(it.nm)}</a>` : U.esc(it.nm)}</td>` +
+          `<td>${ymTxt(it.mv)}</td><td>${it.hh.toLocaleString()}</td><td>${it.reb ? '<span class="tg low">정비사업</span>' : '-'}</td><td class="l">${U.esc(it.bd)}</td><td>${it.pub ? it.pub.slice(0, 4) + '.' + it.pub.slice(4, 6) : '-'}</td><td>${it.cr == null ? '-' : it.cr.toFixed(1) + ':1'}</td></tr>`; }).join('') + '</tbody>';
+    cards($('spCards1'), $('spTable1'), l.map(it => ({ title: it.nm, url: it.url, sub: `${siGu(it).filter(Boolean).join(' ')} ${it.dg}`, kv: [['입주', ymTxt(it.mv)], ['세대', it.hh.toLocaleString()], ['정비사업', it.reb ? '예' : '-'], ['경쟁률', it.cr == null ? '-' : it.cr.toFixed(1) + ':1']] })));
+    Supply._l1 = l;
+  }
+  async function drawMap() {
+    if (!drawn && $('tab-supply').hidden) return;
+    const msg = $('spMapMsg');
+    if (!KMap.ready()) { msg.innerHTML = KMap.needKeyHtml; $('spMap').hidden = true; return; }
+    const l = (Supply._l1 || rows1).slice(0, 150);
+    try { await KMap.load(); } catch (e) { msg.textContent = e.message; return; }
+    drawn = true;
+    if (!map) map = KMap.create($('spMap'), { lat: 37.55, lng: 126.98 }, 8);
+    else map.relayout();
+    marks.forEach(m => m.setMap(null)); marks = [];
+    const S = kakao.maps.services, gc = new S.Geocoder(), now = nowYm();
+    const find = (it) => new Promise(res => {
+      if (geo.has(it.id)) return res(geo.get(it.id));
+      gc.addressSearch(it.ad.replace(/\s*(일원|일대|외\s*\d+필지).*$/, ''), (r, s) => {
+        if (s === S.Status.OK && r.length) { const p = { lat: +r[0].y, lng: +r[0].x }; geo.set(it.id, p); return res(p); }
+        new S.Places().keywordSearch(`${it.sg} ${it.nm}`, (r2, s2) => { const p = s2 === S.Status.OK && r2.length ? { lat: +r2[0].y, lng: +r2[0].x } : null; geo.set(it.id, p); res(p); });
       });
-    }
-    map.relayout();
-    const all = rowsF();
-    drawOverlays();
-    const ok = await locateAll(all);
-    if (!ok) return;
-    drawOverlays();
-    renderUnfound(); renderTable();
-    if (fit) { const pts = mapRows().map(r => pos.get(r.id)).filter(Boolean); if (pts.length) KMap.fit(map, pts); }
-  }
-  function drawOverlays() {
-    if (!map) return;
-    clearOverlays();
-    mode = map.getLevel() >= ZLV ? 'gu' : 'apt';
-    if (mode === 'gu') {
-      const groups = new Map();
-      rowsF().forEach(r => {
-        const p = pos.get(r.id); const k = `${r.sido}|${r.sgg}`;
-        if (!groups.has(k)) groups.set(k, { name: r.sgg, y: {}, pts: [] });
-        const g = groups.get(k);
-        if (p) g.pts.push(p);
-        if (r.ym >= nowYm()) { const y = r.ym.slice(0, 4); g.y[y] = (g.y[y] || 0) + r.hh; }
-      });
-      for (const g of groups.values()) {
-        if (!g.pts.length) continue;
-        const c = { lat: g.pts.reduce((s, p) => s + p.lat, 0) / g.pts.length, lng: g.pts.reduce((s, p) => s + p.lng, 0) / g.pts.length };
-        const el = guLabelEl(g);
-        el.onclick = () => { map.setLevel(ZLV - 2); map.setCenter(KMap.LL(c)); };
-        const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(c), content: el, yAnchor: 0.5, xAnchor: 0.5, zIndex: 3, clickable: true });
-        ov.setMap(map); overlays.push({ ov, el, w: Object.values(g.y).reduce((s, v) => s + v, 0), p: c, gu: 1 });
-      }
-    } else {
-      const sty = L().sty;
-      mapRows().forEach(r => {
-        const p = pos.get(r.id); if (!p) return;
-        const el = labelEl(r);
-        el.onclick = (e) => { e.stopPropagation(); showCard(r); };
-        const ya = sty === 'mini' ? 0.5 : 1, xa = sty === 'mini' ? 0 : 0.5;
-        const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(p), content: el, yAnchor: ya, xAnchor: xa, zIndex: 4 + Math.round(r.hh / 100), clickable: true });
-        ov.setMap(map); overlays.push({ ov, el, w: r.hh, p, r });
-      });
-    }
-    legend();
-    setTimeout(avoid, 50);
-  }
-  /** 라벨이 겹치면 세대수가 작은 단지를 점으로 줄임 (라벨 크기는 처음 그릴 때 한 번 재 두고, 위치는 지도 좌표로 계산) */
-  function measure() {
-    overlays.forEach(o => { if (o.p && o.fw == null) { const f = o.el.querySelector('.spfull'); o.fw = f ? f.offsetWidth : 0; o.fh = f ? f.offsetHeight : 0; } });
-  }
-  function avoid() {
-    if (!overlays.length || !map) return;
-    measure();
-    const lab = overlays.filter(o => o.p && !o.el.classList.contains('sp-fixed'));
-    const on = mode === 'gu' || (L().avoid && (L().n || L().y || L().h));
-    const proj = map.getProjection(), mini = mode === 'apt' && L().sty === 'mini', mid = mode === 'gu', placed = [], pad = 2;
-    const want = new Map();
-    [...lab].sort((a, b) => b.w - a.w).forEach(o => {
-      if (!on || !o.fw) { want.set(o, false); return; }
-      const pt = proj.containerPointFromCoords(KMap.LL(o.p));
-      const b = mini ? { l: pt.x, t: pt.y - o.fh / 2, r: pt.x + o.fw, b: pt.y + o.fh / 2 } : mid ? { l: pt.x - o.fw / 2, t: pt.y - o.fh / 2, r: pt.x + o.fw / 2, b: pt.y + o.fh / 2 } : { l: pt.x - o.fw / 2, t: pt.y - o.fh, r: pt.x + o.fw / 2, b: pt.y };
-      const hit = placed.some(p => b.l < p.r + pad && b.r > p.l - pad && b.t < p.b + pad && b.b > p.t - pad);
-      want.set(o, hit); if (!hit) placed.push(b);
     });
-    // 구별 합계: 줄인 이름표끼리도 겹치면 숨김 (확대하면 다시 보임)
-    const hide = new Set();
-    if (mid) for (const [o, dot] of want) {
-      if (!dot) continue;
-      const pt = proj.containerPointFromCoords(KMap.LL(o.p)), w = 14 + o.el.textContent.length * 4, h = 20;
-      const b = { l: pt.x - w / 2, t: pt.y - h / 2, r: pt.x + w / 2, b: pt.y + h / 2 };
-      if (placed.some(p => b.l < p.r && b.r > p.l && b.t < p.b && b.b > p.t)) hide.add(o); else placed.push(b);
+    const pts = [];
+    msg.textContent = l.length ? `단지 위치 찾는 중… (0/${l.length})` : '지도에 표시할 단지가 없습니다.';
+    for (let i = 0; i < l.length; i++) {
+      const it = l[i], p = await find(it);
+      if (i % 10 === 9) msg.textContent = `단지 위치 찾는 중… (${i + 1}/${l.length})`;
+      if (!p) continue;
+      pts.push(p);
+      const el = document.createElement('div');
+      const sz = Math.round(10 + Math.min(34, Math.sqrt(it.hh) * 0.9));
+      el.className = 'spdot ' + (it.mv < now ? 'past' : it.mv <= now + 100 ? 'soon' : 'later');
+      el.style.width = el.style.height = sz + 'px';
+      el.title = `${it.nm} · ${it.hh.toLocaleString()}세대 · 입주 ${ymTxt(it.mv)}`;
+      el.onclick = () => { const tr = document.querySelector(`#spTable1 tr[data-id="${CSS.escape(it.id)}"]`); if (tr) { tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); tr.classList.add('flash'); setTimeout(() => tr.classList.remove('flash'), 1500); } U.toast(el.title); };
+      const ov = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(p.lat, p.lng), content: el, yAnchor: 0.5, xAnchor: 0.5 });
+      ov.setMap(map); marks.push(ov);
     }
-    for (const [o, dot] of want) {
-      const hd = hide.has(o);
-      if (o.el.classList.contains('sp-dot') !== dot || o.el.classList.contains('sp-hide') !== hd) { o.el.classList.toggle('sp-dot', dot); o.el.classList.toggle('sp-hide', hd); o.ov.setPosition(KMap.LL(o.p)); }
-    }
-  }
-  function legend() {
-    const dk = darkMap(), single = L().col === 'single';
-    const items = single ? [`<span><i style="background:${L().one}"></i>공급 단지</span>`] : KN.map((k, i) => `<span><i style="background:${PAL[dk ? 'dark' : 'light'][i].a}"></i>${k}</span>`);
-    const n = mode === 'apt' ? overlays.length : rowsF().length;
-    $('spLegend').innerHTML = `<b>입주시기</b>${items.join('')}<span class="sub">${mode === 'gu' ? '구별 합계 (확대하면 단지별)' : `단지 ${n}개${opts.small ? '' : ` · ${SMALL}세대 미만 숨김`}`}</span>`;
-  }
-  function showCard(r) {
-    const c = colorOf(period(r.ym)), p = pos.get(r.id);
-    const ch = r.prev && daysSince(r.chAt) <= CHANGED_DAYS ? `<div class="s">⚠ 입주시기 변경: ${fmtYm(r.prev)} → ${fmtYm(r.ym)} (${r.chAt} 확인)</div>` : '';
-    const q = encodeURIComponent(`${r.sgg} ${r.dong} ${r.name}`);
-    $('spCard').innerHTML = `<div class="card spcard" style="border-left:4px solid ${c.a};border-radius:0 10px 10px 0">
-      <div class="bar"><strong>${esc(r.name)}</strong><span class="spchip" style="background:${c.a}">${KN[period(r.ym)]}</span><span class="grow"></span><button class="mini" data-close>닫기</button></div>
-      <div class="s">${esc(r.addr)}</div>
-      <div class="spkv"><span>입주시기 <b>${esc(fmtYm(r.ym))}</b></span><span>세대수 <b>${r.hh.toLocaleString()}</b></span><span>분양가(3.3㎡) <b>${r.price ? U.price(r.price) + '만' : '-'}</b></span><span>시공사 <b>${esc(r.builder || '-')}</b></span><span>유형 <b>${esc(r.type)}</b></span></div>${ch}
-      <div class="bar" style="margin-top:8px"><a class="btn mini" target="_blank" rel="noopener" href="https://map.kakao.com/?q=${q}">카카오맵</a><a class="btn mini" target="_blank" rel="noopener" href="https://search.naver.com/search.naver?query=${q}">네이버 검색</a>
-      <button class="mini" data-pick="${esc(r.id)}">📍 위치 직접 지정</button>${pins[r.id] ? `<button class="mini" data-unpin="${esc(r.id)}">지정 위치 지우기</button>` : ''}${p ? '' : '<span class="hint" style="margin:0">위치를 못 찾았습니다</span>'}</div></div>`;
-  }
-  const daysSince = (d) => (d ? Math.floor((Date.now() - new Date(d).getTime()) / 864e5) : 1e9);
-  function startPick(id) {
-    pickId = id; $('spMap').classList.add('picking');
-    $('spMap').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const r = data.rows.find(x => x.id === id);
-    U.toast(`지도에서 "${r ? r.name : ''}" 위치를 누르세요. (Esc 취소)`);
-  }
-  function renderUnfound() {
-    const miss = mapRows().filter(r => !pos.has(r.id));
-    $('spUnfound').hidden = !miss.length;
-    $('spUnfound').innerHTML = miss.length ? `<b>⚠ 위치를 못 찾은 단지 ${miss.length}개</b> <span class="hint" style="margin:0">— [📍]를 누르고 지도에서 위치를 찍으면 저장됩니다.</span><div class="chips" style="margin-top:6px">${miss.slice(0, 40).map(r => `<button class="mini" data-pick="${esc(r.id)}">📍 ${esc(r.name)} <small>${esc(r.sgg)}</small></button>`).join('')}${miss.length > 40 ? `<span class="hint">외 ${miss.length - 40}개</span>` : ''}</div>` : '';
+    if (pts.length) KMap.fit(map, pts);
+    msg.textContent = l.length ? `${pts.length}곳 표시${l.length > pts.length ? ` (위치를 못 찾은 곳 ${l.length - pts.length})` : ''}${(Supply._l1 || rows1).length > 150 ? ' · 많아서 앞쪽 150곳만' : ''} · 점 크기 = 세대수` : '지도에 표시할 단지가 없습니다.';
   }
 
-  /* ═══ 단지 표 ═══ */
-  const COLS = [['sgg', '시군구'], ['dong', '읍면동'], ['name', '단지명'], ['ym', '입주시기'], ['hh', '세대수'], ['price', '분양가(3.3㎡)'], ['builder', '시공사'], ['type', '유형'], ['loc', '위치']];
-  function renderTable() {
-    const rows = rowsF(), k = opts.sortK, d = opts.sortD;
-    const val = (r) => (k === 'loc' ? (pos.has(r.id) ? 1 : 0) : r[k]);
-    rows.sort((a, b) => { const x = val(a), y = val(b); return (typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'ko')) * d; });
-    $('spTable').innerHTML = `<thead><tr>${COLS.map(([c, t]) => `<th data-sort="${c}" class="sortable">${t}${c === k ? (d > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead><tbody>` +
-      rows.map(r => { const ch = r.prev && daysSince(r.chAt) <= CHANGED_DAYS; const c = colorOf(period(r.ym));
-        return `<tr data-id="${esc(r.id)}"><td>${esc(r.sgg)}</td><td>${esc(r.dong)}</td><td class="l"><span class="spdotmini" style="background:${c.a}"></span>${esc(r.name)}</td><td>${esc(fmtYm(r.ym))}${ch ? ` <small class="spchg" title="이전 ${esc(r.prev)} · ${esc(r.chAt)} 확인">변경 ← ${esc(fmtYm(r.prev))}</small>` : ''}</td><td class="num">${r.hh.toLocaleString()}</td><td class="num">${r.price ? r.price.toLocaleString() : '-'}</td><td>${esc(r.builder || '-')}</td><td>${esc(r.type)}</td><td>${pos.has(r.id) ? (pins[r.id] ? '📍 직접' : '✓') : (map ? '<span class="warn">못 찾음</span>' : '-')}</td></tr>`; }).join('') + '</tbody>';
-    $('spTableCount').textContent = `${rows.length}단지 · ${fmtN(rows.reduce((s, r) => s + r.hh, 0))}세대`;
-  }
-  function excel() {
-    const rows = rowsF().sort((a, b) => a.ym.localeCompare(b.ym));
-    U.download(`공급_${U.stamp()}`, [{ name: '공급', rows: [['시도', '시군구', '읍면동', '단지명', '소재지', '입주시기', '총세대수', '분양가(3.3㎡ 만원)', '시공사', '주택유형', '이전 입주시기'], ...rows.map(r => [r.sido, r.sgg, r.dong, r.name, r.addr, r.ym, r.hh, r.price || '', r.builder, r.type, r.prev || ''])] }]);
-  }
-
-  /* ═══ 라벨 꾸미기 (서랍) ═══ */
-  function seg(k, list) { return `<div class="spseg" data-seg="${k}">${list.map(([v, t]) => `<button type="button" data-v="${v}" class="${String(L()[k]) === String(v) ? 'on' : ''}">${t}</button>`).join('')}</div>`; }
-  function renderDrawer() {
-    const l = L(), my = Store.get(KS, []);
-    const presetOn = (p) => Object.entries(p.v).every(([k, v]) => l[k] === v);
-    $('spDrawerBody').innerHTML = `
-      <div class="drawsec"><h4>추천 조합</h4><div class="spseg">${PRESETS.map(p => `<button type="button" data-preset="${p.k}" class="${presetOn(p) ? 'on' : ''}">${p.name}</button>`).join('')}</div></div>
-      <div class="drawsec"><h4>라벨에 넣을 것</h4>
-        <label class="inline"><input type="checkbox" data-k="n" ${l.n ? 'checked' : ''}> 아파트 이름</label>
-        <label class="inline"><input type="checkbox" data-k="y" ${l.y ? 'checked' : ''}> 연식(입주시기)</label>
-        <label class="inline"><input type="checkbox" data-k="h" ${l.h ? 'checked' : ''}> 세대수</label>
-        <span class="hint" style="margin:0;width:100%">셋 다 끄면 색 점만 보입니다. 구별 합계 라벨은 그대로입니다.</span></div>
-      <div class="drawsec"><h4>스타일</h4>${seg('sty', STYLES)}</div>
-      <div class="drawsec"><h4>색상</h4>${seg('col', [['period', '입주시기별'], ['single', '단일색'], ['outline', '테두리만']])}
-        ${l.col === 'single' ? `<label class="inline">색 <input type="color" data-k="one" value="${esc(l.one)}"></label>` : ''}</div>
-      <div class="drawsec"><h4>지도 바탕</h4>${seg('map', [['auto', '자동 (배경 테마 따라)'], ['dark', '어둡게'], ['light', '밝게']])}</div>
-      <div class="drawsec"><h4>크기</h4>${seg('size', [['s', '작게'], ['m', '보통'], ['l', '크게']])}
-        <label class="inline"><input type="checkbox" data-k="byHh" ${l.byHh ? 'checked' : ''}> 세대수가 많을수록 크게</label></div>
-      <div class="drawsec"><h4>세부 설정</h4>
-        <label class="inline" style="width:100%">배경 투명도 <input type="range" min="40" max="100" step="5" data-k="op" value="${l.op}" style="flex:1"> <b>${l.op}%</b></label>
-        <span class="hint" style="margin:0">모서리</span>${seg('rad', [['sq', '각지게'], ['md', '약간'], ['round', '완전 둥글게']])}
-        <span class="hint" style="margin:0">글자</span>${seg('wt', [['n', '보통'], ['b', '굵게']])}
-        <label>연식 표기 <select data-k="yf"><option value="dot">27.04</option><option value="full">2027.04</option><option value="kor">27년 4월</option></select></label>
-        <label>세대수 표기 <select data-k="hf"><option value="full">1,250세대</option><option value="k">1.3천</option><option value="num">1,250</option></select></label>
-        <label>구분 기호 <select data-k="sep"><option value=" · ">가운뎃점 ·</option><option value=" | ">세로줄 |</option><option value="br">줄바꿈</option></select></label></div>
-      <div class="drawsec"><h4>효과</h4>
-        <label class="inline"><input type="checkbox" data-k="shadow" ${l.shadow ? 'checked' : ''}> 그림자</label>
-        <label class="inline"><input type="checkbox" data-k="hover" ${l.hover ? 'checked' : ''}> 마우스를 올리면 살짝 커짐</label>
-        <label class="inline"><input type="checkbox" data-k="avoid" ${l.avoid ? 'checked' : ''}> 겹치면 작은 단지는 점으로</label></div>
-      <div class="drawsec"><h4>내 스타일 (최대 3개)</h4>
-        ${my.length ? my.map((s, i) => `<span class="spmy"><button type="button" data-myload="${i}">${esc(s.name)}</button><button class="mini" data-mydel="${i}" title="지우기">✕</button></span>`).join('') : '<span class="hint" style="margin:0">저장한 스타일이 없습니다.</span>'}
-        <div class="bar" style="width:100%;margin-top:4px"><input type="text" id="spMyName" placeholder="스타일 이름" maxlength="12" style="flex:1"><button type="button" data-mysave>지금 스타일 저장</button></div>
-        <button type="button" data-reset style="margin-top:4px">기본값으로 되돌리기</button></div>
-      <div class="drawsec"><h4>지도 크기</h4><label class="inline" style="width:100%">세로 <input type="range" min="320" max="1000" step="20" data-mh value="${opts.mapH}" style="flex:1"> <b>${opts.mapH}px</b></label></div>`;
-    $('spDrawerBody').querySelectorAll('select[data-k]').forEach(s => { s.value = l[s.dataset.k]; });
-  }
-  function setLabel(patch) { Object.assign(opts.label, patch); saveOpts(); renderDrawer(); restyle(); }
-  function restyle() { $('spMap').classList.toggle('spdark', darkMap()); drawOverlays(); renderTable(); }
-  function initDrawer() {
-    const body = $('spDrawerBody');
-    body.onclick = (e) => {
-      const b = e.target.closest('button'); if (!b) return;
-      const sg = b.closest('[data-seg]');
-      if (sg && b.dataset.v != null) return setLabel({ [sg.dataset.seg]: b.dataset.v });
-      if (b.dataset.preset) return setLabel({ ...PRESETS.find(p => p.k === b.dataset.preset).v });
-      if (b.dataset.myload != null) { const s = Store.get(KS, [])[+b.dataset.myload]; if (s) setLabel({ ...s.v }); return; }
-      if (b.dataset.mydel != null) { const a = Store.get(KS, []); a.splice(+b.dataset.mydel, 1); Store.set(KS, a); return renderDrawer(); }
-      if (b.hasAttribute('data-mysave')) {
-        const a = Store.get(KS, []), name = ($('spMyName').value || '').trim() || `내 스타일 ${a.length + 1}`;
-        if (a.length >= 3) return U.toast('내 스타일은 3개까지 저장됩니다. 하나를 지우고 저장하세요.');
-        a.push({ name, v: { ...L() } }); Store.set(KS, a); U.toast(`"${name}" 저장했습니다.`); return renderDrawer();
+  /* ── ⑤ 분양가 vs 주변 시세 ── */
+  const norm = (s) => String(s || '').replace(/\s|\(.*?\)|아파트/g, '');
+  async function buildCmp() {
+    const seq = ++cmpSeq;
+    const from = String(Math.floor(nowYm() / 100) - st.pubYears) + String(nowYm() % 100).padStart(2, '0') + '01';
+    const l = inScope().filter(it => it.pub && (st.pubYears >= 7 || it.pub >= from) && it.m && it.m.length);
+    const need = [...new Set(l.map(it => it.c))];
+    $('spEmpty2').hidden = false; $('spEmpty2').textContent = need.length ? `주변 실거래 불러오는 중… (0/${need.length} 지역)` : '';
+    const sale = await K.sale(need, (i, n) => { $('spEmpty2').textContent = `주변 실거래 불러오는 중… (${i}/${n} 지역)`; });
+    if (seq !== cmpSeq) return;
+    const t = new Date(), since = (t.getFullYear() - 1) * 10000 + (t.getMonth() + 1) * 100 + t.getDate();
+    const minYear = t.getFullYear() - 10;
+    const out = [];
+    for (const it of l) {
+      const m = sale.get(it.c) || new Map(), mt = K.meta(it.c) || { by: {} };
+      for (const [ty, area, n, price] of it.m) {
+        if (!area || !price) continue;
+        const pc = Home.pyClass(area);
+        if (st.py && pc !== st.py) continue;
+        const comp = [];
+        m.forEach(o => {
+          if (Math.abs(o.area - area) > 3) return;
+          const p = Data.parseKey(o.key);
+          if (st.scope === 'dong' && p.dong !== it.dg) return;
+          if (norm(p.name) && norm(it.nm).includes(norm(p.name))) return;            // 자기 단지(입주 뒤 거래) 빼기
+          const by = mt.by[o.key];
+          if (st.age === 'new' && !(by && by >= minYear)) return;
+          const tr = o.tr.filter(x => x.d >= since && !x.direct);
+          if (!tr.length) return;
+          const last = tr[tr.length - 1];
+          comp.push({ name: p.name, dong: p.dong, area: o.area, by, avg: tr.reduce((a, x) => a + x.price, 0) / tr.length, n: tr.length, last });
+        });
+        const avg = comp.length ? comp.reduce((a, x) => a + x.avg, 0) / comp.length : null;
+        out.push({ rid: `${it.id}#${ty}`, it, ty, area, n, price, pc, comp, avg, diff: avg ? (price / avg - 1) * 100 : null, cr: it.cm ? it.cm[ty] ?? null : null });
       }
-      if (b.hasAttribute('data-reset')) return setLabel({ ...DEF_LABEL });
+    }
+    rows2 = out;
+    drawCmp();
+  }
+  function cols2() {
+    const N = ColFilter.numCol, T = ColFilter.txtCol;
+    return {
+      si: T('시', r => siGu(r.it)[0]), gu: T('구', r => siGu(r.it)[1]), dong: T('동', r => r.it.dg), name: T('단지', r => r.it.nm),
+      ty: { label: '주택형', get: r => `${r.ty.replace(/^0+/, '')} (${CONFIG.toPyeong(r.area)}평)`, num: r => r.area }, pc: T('평형 구분', r => Home.pyName(r.pc)),
+      pub: { label: '공고일', get: r => (r.it.pub ? `${r.it.pub.slice(0, 4)}.${r.it.pub.slice(4, 6)}` : ''), num: r => +r.it.pub || null },
+      mv: { label: '입주 예정', get: r => ymTxt(r.it.mv), num: r => r.it.mv },
+      price: N('분양가', r => r.price), avg: N('주변 시세', r => r.avg), diff: N('주변 대비', r => r.diff, 'pct'),
+      cnt: N('비교 단지', r => r.comp.length, 'n'), cr: N('경쟁률', r => r.cr, 'n'),
     };
-    body.onchange = (e) => {
-      const t = e.target, k = t.dataset.k;
-      if (k) setLabel({ [k]: t.type === 'checkbox' ? (t.checked ? 1 : 0) : t.type === 'range' ? +t.value : t.value });
-    };
-    body.oninput = (e) => {
-      const t = e.target;
-      if (t.dataset.mh != null) { opts.mapH = +t.value; t.nextElementSibling.textContent = t.value + 'px'; $('spMap').style.height = opts.mapH + 'px'; if (map) map.relayout(); saveOpts(); }
-      else if (t.dataset.k === 'op') { t.nextElementSibling.textContent = t.value + '%'; opts.label.op = +t.value; saveOpts(); drawOverlays(); }
-    };
-    $('btnSpDrawer').onclick = () => { const d = $('spDrawer'); d.hidden = !d.hidden; if (!d.hidden) renderDrawer(); $('btnSpDrawer').classList.toggle('on', !d.hidden); };
-    $('btnSpDrawerClose').onclick = () => { $('spDrawer').hidden = true; $('btnSpDrawer').classList.remove('on'); };
+  }
+  const F2 = () => f2 || (f2 = ColFilter.create({ key: 'sup2', cols: cols2, bar: 'spCfBar2', onChange: drawCmp }));
+  function drawCmp() {
+    const l = F2().apply(rows2, (x) => [...x].sort((a, b) => (b.it.pub || '').localeCompare(a.it.pub || '') || a.it.nm.localeCompare(b.it.nm, 'ko') || a.area - b.area));
+    $('spCmpTitle').textContent = `분양가 vs 주변 시세 (${l.length.toLocaleString()}개 주택형)`;
+    $('spEmpty2').hidden = l.length > 0; $('spEmpty2').textContent = rows2.length ? '필터에 맞는 주택형이 없습니다.' : '고른 지역·기간에 분양 공고가 없습니다.';
+    const b = (k) => F2().btn(k), c = cols2();
+    const th = (k, cls = '') => `<th class="${cls}">${c[k].label}${b(k)}</th>`;
+    $('spTable2').innerHTML = `<thead><tr>${th('si', 'l')}${th('gu', 'l')}${th('dong', 'l')}${th('name', 'l name')}${th('ty')}${th('pc')}${th('pub')}${th('mv')}${th('price')}${th('avg')}${th('diff')}${th('cnt')}${th('cr')}</tr></thead><tbody>` +
+      l.map(r => { const [si, gu] = siGu(r.it), weak = r.comp.length < 3;
+        let h = `<tr data-r="${U.esc(r.rid)}" class="click${weak ? ' old' : ''}"><td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(r.it.dg)}</td><td class="l name">${U.esc(r.it.nm)}</td>` +
+          `<td>${U.esc(r.ty.replace(/^0+/, ''))}<small>${CONFIG.toPyeong(r.area)}평</small></td><td>${Home.pyName(r.pc)}</td><td>${r.it.pub ? r.it.pub.slice(2, 4) + '.' + r.it.pub.slice(4, 6) : '-'}</td><td>${ymTxt(r.it.mv)}</td>` +
+          `<td class="sale"><b>${eok(r.price)}</b></td><td>${eok(r.avg)}</td><td class="${U.cls(r.diff)}">${r.diff == null ? '-' : U.pct(r.diff)}</td><td>${r.comp.length}${weak ? ' <small>비교 부족</small>' : ''} ${r.comp.length ? (open2.has(r.rid) ? '▴' : '▾') : ''}</td><td>${r.cr == null ? '-' : r.cr.toFixed(1) + ':1'}</td></tr>`;
+        if (open2.has(r.rid) && r.comp.length) h += `<tr class="hmsub"><td colspan="13">${r.comp.sort((a, b) => b.avg - a.avg).map(x => `<span>${U.esc(x.dong)} ${U.esc(x.name)} ${Math.round(x.area)}㎡ · 평균 <b>${eok(x.avg)}</b> (${x.n}건, 최근 ${U.date(x.last.d)}) · ${x.by || '-'}년</span>`).join('<br>')}</td></tr>`;
+        return h; }).join('') + '</tbody>';
+    cards($('spCards2'), $('spTable2'), l.map(r => ({ title: `${r.it.nm} ${r.ty.replace(/^0+/, '')}`, sub: `${siGu(r.it).filter(Boolean).join(' ')} ${r.it.dg} · 공고 ${r.it.pub ? r.it.pub.slice(0, 4) + '.' + r.it.pub.slice(4, 6) : '-'}`,
+      kv: [['분양가', eok(r.price)], ['주변', eok(r.avg)], ['주변 대비', r.diff == null ? '-' : U.pct(r.diff)], ['비교', r.comp.length + '곳'], ['경쟁률', r.cr == null ? '-' : r.cr.toFixed(1) + ':1']] })));
+    Supply._l2 = l;
   }
 
-  /* ═══ 그리기 ═══ */
-  function render(fit = true) {
-    const has = data.rows.length > 0;
-    $('spEmpty').hidden = has; $('spBody').hidden = !has;
-    renderFiles();
-    if (!has) return;
-    renderFilters();
-    const rows = rowsF();
-    renderCards(rows);
-    $('spView').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.view === opts.view));
-    renderChart(rows);
-    renderTable();
-    if (!$('tab-supply').hidden) renderMap(fit);
+  /* 휴대폰: 표 대신 카드 */
+  function cards(box, table, list) {
+    const narrow = window.innerWidth <= 760;
+    table.closest('.tablewrap').hidden = narrow; box.hidden = !narrow;
+    if (!narrow) return;
+    box.innerHTML = list.slice(0, 300).map(x => `<div class="hmrc"><div class="hmrc1">${x.url ? `<a href="${U.esc(x.url)}" target="_blank" rel="noopener">${U.esc(x.title)}</a>` : `<b>${U.esc(x.title)}</b>`} <small>${U.esc(x.sub)}</small></div>` +
+      `<div class="hmrc2">${x.kv.map(([k, v]) => `<span>${k} <b>${U.esc(v)}</b></span>`).join('')}</div></div>`).join('');
+  }
+
+  function excel(which) {
+    const l = which === 1 ? Supply._l1 || [] : Supply._l2 || [], c = which === 1 ? cols1() : cols2();
+    const ks = Object.keys(c);
+    const money = ['price', 'avg'];
+    const rows = [ks.map(k => c[k].label), ...l.map(r => ks.map(k => { if (money.includes(k)) { const v = c[k].num(r); return v == null ? '' : +(v / 10000).toFixed(2); } if (k === 'diff') { const v = c[k].num(r); return v == null ? '' : +v.toFixed(1); } return c[k].get(r); }))];
+    U.download(`공급_${which === 1 ? '입주예정' : '분양가비교'}_${U.stamp ? U.stamp() : ''}`, [{ name: which === 1 ? '입주예정' : '분양가비교', rows }]);
+  }
+
+  /* ── 고르는 줄 ── */
+  function syncControls() {
+    document.querySelectorAll('#spUnit button').forEach(b => b.classList.toggle('on', b.dataset.u === st.unit));
+    document.querySelectorAll('#spScope button').forEach(b => b.classList.toggle('on', b.dataset.s === st.scope));
+    document.querySelectorAll('#spAge button').forEach(b => b.classList.toggle('on', b.dataset.a === st.age));
+    document.querySelectorAll('#spPy button').forEach(b => b.classList.toggle('on', b.dataset.p === st.py));
+    $('spNoReb').checked = st.noReb; $('spPubYears').value = String(st.pubYears);
+    $('spChips').innerHTML = st.regs.map(t => `<span class="hmchip">${U.esc(K.tokLabel(t))}<button data-rm="${t}" title="빼기">✕</button></span>`).join('') || '<span class="hint" style="margin:0">지역을 추가하세요</span>';
+    $('spCondSum').textContent = [st.regs.map(K.tokLabel).join(', ') || '지역 없음', st.unit === 'h' ? '반기별' : '연도별', st.noReb ? '정비사업 제외' : ''].filter(Boolean).join(' · ');
+  }
+  function regPop() {
+    const pop = $('spRegPop'), regions = K.regions();
+    const sidoList = [...new Set(regions.map(r => r[1]))], cur = pop.dataset.p || '';
+    const subs = cur ? regions.filter(r => (cur.startsWith('m:') ? (K.metroOf(r) === cur.slice(2) || K.cityOf(r) === cur.slice(2)) : r[1] === cur)) : [];
+    const on = (t) => (st.regs.includes(t) ? ' on' : '');
+    pop.innerHTML = `<div class="hmpr"><span class="hmk">묶음</span>${Object.entries(K.GRP).map(([k, v]) => `<button class="mini${on('g:' + k)}" data-tok="g:${k}">${v}</button>`).join('')}</div>` +
+      `<div class="hmpr"><span class="hmk">광역시</span>${K.METRO.map(m => `<button class="mini${on('m:' + m)}" data-tok="m:${m}">${m}</button>`).join('')}</div>` +
+      `<div class="hmpr"><span class="hmk">중소도시</span>${K.CITY.map(m => `<button class="mini${on('m:' + m)}" data-tok="m:${m}">${m}</button>`).join('')}</div>` +
+      `<div class="hmpr"><span class="hmk">구 고르기</span><select id="spGuSel"><option value="">시·도 / 도시 고르기</option>` +
+      sidoList.map(s => `<option value="${U.esc(s)}"${cur === s ? ' selected' : ''}>${U.esc(K.shortSido(s))}</option>`).join('') +
+      [...K.METRO, ...K.CITY].filter(m => regions.some(r => K.metroOf(r) === m || K.cityOf(r) === m)).map(m => `<option value="m:${m}"${cur === 'm:' + m ? ' selected' : ''}>${m} (구별)</option>`).join('') + '</select></div>' +
+      (subs.length ? `<div class="hmpr hmgus">${subs.map(r => `<label class="inline"><input type="checkbox" data-gu="${r[0]}"${st.regs.includes('c:' + r[0]) ? ' checked' : ''}> ${U.esc(K.tokLabel('c:' + r[0]))}</label>`).join('')}</div>` : '') +
+      '<div class="hmpr" style="justify-content:flex-end"><button class="mini" data-close="1">닫기</button></div>';
+  }
+  const regChanged = () => { st.period = null; save(); regPop(); refresh(true); };
+
+  function refresh(cmp) {
+    syncControls();
+    drawBars();
+    rows1 = listRows(); drawList(); drawMap();
+    if (cmp !== false) buildCmp();
+  }
+
+  function setup() {
+    const err = status && status.errors && status.errors.length ? status.errors : null;
+    $('spBody').hidden = !!(!items.length);
+    const box = $('spSetup');
+    box.hidden = items.length > 0 && !err;
+    if (box.hidden) return;
+    box.innerHTML = items.length
+      ? `<div class="bar"><strong>⚠️ 마지막 공급 자료 수집에 문제가 있었습니다</strong></div><p class="hint">${err.map(U.esc).join('<br>')}</p><p class="hint">예전에 받은 자료로 화면을 보여 줍니다. 위 내용을 캡처해 보내 주시면 고쳐 드립니다.</p>`
+      : `<div class="bar"><strong>공급 자료가 아직 없습니다</strong></div>
+        <ol class="spsteps">
+          <li>공공데이터포털에서 <b>청약홈 분양정보 조회 서비스</b>, <b>청약홈 청약접수 경쟁률 조회 서비스</b> 활용 신청 (실거래와 같은 키)</li>
+          <li>GitHub 저장소 → <b>Actions</b> → <b>공급 자료 수집 (청약홈)</b> → <b>Run workflow</b></li>
+          <li>처음에는 2020년 이후 공고를 모두 받느라 수십 분 걸립니다. 초록 체크가 뜨면 이 화면을 새로고침(Ctrl+Shift+R)</li>
+        </ol>${err ? `<p class="hint">마지막 수집 기록 (${U.esc(status.asOf || '')}): ${err.map(U.esc).join('<br>')}</p>` : ''}`;
   }
 
   async function init() {
-    if (inited) return; inited = true;
-    regions = await Data.regions();
-    fetch(`${CONFIG.DATA_URL}/population.json`, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).then(d => { pop = d; if (data.rows.length && !$('tab-supply').hidden) { const rows = rowsF(); renderCards(rows); renderChart(rows); } }).catch(() => {});
-    $('spFile').onchange = onFiles;
-    $('btnSpUpload').onclick = () => $('spFile').click();
-    $('btnSpUpload2').onclick = () => $('spFile').click();
-    $('spFiles').onclick = (e) => {
-      const b = e.target.closest('[data-delf]'); if (!b) return;
-      const f = data.files[+b.dataset.delf]; if (!f || !confirm(`${f.sidos.join('·')} 공급 자료를 지울까요?`)) return;
-      data.rows = data.rows.filter(r => !f.sidos.includes(r.sido)); data.files.splice(+b.dataset.delf, 1); saveData(); render();
-    };
-    $('spSido').onchange = () => { opts.sido = $('spSido').value; opts.sggs = []; opts.dong = ''; saveOpts(); render(); };
-    $('spSggs').onclick = (e) => {
-      const b = e.target.closest('[data-g]'); if (!b) return;
-      const g = b.dataset.g;
-      if (!g) opts.sggs = []; else opts.sggs = opts.sggs.includes(g) ? opts.sggs.filter(x => x !== g) : [...opts.sggs, g];
-      opts.dong = ''; saveOpts(); render();
-    };
-    $('spDong').onchange = () => { opts.dong = $('spDong').value; saveOpts(); render(); };
-    $('spNoRent').onchange = () => { opts.noRent = $('spNoRent').checked ? 1 : 0; saveOpts(); render(false); };
-    $('spSmall').onchange = () => { opts.small = $('spSmall').checked ? 1 : 0; saveOpts(); drawOverlays(); renderUnfound(); };
-    $('spRatio').onchange = () => { const v = parseFloat($('spRatio').value); opts.ratio = isFinite(v) && v > 0 ? Math.min(5, v) : 0.5; saveOpts(); const rows = rowsF(); renderCards(rows); renderChart(rows); };
-    $('spView').onclick = (e) => { const b = e.target.closest('[data-view]'); if (!b) return; opts.view = b.dataset.view; saveOpts(); $('spView').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderChart(rowsF()); };
-    $('btnSpExcel').onclick = excel;
-    $('btnSpFit').onclick = () => { if (!map) return; const pts = mapRows().map(r => pos.get(r.id)).filter(Boolean); if (pts.length) KMap.fit(map, pts); };
-    $('spTable').onclick = (e) => {
-      const th = e.target.closest('th[data-sort]');
-      if (th) { const k = th.dataset.sort; opts.sortD = opts.sortK === k ? -opts.sortD : 1; opts.sortK = k; saveOpts(); return renderTable(); }
-      const tr = e.target.closest('tr[data-id]'); if (!tr) return;
-      const r = data.rows.find(x => x.id === tr.dataset.id); if (!r) return;
-      showCard(r);
-      const p = pos.get(r.id);
-      if (p && map) { map.setLevel(4); map.setCenter(KMap.LL(p)); $('spMap').scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-    };
-    const pickClick = (e) => {
-      const b = e.target.closest('[data-pick],[data-unpin],[data-close]'); if (!b) return;
-      if (b.dataset.pick) startPick(b.dataset.pick);
-      else if (b.dataset.unpin) { delete pins[b.dataset.unpin]; Store.set(KP, pins); pos.delete(b.dataset.unpin); geoMemo.delete(b.dataset.unpin); renderMap(false); $('spCard').innerHTML = ''; }
-      else $('spCard').innerHTML = '';
-    };
-    $('spUnfound').onclick = pickClick; $('spCard').onclick = pickClick;
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && pickId) { pickId = null; $('spMap').classList.remove('picking'); U.toast('위치 지정을 취소했습니다.'); } });
-    initDrawer();
-    if (typeof Saves !== 'undefined') Saves.register('supply', { name: '공급', keys: [KD, KO, KP] });
-  }
-  function open() { render(!map); if (map) setTimeout(() => map.relayout(), 50); }
+    K = Home.kit;
+    await K.regReady();
+    st = Object.assign(DEF(), Store.get(SK, {}) || {});
+    const [sp, ss, pp] = await Promise.all([Data.json('supply.json', null), Data.json('supply_status.json', null), Data.json('population.json', null)]);
+    items = (sp && sp.items) || []; status = ss; pop = pp && pp.pop ? pp : null;
+    $('spInfo').textContent = items.length
+      ? `자료 기준 ${sp.asOf || '-'} · 청약홈 분양 공고 ${items.length.toLocaleString()}건 (2020.02~) · 세대수는 일반분양 기준${pop ? ` · 인구 ${ymTxt(pop.ym)} 기준` : ''}`
+      : '';
+    setup();
+    if (window.innerWidth <= 760) $('spCond').open = false;
 
-  return { init, open };
+    $('spUnit').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.unit = b.dataset.u; st.period = null; save(); refresh(false); };
+    $('spNoReb').onchange = () => { st.noReb = $('spNoReb').checked; save(); refresh(true); };
+    $('spPeriodClear').onclick = () => { st.period = null; save(); refresh(false); };
+    $('spPubYears').onchange = () => { st.pubYears = +$('spPubYears').value; save(); buildCmp(); };
+    $('spScope').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.scope = b.dataset.s; save(); syncControls(); buildCmp(); };
+    $('spAge').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.age = b.dataset.a; save(); syncControls(); buildCmp(); };
+    $('spPy').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.py = b.dataset.p; save(); syncControls(); buildCmp(); };
+    $('spChips').onclick = (e) => { const b = e.target.closest('[data-rm]'); if (b) { st.regs = st.regs.filter(t => t !== b.dataset.rm); regChanged(); } };
+    $('spAddReg').onclick = () => { const p = $('spRegPop'); p.hidden = !p.hidden; if (!p.hidden) regPop(); };
+    $('spRegPop').onclick = (e) => {
+      const t = e.target.closest('[data-tok]');
+      if (t) { const k = t.dataset.tok; st.regs = k === 'g:all' ? ['g:all'] : st.regs.includes(k) ? st.regs.filter(x => x !== k) : [...st.regs.filter(x => x !== 'g:all'), k]; regChanged(); return; }
+      if (e.target.closest('[data-close]')) $('spRegPop').hidden = true;
+    };
+    $('spRegPop').onchange = (e) => {
+      if (e.target.id === 'spGuSel') { $('spRegPop').dataset.p = e.target.value; regPop(); return; }
+      const gc = e.target.dataset.gu;
+      if (gc) { const t = 'c:' + gc; st.regs = e.target.checked ? [...st.regs.filter(x => x !== 'g:all' && x !== t), t] : st.regs.filter(x => x !== t); regChanged(); }
+    };
+    document.addEventListener('mousedown', (e) => { const p = $('spRegPop'); if (!p.hidden && !p.contains(e.target) && e.target.id !== 'spAddReg') p.hidden = true; });
+    $('spTable2').onclick = (e) => { const tr = e.target.closest('tr[data-r]'); if (!tr || e.target.closest('button.colf')) return; const id = tr.dataset.r; open2.has(id) ? open2.delete(id) : open2.add(id); drawCmp(); };
+    $('spExcel1').onclick = () => excel(1);
+    $('spExcel2').onclick = () => excel(2);
+    // 탭이 처음 보일 때 지도 그리기 (숨긴 상태에서는 지도 크기를 잴 수 없음)
+    new MutationObserver(() => { if (!$('tab-supply').hidden && items.length) { drawn = true; setTimeout(drawMap, 50); } }).observe($('tab-supply'), { attributes: true, attributeFilter: ['hidden'] });
+    if (items.length) refresh(!$('tab-supply').hidden);
+    else syncControls();
+    // 분양가 비교는 무거우니 탭을 처음 열 때 계산
+    let once = false;
+    new MutationObserver(() => { if (!$('tab-supply').hidden && items.length && !once) { once = true; buildCmp(); } }).observe($('tab-supply'), { attributes: true, attributeFilter: ['hidden'] });
+  }
+
+  return { init, _st: () => st };
 })();

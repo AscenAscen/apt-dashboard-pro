@@ -129,6 +129,7 @@ const App = (() => {
     Compare.init();
     Infra.init();
     Home.init();
+    if (typeof Supply !== 'undefined') Supply.init();
     Market.init(); Imjang.init(); PriceMap.init(); if (typeof PmArea !== "undefined") PmArea.init(); Eval.init();
     await Search.init();
     await Promise.all([My.init(), Land.init()]);
