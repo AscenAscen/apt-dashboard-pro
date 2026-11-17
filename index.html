@@ -29,6 +29,7 @@
     <button data-tab="map">시세지도</button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
+    <button data-tab="supply">공급</button>
     <button data-tab="invest">투자금</button>
     <button data-tab="market">시장 신호</button>
     <button data-tab="my">내 분석</button>
@@ -860,6 +861,62 @@
   </section>
 </main>
 
+<!-- ═══════════════ 공급 (입주물량) ═══════════════ -->
+<main id="tab-supply" class="tab" hidden>
+  <section class="panel">
+    <div class="bar"><strong>🏗️ 입주물량 (부동산지인)</strong><span class="grow"></span>
+      <button id="btnSpUpload" class="primary">📂 엑셀 올리기</button></div>
+    <p class="hint">부동산지인에서 내려받은 입주물량 엑셀을 그대로 올리세요. 지역마다 따로 올리면 합쳐집니다. 자료는 <b>이 브라우저에만</b> 저장되고, 전체 백업에 함께 들어갑니다.</p>
+    <div class="spfiles" id="spFiles"></div>
+    <input type="file" id="spFile" accept=".xlsx,.xls,.csv" multiple hidden>
+  </section>
+  <section class="panel empty" id="spEmpty">아직 공급 자료가 없습니다.<br>부동산지인 입주물량 화면에서 엑셀을 내려받아 <button id="btnSpUpload2" class="primary">📂 엑셀 올리기</button> 를 누르세요.</section>
+  <div id="spBody" hidden>
+    <section class="panel">
+      <div class="filters">
+        <label>시도 <select id="spSido"></select></label>
+        <label id="spDongWrap" hidden>읍면동 <select id="spDong"></select></label>
+        <div class="checks">
+          <label><input type="checkbox" id="spNoRent"> 임대 제외</label>
+        </div>
+      </div>
+      <div class="chips spsggs" id="spSggs" aria-label="시군구 (여러 개 고르면 합산)"></div>
+      <p class="hint" style="margin-bottom:0">시군구를 여러 개 누르면 합쳐서 봅니다. [전체]를 누르면 시도 전체.</p>
+    </section>
+    <section class="panel"><div class="cards spcards" id="spCards"></div></section>
+    <section class="panel">
+      <div class="cxchartbar"><b>📊 공급 그래프</b>
+        <span class="grow"></span>
+        <label class="inline">적정 수요 = 인구 × <input type="number" id="spRatio" min="0.1" max="5" step="0.1" style="width:64px">%</label>
+        <span class="ckrange" id="spView"><button type="button" class="ckr" data-view="year">연도별</button><button type="button" class="ckr" data-view="month">월별</button></span>
+      </div>
+      <div class="spchart" id="spChartBox"></div>
+      <p class="hint" id="spChartNote"></p>
+    </section>
+    <section class="panel">
+      <div class="filters pmbar"><b>🗺️ 공급 지도</b>
+        <label class="inline chk"><input type="checkbox" id="spSmall"> 100세대 미만도 표시</label>
+        <span class="hint" id="spGeo" style="margin:0"></span>
+        <span class="grow"></span>
+        <button id="btnSpFit">전체 보기</button>
+        <button id="btnSpDrawer">🎨 라벨 꾸미기</button>
+      </div>
+      <div class="pmmapbox"><div class="kmap spmap" id="spMap"></div><div class="pmlegend splegend" id="spLegend" aria-label="범례"></div></div>
+      <div class="spunfound" id="spUnfound" hidden></div>
+      <div id="spCard" style="margin-top:10px"></div>
+      <p class="hint">멀리 보면 구별 합계, 가까이 보면 단지 라벨이 나옵니다. 라벨을 누르면 자세한 정보가 나옵니다. 위치는 카카오 주소 검색으로 그때그때 찾습니다.</p>
+    </section>
+    <section class="panel">
+      <div class="bar"><b>📋 단지 목록</b><span class="hint" id="spTableCount" style="margin:0"></span><span class="grow"></span><button id="btnSpExcel">엑셀 다운로드</button></div>
+      <div class="tablewrap short"><table id="spTable" data-title="공급 단지"></table></div>
+    </section>
+  </div>
+  <aside class="drawer" id="spDrawer" hidden>
+    <div class="drawhead"><strong>🎨 라벨 꾸미기</strong><span class="grow"></span><button id="btnSpDrawerClose">닫기 ✕</button></div>
+    <div id="spDrawerBody"></div>
+  </aside>
+</main>
+
 <!-- ═══════════════ 랜드마크 ═══════════════ -->
 <!-- ═══════════════ 시세지도 ═══════════════ -->
 <main id="tab-map" class="tab" hidden>
@@ -1124,7 +1181,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/supply.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

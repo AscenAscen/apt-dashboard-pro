@@ -19,6 +19,7 @@ const App = (() => {
     if (name === 'imjang') Imjang.open();
     if (name === 'guide') Guide.open();
     if (name === 'grouping') My.pivot();
+    if (name === 'supply') Supply.open();
   }
 
   /** 지도 창 열기. 단지 정보(code, key, sido, sgg, dong, jibun, name)가 있으면 됩니다.
@@ -118,7 +119,7 @@ const App = (() => {
     document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
     $('mapClose').onclick = closeMap;
     $('mapModal').onclick = (e) => { if (e.target.id === 'mapModal') closeMap(); };
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); ['realModal', 'codeModal', 'pasteModal'].forEach(id => { $(id).hidden = true; }); document.body.classList.remove('imjang-mode'); } });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMap(); const sd = $('spDrawer'); if (sd && !sd.hidden) { sd.hidden = true; $('btnSpDrawer')?.classList.remove('on'); } ['realModal', 'codeModal', 'pasteModal'].forEach(id => { $(id).hidden = true; }); document.body.classList.remove('imjang-mode'); } });
     Guide.init();
     Tracking.init(); if (typeof TrkPlus !== "undefined") TrkPlus.init(); if (typeof Sync !== "undefined") Sync.init(); if (typeof CxView !== "undefined") CxView.init(); if (typeof CK !== "undefined") CK.init();
     QLog.check();              // 지금 상태를 기준으로 삼아, 이후에 고친 호가만 이력에 남김
@@ -129,7 +130,7 @@ const App = (() => {
     Compare.init();
     Infra.init();
     Home.init();
-    Market.init(); Imjang.init(); PriceMap.init(); if (typeof PmArea !== "undefined") PmArea.init(); Eval.init();
+    Market.init(); Imjang.init(); PriceMap.init(); Supply.init(); if (typeof PmArea !== "undefined") PmArea.init(); Eval.init();
     await Search.init();
     await Promise.all([My.init(), Land.init()]);
     Settings.init();           // 탭 순서·보이기, 업무지구 — 다른 탭이 모두 준비된 뒤에 적용해야 첫 화면이 바뀌어도 안전합니다
