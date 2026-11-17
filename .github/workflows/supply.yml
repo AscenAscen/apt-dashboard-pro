@@ -1,0 +1,69 @@
+name: 공급 자료 수집 (청약홈) · 사이트 배포
+
+# 매주 월요일 새벽에 청약홈 분양 공고·주택형별 분양가·경쟁률을 받아 data/supply.json 으로 저장합니다.
+# population/ 폴더에 인구 CSV 를 올리면 적정 수요선용 data/population.json 도 만듭니다.
+on:
+  schedule:
+    - cron: '20 19 * * 0'    # 매주 월요일 04:20 (한국 시간)
+  push:
+    branches: [main]
+    paths: ['population/**']
+  workflow_dispatch:         # Actions 화면에서 [Run workflow] 로 직접 실행
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: apt-supply
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: 청약홈 공급 자료 받기
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 청약홈 → data/supply.json (인구 CSV 만 올렸을 때는 건너뜀)
+        if: github.event_name != 'push'
+        env:
+          MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+        run: python scripts/supply.py
+      - name: 인구 CSV → data/population.json
+        run: python scripts/population.py
+      - name: 바뀐 파일 저장(커밋)
+        run: |
+          git config user.name "apt-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          for f in data/supply.json data/supply_status.json data/population.json; do [ -e "$f" ] && git add "$f"; done
+          if git diff --cached --quiet; then echo "바뀐 것 없음"; exit 0; fi
+          git commit -q -m "공급 자료 갱신 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+          for i in 1 2 3; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
+
+  deploy:
+    name: 사이트 배포
+    needs: collect
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
