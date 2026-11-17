@@ -55,6 +55,14 @@ jobs:
         continue-on-error: true
         run: python scripts/monthly_summary.py
 
+      - name: 시군구 인구 (공급 탭 적정 수요선, 한 달에 한 번만 받음, 실패해도 계속 진행)
+        if: always()
+        continue-on-error: true
+        env:
+          MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+          POP_API_KEY: ${{ secrets.POP_API_KEY }}
+        run: python scripts/population.py
+
       - name: 바뀐 데이터 저장(커밋)
         if: always()
         run: |
