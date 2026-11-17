@@ -118,7 +118,7 @@ const Data = (() => {
   const cx = (sd) => getJson(`cx/${sd}.json`, null);   // 단지 요약 (비슷한 단지 찾기용, scripts/cx_summary.py)
   const kaptFile = () => getJson('kapt_file_status.json', null);   // K-apt 엑셀 → 세대수 변환 결과 (scripts/kapt_file.py)
 
-  return { regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
+  return { json: getJson, regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
 })();
 
 /* ───────────── 공통 도구 ───────────── */

@@ -29,7 +29,6 @@
     <button data-tab="map">시세지도</button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
-    <button data-tab="supply">공급</button>
     <button data-tab="invest">투자금</button>
     <button data-tab="market">시장 신호</button>
     <button data-tab="my">내 분석</button>
@@ -50,30 +49,83 @@
 <!-- ═══════════════ 1. 실거래 조회 ═══════════════ -->
 <!-- ═══════════════ 0. 최근 거래 (첫 화면) ═══════════════ -->
 <main id="tab-home" class="tab">
-  <section class="panel" id="homeSummary" hidden>
-    <div class="bar"><strong id="homeSumTitle">최근 1개월 한눈에</strong></div>
-    <div class="sumgrid">
-      <div class="cards" id="homeCards"></div>
-      <div class="sumchart"><canvas id="homeVol"></canvas></div>
-    </div>
+  <!-- ① 고르는 줄 (위에 고정) -->
+  <section class="panel hmcond" id="hmCondPanel">
+    <details id="hmCond" open>
+      <summary><span id="hmCondSum">조건</span> <span class="hmchg">바꾸기 ▾</span></summary>
+      <div class="hmrow">
+        <span class="hmk">거래</span>
+        <span class="seg" id="hmKind"><button data-k="sale" class="on">매매</button><button data-k="rent">전세</button></span>
+        <span class="hmk">월</span><select id="hmMonth"></select>
+        <span class="grow"></span>
+        <select id="hmPreset" title="저장한 조건 불러오기"><option value="">저장한 조건 ▾</option></select>
+        <button id="hmPresetDel" class="mini" title="고른 저장 조건 지우기" hidden>✕</button>
+        <button id="hmPresetSave" class="mini">⭐ 조건 저장</button>
+      </div>
+      <div class="hmrow">
+        <span class="hmk">지역</span>
+        <span id="hmChips" class="hmchips"></span>
+        <span class="hmaddwrap"><button id="hmAddReg" class="mini">+ 지역 추가 ▾</button>
+          <div id="hmRegPop" class="hmregpop" hidden></div></span>
+      </div>
+      <div class="hmrow">
+        <span class="hmk">평형</span>
+        <span class="seg" id="hmPy"><button data-p="" class="on">전체</button><button data-p="s">소형</button><button data-p="59">59</button><button data-p="74">74</button><button data-p="84">84</button><button data-p="L">대형</button></span>
+        <span class="hmk">보기</span>
+        <span class="seg" id="hmView"><button data-v="month" class="on">이달 거래된 단지만</button><button data-v="all">지역 전체 단지</button></span>
+        <label class="inline" id="hmYearsWrap" hidden>기간 <select id="hmYears"><option value="1">최근 1년</option><option value="2">최근 2년</option><option value="3">최근 3년</option></select></label>
+        <label class="inline"><input type="checkbox" id="hmLow"> 저층(1~3층) 빼기</label>
+        <label class="inline"><input type="checkbox" id="hmDirect"> 직거래 빼기</label>
+      </div>
+    </details>
+    <div id="hmLoad" class="hint hmload" hidden></div>
   </section>
-  <section class="panel" id="homeChartPanel" hidden>
-    <div class="bar"><strong>최근 1개월 고가 거래</strong><span class="grow"></span></div>
-    <div class="filters">
-      <label>지역 <select id="hcGroup"><option value="all">전체 (서울·수도권·광역시)</option><option value="0">서울</option><option value="1">수도권 (경기·인천)</option><option value="2">광역시</option></select></label>
-      <label>거래 유형 <select id="hcKind"><option value="sale">매매</option><option value="rent">전세</option></select></label>
-      <label>막대 길이 <select id="hcMetric"><option value="price">실거래 가격 (억)</option><option value="rec">전고점 대비 회복률 (%)</option></select></label>
-      <label>개수 <select id="hcCount"><option>10</option><option selected>20</option><option>30</option></select></label>
-    </div>
-    <p class="hint">단지·평형마다 최근 30일 중 가장 비싼 1건만 골라 비싼 순으로 보여 줍니다. 괄호 안은 2020년 이후 최고가 대비 등락이고, 뒤의 옅은 막대가 그 최고가입니다. 색: <span class="lg g0">■</span> 서울 <span class="lg g1">■</span> 수도권 <span class="lg g2">■</span> 광역시</p>
-    <div class="hbar"><canvas id="homeChart"></canvas></div>
-  </section>
+
+  <!-- ③ 억대 막대 + ② 요약 -->
   <section class="panel">
-    <div class="bar"><strong id="homeTitle">최근 1개월 거래 현황</strong><span class="grow"></span>
-      <label class="inline"><input type="checkbox" id="homeAll"> 그 외 지역도 보기</label></div>
-    <p class="hint" id="homeHint">서울 → 수도권(경기·인천) → 광역시 순서이며, 각 묶음 안에서는 매매 건수가 많은 지역부터 나옵니다. 열 제목을 누르면 정렬이 바뀌고, 지역을 누르면 실거래 조회로 넘어갑니다. 실거래는 계약 후 30일 안에 신고되므로 최근 건수는 며칠 뒤 더 늘어납니다.</p>
-    <div class="tablewrap tall"><table id="homeTable"></table></div>
-    <p class="empty" id="homeEmpty" hidden></p>
+    <div class="hmtop">
+      <div class="hmbars">
+        <div class="bar"><strong id="hmBarTitle">억대별 분포</strong><span class="grow"></span>
+          <select id="hmBarMetric" class="mini"><option value="n">단지 수</option><option value="t">거래 건수</option></select>
+          <button id="hmBandClear" class="mini" hidden>선택 풀기</button></div>
+        <div class="hmbarbox"><canvas id="hmBarChart" role="img" aria-label="억대별 단지 수 막대그래프"></canvas></div>
+        <p class="hint hmbarhint">막대(또는 아래 글자)를 누르면 그 억대를 고릅니다 · Ctrl 을 누른 채 누르면 여러 개 · 다시 누르면 해제</p>
+      </div>
+      <div class="hmsum" id="hmSum"></div>
+    </div>
+  </section>
+
+  <!-- ④ 평형별 신고가 -->
+  <section class="panel">
+    <div class="bar hmtitle"><strong>④</strong> <select class="hmtb" data-t="band"></select> · <select class="hmtm"></select> <strong id="hmCardTitle">평형별 신고가</strong></div>
+    <div class="hmcards" id="hmCards"></div>
+  </section>
+
+  <!-- ⑤ 단지 표 -->
+  <section class="panel">
+    <div class="bar hmtitle"><strong>⑤</strong> <select class="hmtb" data-t="band"></select> <select class="hmtk"><option value="sale">매매</option><option value="rent">전세</option></select> <strong id="hmTblTitle">거래 단지</strong><span class="grow"></span></div>
+    <div class="hmtools">
+      <label class="inline">정렬 <select id="hmSort"><option value="drop">전고 대비 낮은 순</option><option value="pdesc">가격 높은 순</option><option value="pasc">가격 낮은 순</option><option value="cnt">거래 많은 순</option><option value="name">단지명</option></select></label>
+      <button id="hmOnlyHigh" class="mini" title="신고가 단지만 보기">🔴 신고가만</button>
+      <span class="grow"></span>
+      <label class="inline">담을 폴더 <select id="hmFolder"></select></label>
+      <button id="hmAddSel" class="mini">선택 단지 담기</button>
+      <button id="hmMapSel" class="mini">시세지도에서 보기</button>
+      <button id="hmExcel" class="mini">엑셀</button>
+    </div>
+    <div id="hmCfBar" class="cfbar"></div>
+    <div class="tablewrap tall"><table id="hmTable" class="hmtable"></table></div>
+    <div id="hmCardList" class="hmcardlist" hidden></div>
+    <p class="empty" id="hmEmpty" hidden></p>
+    <p class="hint">NEW 지난 방문 뒤 새로 신고 · 🔴 신고가 · 🔵 급락(직전 거래보다 10% 넘게 쌈) · ⭐ 내 단지(시세트래킹) · 저층 1~3층 · 직 직거래 · 🟠 이달 거래 있음. 단지 이름을 누르면 실거래 조회, 건수 ▾ 를 누르면 그 달 거래가 펼쳐집니다.</p>
+  </section>
+
+  <!-- ⑥ 지역별 거래 현황 -->
+  <section class="panel">
+    <details id="hmRegDet">
+      <summary><strong id="hmRegTitle">지역별 거래 현황</strong> <span class="hint" style="margin:0">(펼치기)</span></summary>
+      <div class="tablewrap"><table id="hmRegTable"></table></div>
+    </details>
   </section>
 </main>
 
@@ -861,62 +913,6 @@
   </section>
 </main>
 
-<!-- ═══════════════ 공급 (입주물량) ═══════════════ -->
-<main id="tab-supply" class="tab" hidden>
-  <section class="panel">
-    <div class="bar"><strong>🏗️ 입주물량 (부동산지인)</strong><span class="grow"></span>
-      <button id="btnSpUpload" class="primary">📂 엑셀 올리기</button></div>
-    <p class="hint">부동산지인에서 내려받은 입주물량 엑셀을 그대로 올리세요. 지역마다 따로 올리면 합쳐집니다. 자료는 <b>이 브라우저에만</b> 저장되고, 전체 백업에 함께 들어갑니다.</p>
-    <div class="spfiles" id="spFiles"></div>
-    <input type="file" id="spFile" accept=".xlsx,.xls,.csv" multiple hidden>
-  </section>
-  <section class="panel empty" id="spEmpty">아직 공급 자료가 없습니다.<br>부동산지인 입주물량 화면에서 엑셀을 내려받아 <button id="btnSpUpload2" class="primary">📂 엑셀 올리기</button> 를 누르세요.</section>
-  <div id="spBody" hidden>
-    <section class="panel">
-      <div class="filters">
-        <label>시도 <select id="spSido"></select></label>
-        <label id="spDongWrap" hidden>읍면동 <select id="spDong"></select></label>
-        <div class="checks">
-          <label><input type="checkbox" id="spNoRent"> 임대 제외</label>
-        </div>
-      </div>
-      <div class="chips spsggs" id="spSggs" aria-label="시군구 (여러 개 고르면 합산)"></div>
-      <p class="hint" style="margin-bottom:0">시군구를 여러 개 누르면 합쳐서 봅니다. [전체]를 누르면 시도 전체.</p>
-    </section>
-    <section class="panel"><div class="cards spcards" id="spCards"></div></section>
-    <section class="panel">
-      <div class="cxchartbar"><b>📊 공급 그래프</b>
-        <span class="grow"></span>
-        <label class="inline">적정 수요 = 인구 × <input type="number" id="spRatio" min="0.1" max="5" step="0.1" style="width:64px">%</label>
-        <span class="ckrange" id="spView"><button type="button" class="ckr" data-view="year">연도별</button><button type="button" class="ckr" data-view="month">월별</button></span>
-      </div>
-      <div class="spchart" id="spChartBox"></div>
-      <p class="hint" id="spChartNote"></p>
-    </section>
-    <section class="panel">
-      <div class="filters pmbar"><b>🗺️ 공급 지도</b>
-        <label class="inline chk"><input type="checkbox" id="spSmall"> 100세대 미만도 표시</label>
-        <span class="hint" id="spGeo" style="margin:0"></span>
-        <span class="grow"></span>
-        <button id="btnSpFit">전체 보기</button>
-        <button id="btnSpDrawer">🎨 라벨 꾸미기</button>
-      </div>
-      <div class="pmmapbox"><div class="kmap spmap" id="spMap"></div><div class="pmlegend splegend" id="spLegend" aria-label="범례"></div></div>
-      <div class="spunfound" id="spUnfound" hidden></div>
-      <div id="spCard" style="margin-top:10px"></div>
-      <p class="hint">멀리 보면 구별 합계, 가까이 보면 단지 라벨이 나옵니다. 라벨을 누르면 자세한 정보가 나옵니다. 위치는 카카오 주소 검색으로 그때그때 찾습니다.</p>
-    </section>
-    <section class="panel">
-      <div class="bar"><b>📋 단지 목록</b><span class="hint" id="spTableCount" style="margin:0"></span><span class="grow"></span><button id="btnSpExcel">엑셀 다운로드</button></div>
-      <div class="tablewrap short"><table id="spTable" data-title="공급 단지"></table></div>
-    </section>
-  </div>
-  <aside class="drawer" id="spDrawer" hidden>
-    <div class="drawhead"><strong>🎨 라벨 꾸미기</strong><span class="grow"></span><button id="btnSpDrawerClose">닫기 ✕</button></div>
-    <div id="spDrawerBody"></div>
-  </aside>
-</main>
-
 <!-- ═══════════════ 랜드마크 ═══════════════ -->
 <!-- ═══════════════ 시세지도 ═══════════════ -->
 <main id="tab-map" class="tab" hidden>
@@ -1181,7 +1177,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/supply.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

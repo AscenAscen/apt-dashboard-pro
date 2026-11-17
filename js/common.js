@@ -314,7 +314,7 @@ const Stations = (() => {
 
 /* ═════════ ⑤ 탭 위쪽 공통 버튼 줄 ═════════ */
 const TabTools = (() => {
-  const TABS = ['compare', 'eval', 'infra', 'survey', 'map', 'grouping', 'land', 'trends', 'supply', 'market', 'my'];     // 버튼 줄을 붙일 탭
+  const TABS = ['compare', 'eval', 'infra', 'survey', 'map', 'grouping', 'land', 'trends', 'market', 'my'];     // 버튼 줄을 붙일 탭
   const SIZED = ['compare', 'eval', 'grouping'], STATION = ['compare', 'eval', 'infra'];
   const done = new Set();
   function attach(tab) {

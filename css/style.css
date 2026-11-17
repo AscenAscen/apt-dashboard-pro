@@ -652,80 +652,83 @@ button.colf.on.so{background:#2563eb;color:#fff}
 .colpop .cfcols button{text-align:left}
 .colpop .cfcols button.on{border-color:#2563eb;color:#2563eb;font-weight:600}
 @media (max-width:760px){.colpop.cfx{width:calc(100vw - 24px);max-height:70vh}.colpop .cflist{max-height:45vh}.colpop .cflist label{padding:6px 0}}
-
-/* ═══ 공급 탭 (js/supply.js) ═══ */
-.spfiles { display: flex; flex-wrap: wrap; gap: 6px; }
-.spfile { display: inline-flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 4px 3px 12px; font-size: 13px; }
-.spsggs { margin-top: 10px; } .spsggs button { padding: 5px 12px; } .spsggs small { margin-left: 4px; font-size: 11px; color: var(--sub); }
-.spsggs button.on small { color: var(--on-accent); }
-.spcards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 0; }
-.spcards .card.p0 { border-top: 3px solid #E24B4A; } .spcards .card.p1 { border-top: 3px solid #EF9F27; } .spcards .card.p2 { border-top: 3px solid #7F77DD; }
-.spcards .card em { font-style: normal; font-weight: 700; margin-left: 4px; }
-.spchart { position: relative; height: 340px; }
-.spchart .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.spmap { height: 560px; }
-.spmap.picking, .spmap.picking * { cursor: crosshair !important; }
-.spmap.spdark img { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.55); }
-.splegend .sub { color: #9aa0a9; margin-top: 2px; }
-.spunfound { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--rent); border-radius: 10px; }
-.spunfound small { color: var(--sub); margin-left: 4px; }
-.spcard .spkv { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; font-size: 13px; color: var(--sub); }
-.spcard .spkv b { color: var(--text); margin-left: 4px; }
-.spchip { color: #fff; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 700; }
-.spdotmini { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
-.spchg { color: var(--rent) !important; font-weight: 700; }
-#spTable td:nth-child(-n+3), #spTable td:nth-child(7), #spTable td:nth-child(8), #spTable th:nth-child(-n+3) { text-align: left; }
-#spTable tbody tr { cursor: pointer; }
-#spTable .warn { color: var(--rent); }
-.spseg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.spseg button { border-radius: 999px; padding: 4px 12px; font-size: 13px; }
-.spseg button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
-.spmy { display: inline-flex; gap: 2px; align-items: center; }
-#spDrawer .drawsec label:not(.inline) { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--sub); }
-
-/* 공급 지도 라벨 — 색은 js 에서 입주시기별로 넣고, 모양만 여기서 정함 */
-.splbl { position: relative; font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif; line-height: 1.25; white-space: nowrap; cursor: pointer; transition: transform .12s ease; transform-origin: 50% 100%; color: #2C2C2A; }
-.splbl.hv:hover { transform: scale(1.08); z-index: 999; }
-.splbl .spdotonly { display: none; }
-.splbl.sp-dot .spfull { display: none; }
-.splbl.sp-dot .spdotonly { display: block; }
-.splbl .spd { display: block; border-radius: 50%; border: 2px solid #fff; flex: none; }
-.splbl.sh .spbox, .splbl.sh .pin-h, .splbl.sh .pin-c, .splbl.sh .spd { box-shadow: 0 2px 6px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06); }
-.splbl .spbox { display: inline-flex; align-items: center; }
-.spfull { display: flex; flex-direction: column; align-items: center; }
-/* 투톤 */
-.spbox.tt { overflow: hidden; }
-.spbox.tt .tt-l { padding: .32em .7em; align-self: stretch; display: flex; align-items: center; }
-.spbox.tt .tt-r { padding: .32em .8em; display: inline-flex; gap: .45em; align-items: center; }
-.spbox.tt .tt-b { border-radius: 999px; padding: .05em .55em; font-size: .9em; }
-.splbl .spstem { width: 2px; height: 8px; }
-.splbl .spfoot { width: 8px; height: 8px; border-radius: 50%; border: 2px solid #fff; margin-top: -2px; }
-/* 아이콘 카드 */
-.spbox.cd { gap: .6em; padding: .45em .9em .45em .45em; }
-.spbox.cd .cd-i { width: 2.1em; height: 2.1em; border-radius: .6em; display: flex; align-items: center; justify-content: center; font-size: 1em; }
-.spbox.cd .cd-s { font-size: .9em; font-weight: 400; }
-.splbl .sptail { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #ccc; }
-/* 핀 */
-.pinwrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.pin-c { padding: .15em .6em; font-size: .92em; }
-.pin-h { border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
-.pin-h span { transform: rotate(45deg); font-weight: 700; font-size: .92em; }
-/* 태그 */
-.spbox.tg { gap: .5em; padding: .3em .75em; }
-.spbox.tg .tg-d { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.spbox.tg b { font-weight: inherit; }
-.spbox.tg .tg-s { opacity: .45; margin: 0 .35em; }
-/* 미니멀 */
-.spbox.mn { gap: 6px; }
-.spbox.mn .mn-t { padding: 1px 6px; }
-.splbl:has(.spbox.mn) { transform-origin: 0 50%; }
-/* 구별 합계 */
-.splbl.gu { transform-origin: 50% 50%; }
-.spbox.gub { flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
-.spbox.gub b { font-size: 14px; }
-.spbox.gub span { display: flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
-.spbox.gub i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-@media (max-width: 760px) { .spchart { height: 260px; } .spmap { height: 420px !important; } }
-.splbl.gu .gus { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
-.splbl.gu .gus b { margin-left: 3px; }
-.splbl.sp-hide { visibility: hidden; }
+/* ── 최근 거래 탭 ── */
+#tab-home .hmcond{position:sticky;top:0;z-index:20;padding-top:8px;padding-bottom:8px}
+#tab-home .hmcond summary{cursor:pointer;font-size:13.5px;list-style:none;display:flex;gap:8px;align-items:center}
+#tab-home .hmcond summary::-webkit-details-marker{display:none}
+#tab-home .hmcond details[open] summary{margin-bottom:6px;opacity:.75}
+#tab-home .hmchg{color:var(--accent);font-size:12.5px}
+#tab-home .hmrow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:5px 0}
+#tab-home .hmk{font-size:12.5px;color:var(--sub);min-width:30px}
+#tab-home .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+#tab-home .seg button{border:0;border-radius:0;background:transparent;padding:5px 11px;font-size:13px;color:var(--text);cursor:pointer}
+#tab-home .seg button+button{border-left:1px solid var(--line)}
+#tab-home .seg button.on{background:var(--c-sale);color:#fff}
+#tab-home.rentmode .seg button.on{background:var(--c-rent)}
+#tab-home .hmchips{display:inline-flex;flex-wrap:wrap;gap:5px}
+#tab-home .hmchip{display:inline-flex;align-items:center;gap:3px;padding:3px 4px 3px 10px;border-radius:14px;background:color-mix(in srgb,var(--c-sale) 16%,transparent);font-size:13px}
+#tab-home.rentmode .hmchip{background:color-mix(in srgb,var(--c-rent) 16%,transparent)}
+#tab-home .hmchip button{border:0;background:transparent;color:var(--sub);cursor:pointer;padding:0 5px;font-size:12px}
+#tab-home .hmaddwrap{position:relative}
+#tab-home .hmregpop{position:absolute;left:0;top:calc(100% + 4px);z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:min(620px,92vw);box-shadow:0 6px 24px rgba(0,0,0,.25)}
+#tab-home .hmpr{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin:4px 0}
+#tab-home .hmpr button.on{background:var(--c-sale);color:#fff;border-color:var(--c-sale)}
+#tab-home .hmgus{max-height:180px;overflow:auto;padding:4px 0 4px 34px}
+#tab-home .hmload{margin:6px 0 0;color:var(--accent)}
+#tab-home .hmtop{display:grid;grid-template-columns:minmax(0,2fr) minmax(220px,1fr);gap:14px}
+#tab-home .hmbarbox{position:relative;height:230px}
+#tab-home .hmbarhint{margin:4px 0 0;font-size:12px}
+#tab-home .hmsum{display:flex;flex-direction:column;gap:8px}
+#tab-home .hmst{background:var(--panel2);border-radius:8px;padding:9px 12px}
+#tab-home .hmst .k,#tab-home .hmcard .k{font-size:12.5px;color:var(--sub)}
+#tab-home .hmst .v,#tab-home .hmcard .v{font-size:21px;font-weight:600;font-variant-numeric:tabular-nums}
+#tab-home .hmst .v small,#tab-home .hmcard .v small{font-size:12.5px;font-weight:400;color:var(--sub);margin-left:2px}
+#tab-home .hmst .s,#tab-home .hmcard .s{font-size:12.5px;color:var(--sub)}
+#tab-home .hmwait{font-size:11.5px;margin:0}
+#tab-home .hmtitle{gap:6px;flex-wrap:wrap}
+#tab-home .hmtitle select{font-weight:600}
+#tab-home .hmcards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+#tab-home .hmcard{border:1px solid var(--line);border-radius:9px;padding:9px 11px;display:flex;flex-direction:column;gap:3px}
+#tab-home .hmcard.on{border-color:var(--c-sale)}
+#tab-home .hmcard button{align-self:flex-start;margin-top:3px}
+#tab-home .hmtools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+#tab-home #hmOnlyHigh.on{background:#d03b3b;color:#fff;border-color:#d03b3b}
+#tab-home .hmtable td,#tab-home .hmtable th{white-space:nowrap}
+#tab-home .hmtable td{text-align:right;font-variant-numeric:tabular-nums}
+#tab-home .hmtable td.l,#tab-home .hmtable td.c{text-align:left}
+#tab-home .hmtable td.c{text-align:center}
+#tab-home .hmtable td.name a{color:inherit;font-weight:600;margin-left:3px}
+#tab-home .hmtable td small{color:var(--sub);margin-left:3px}
+#tab-home .hmtable td.tags{font-size:12px;color:var(--sub)}
+#tab-home .hmtable tr.old td{opacity:.55}
+#tab-home .hmtable tr.hmsub td{font-size:12.5px;color:var(--sub);text-align:left;background:rgba(127,127,127,.06)}
+#tab-home .hmtable .tg{font-size:10.5px;border-radius:4px;padding:0 4px;margin-right:3px}
+#tab-home .hmtable .tg.new{background:#e34948;color:#fff;font-weight:700}
+#tab-home .hmtable .tg.low{background:rgba(127,127,127,.18);color:var(--sub)}
+#tab-home .hmtable .tg.dir{background:#eda100;color:#fff}
+#tab-home .hmtable td.sale b{color:var(--c-sale)}
+#tab-home .hmtable td.rent b{color:var(--c-rent)}
+#tab-home .spk{color:var(--c-sale)}
+@media (max-width:760px){
+  #tab-home .hmtop{grid-template-columns:1fr}
+  #tab-home .hmsum{flex-direction:row;overflow-x:auto;order:-1}
+  #tab-home .hmst{min-width:150px}
+  #tab-home .hmbarbox{height:160px}
+  #tab-home .hmbarhint{display:none}
+  #tab-home .hmcards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory}
+  #tab-home .hmcard{min-width:140px;scroll-snap-align:start}
+  #tab-home .hmregpop{position:fixed;left:4vw;top:12vh;max-height:76vh;overflow:auto}
+}
+#tab-home .hmcardlist{display:flex;flex-direction:column;gap:7px}
+#tab-home .hmrc{border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px}
+#tab-home .hmrc a{font-weight:600;color:inherit}
+#tab-home .hmrc small{color:var(--sub)}
+#tab-home .hmrc2{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin-top:4px;color:var(--sub)}
+#tab-home .hmrc2 b.sale{color:var(--c-sale);font-size:15px}
+#tab-home .hmrc2 b.rent{color:var(--c-rent);font-size:15px}
+#tab-home .hmrc2 button{margin-left:auto}
+#tab-home .hmrc .tg.new{background:#e34948;color:#fff;font-weight:700;font-size:10.5px;border-radius:4px;padding:0 4px;margin-right:3px}
+@media (max-width:760px){
+  #tab-home .hmsum{align-items:flex-start}
+  #tab-home .hmsum .hmwait{display:none}
+}
