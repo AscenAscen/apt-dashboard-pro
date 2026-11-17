@@ -1,9 +1,10 @@
 {
- "asOf": "2026-11-17 18:22",
+ "asOf": "2026-11-17 23:01",
  "ok": true,
  "errors": [],
  "notes": [
-  "지역을 찾지 못한 주소 126건 (예: 인천광역시 서해구 청라동 86-1번지 (청라국제업무단지 M5BL) / 경기도 화성특례시 동탄구 반송동 99번지[동탄(1) M1-2-2블록] / 경기도 화성특례시 동탄구 반송동 95번지[동탄(1) M1-1-2블록] / 경기도 화성특례시 만세구 향남읍 하길리 404-2번지 일원 / 인천광역시 서해구 인천검암역세권 공공주택지구 내 B-1BL)"
+  "예전에 지역을 못 찾은 공고 90건을 다시 맞췄습니다.",
+  "지역을 찾지 못한 주소 1건 (예: 세종특별자치시 다솜동 5204-1번지 일원(행정중심복합도시 5-2생활권 S1BL))"
  ],
  "fields": {
   "detail": [
@@ -56,37 +57,6 @@
    "SUBSCRPT_AREA_CODE",
    "SUBSCRPT_AREA_CODE_NM",
    "TOT_SUPLY_HSHLDCO"
-  ],
-  "model": [
-   "ETC_HSHLDCO",
-   "HOUSE_MANAGE_NO",
-   "HOUSE_TY",
-   "INSTT_RECOMEND_HSHLDCO",
-   "LFE_FRST_HSHLDCO",
-   "LTTOT_TOP_AMOUNT",
-   "MNYCH_HSHLDCO",
-   "MODEL_NO",
-   "NWBB_HSHLDCO",
-   "NWWDS_HSHLDCO",
-   "OLD_PARNTS_SUPORT_HSHLDCO",
-   "PBLANC_NO",
-   "SPSPLY_HSHLDCO",
-   "SUPLY_AR",
-   "SUPLY_HSHLDCO",
-   "TRANSR_INSTT_ENFSN_HSHLDCO",
-   "YGMN_HSHLDCO"
-  ],
-  "cmp": [
-   "CMPET_RATE",
-   "HOUSE_MANAGE_NO",
-   "HOUSE_TY",
-   "MODEL_NO",
-   "PBLANC_NO",
-   "REQ_CNT",
-   "RESIDE_SECD",
-   "RESIDE_SENM",
-   "SUBSCRPT_RANK_CODE",
-   "SUPLY_HSHLDCO"
   ]
  },
  "sample": {
@@ -131,44 +101,12 @@
    "PUBLIC_HOUSE_SPCLW_APPLC_AT": "N",
    "RCEPT_BGNDE": "2026-11-23",
    "RCEPT_ENDDE": "2026-11-25"
-  },
-  "model": {
-   "ETC_HSHLDCO": 0,
-   "HOUSE_MANAGE_NO": "2026820015",
-   "HOUSE_TY": "055.0000A",
-   "INSTT_RECOMEND_HSHLDCO": 0,
-   "LFE_FRST_HSHLDCO": 0,
-   "LTTOT_TOP_AMOUNT": "43390",
-   "MNYCH_HSHLDCO": 0,
-   "MODEL_NO": "01",
-   "NWBB_HSHLDCO": 0,
-   "NWWDS_HSHLDCO": 0,
-   "OLD_PARNTS_SUPORT_HSHLDCO": 0,
-   "PBLANC_NO": "2026820015",
-   "SPSPLY_HSHLDCO": 277,
-   "SUPLY_AR": "79.0470",
-   "SUPLY_HSHLDCO": 0,
-   "TRANSR_INSTT_ENFSN_HSHLDCO": 0,
-   "YGMN_HSHLDCO": 0
-  },
-  "cmp": {
-   "CMPET_RATE": "(△42)",
-   "HOUSE_MANAGE_NO": "2026000554",
-   "HOUSE_TY": "062.2537 ",
-   "MODEL_NO": "01",
-   "PBLANC_NO": "2026000554",
-   "REQ_CNT": "0",
-   "RESIDE_SECD": "01",
-   "RESIDE_SENM": "해당지역",
-   "SUBSCRPT_RANK_CODE": 1,
-   "SUPLY_HSHLDCO": 42
   }
  },
- "since": "2020-01-01",
- "newItems": 2943,
- "unmatched": 126,
- "models": 15047,
- "cmp": 2497,
- "calls": 76,
+ "since": "2026-07-16",
+ "newItems": 0,
+ "unmatched": 1,
+ "cmp": 0,
+ "calls": 34,
  "items": 2943
 }
