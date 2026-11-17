@@ -278,7 +278,7 @@
         가격대 좁히기와 매매 호가 정렬은 적어 둔 호가 기준이며, 호가가 없는 단지는 최근 실거래가 기준(<span class="star">실</span> 표시)입니다. 정렬은 고를 때 한 번 적용되고, 입력하는 동안에는 줄이 움직이지 않습니다.
         ★ 표시 줄 = 시세트래킹에 담긴 단지, ☆ 버튼 = 후보로 표시. <b>단지 정보 펼치기</b>를 누르면 생활권·구조·방·화 칸이 나옵니다. <b>호가-실거래</b>는 적은 매매 호가에서 최근 매매 실거래가를 뺀 값입니다.</p>
       </details>
-      <div id="svColPop" class="colpop" hidden></div>
+      <div id="svCfBar" class="cfbar"></div>
       <div class="tablewrap"><table id="svTable"></table></div>
       <p class="hint" id="svNote"></p>
       <button id="btnSvMore" hidden>더 보기</button>
@@ -369,6 +369,7 @@
       기록은 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 오른쪽 <b>🧰 도구</b>의 백업이나 기기 동기화를 쓰세요.</p>
     </details>
     <p class="empty" id="trkNoMonth" hidden>아직 기록한 달이 없습니다. 위에서 달을 고르고 <b>시세 추가</b>를 눌러 가격 칸을 만드세요.</p>
+    <div id="trkCfBar" class="cfbar"></div>
     <div id="trkCards" hidden></div>
     <div class="tablewrap"><table id="trkTable"></table></div>
     <p class="empty" id="trkEmpty">담아 둔 단지가 없습니다. 위의 단지 검색이나 [실거래 조회]·[전수조사]에서 <b>트래킹에 담기</b>를 누르세요.</p>
@@ -677,6 +678,10 @@
       <div class="chartbox"><canvas id="trChart"></canvas></div>
     </section>
     <section class="panel">
+      <div class="bar"><strong>매매·전세 흐름과 투자금</strong><span class="hint" style="margin:0">— 최근 3년, 월별. 그 달 ㎡당 중간값을 전용 84㎡로 환산 · 두 선 사이 = 투자금(매매 − 전세)</span><span class="grow"></span><span class="ckrange" id="trRange"></span></div>
+      <div class="chartbox"><canvas id="trChart3"></canvas></div>
+    </section>
+    <section class="panel">
       <div class="bar"><strong>전세가율 · 신고가 비율 추이</strong><span class="hint" style="margin:0">— 최근 3년, 월별. 전세가율 = 그 달 전세 ㎡당 중간값 ÷ 매매 ㎡당 중간값, 신고가 비율 = 이전 최고가를 넘긴 매매 ÷ 매매(직거래 제외)</span></div>
       <div class="chartbox"><canvas id="trChart2"></canvas></div>
       <div class="tablewrap short" style="max-height:220px"><table id="trMonthly" data-title="월별 추이"></table></div>
@@ -874,7 +879,8 @@
       <div class="filters pmbar">
         <label>권역 <select id="pmZone"><option value="">전체</option><option>서울</option><option>수도권</option><option>광역시</option><option>중소도시</option></select></label>
         <label>금액대 <select id="pmBand"><option value="">전체</option></select></label>
-        <label>라벨에 표시 <select id="pmShow"><option value="s">매매 가격</option><option value="r">전세 가격</option><option value="gap">매-전 (투자금)</option><option value="ratio">전세가율</option><option value="none">단지명만</option></select></label>
+        <label>라벨에 표시 <select id="pmShow"><option value="s">매매 가격</option><option value="r">전세 가격</option><option value="gap">매-전 (투자금)</option><option value="ratio">전세가율</option><option value="none">단지명만</option><option value="sr">매매 + 전세</option><option value="srg">매매 + 전세 + 투자금</option></select></label>
+        <label id="pmSubWrap" hidden>아랫줄 <select id="pmSub"><option value="gr">투자금 + 전세가율</option><option value="g">투자금만</option><option value="r">전세가율만</option></select></label>
         <label>글자 <select id="pmName"><option value="both">단지명 + 값</option><option value="val">값만</option><option value="name">단지명만</option></select></label>
         <label>기준 달 <select id="pmMonth"><option value="">최신 호가</option></select></label>
         <label>프리셋 <select id="pmPreset"><option value="">(고르기)</option><option value="report">보고서용</option><option value="field">임장용</option><option value="simple">간단히</option></select></label>
@@ -883,10 +889,13 @@
         <button id="btnPmDrawer" title="지도 크기 · 라벨 모양 · 캡처 · 영역 그리기 · 단지 목록">🎨 꾸미기</button>
       </div>
       <p class="hint pmhint"><span style="color:#4f9cff">●</span> 내가 적은 호가 · <span style="color:#f5a742">●</span> ·실 = 호가가 없어 최근 실거래로 대신 · 진한 테두리 = 시세트래킹에서 체크한 단지 · 라벨을 누르면 호가를 바로 적을 수 있습니다. <span id="pmCount"></span></p>
-      <div class="kmap tallmap" id="pmMap"><p class="empty" id="pmMapMsg"></p></div>
+      <div class="pmwrap">
+        <div class="pmmapbox"><div class="kmap tallmap" id="pmMap"><p class="empty" id="pmMapMsg"></p></div><div class="pmlegend" id="pmLegend" aria-label="범례"></div></div>
+        <aside class="pmside" id="pmSide"><div class="pmsidehead"><b>지도에 보이는 단지</b><small>전고 대비 많이 빠진 순 · 누르면 그 단지로 이동</small></div><div id="pmSideList"></div></aside>
+      </div>
       <div class="cards" id="pmCard" style="margin-top:10px"></div>
       <details open style="margin-top:10px"><summary>지도에 올라간 단지 표 (엑셀로 받을 수 있습니다)</summary>
-        <div class="tablewrap short"><table id="pmTable" data-title="시세지도 단지"></table></div></details>
+        <div id="pmCfBar" class="cfbar"></div><div class="tablewrap short"><table id="pmTable" data-title="시세지도 단지"></table></div></details>
     </section>
   </div>
   <div class="pmpop" id="pmPop" hidden></div>
@@ -1115,7 +1124,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

@@ -10,6 +10,7 @@ const Tracking = (() => {
   const KEY = 'apt.tracking.v1', FKEY = 'apt.folders.v1', MKEY = 'apt.trkMonths.v1', SKEY = 'apt.survey.v1', BASE = '기본', PINKEY = 'apt.trkPins.v1';   // 상태 값(it.status)은 지우지 않고 화면에서만 숨김
   // 엑셀의 열 이름 (순서를 바꾸려면 여기서)
   const FIXED = ['가격대', '시', '구', '동', '생활권', '단지명', '연식', '연차', '세대수', '평형', '구조', '방', '화', '링크', '전고점', '전고 대비 하락률', '전저점', '전저 대비 상승률'];
+  const MF = ['s', 'sn', 'sd', 'r', 'rn', 'rd', 'gap', 'gd', 'ratio', 'rtd'];   // GROUP 순서와 같은 값 이름
   const GROUP = ['매매', '매매 개수', '전월 대비', '전세', '전세 개수', '전월 대비', '매-전(투자금)', '전월 대비', '전세가율', '전월 대비'];
   const STATUSES = ['', '관심', '임장 예정', '임장 완료', '매수 후보', '제외'];
   // 트래킹에 담거나 뺄 때 함께 옮겨 다니는 값
@@ -345,10 +346,34 @@ const Tracking = (() => {
   const isNew = (it) => { const rl = real.get(it.id); return !!rl && ((rl.sale && it.seenSale && rl.sale.d > it.seenSale) || (rl.rent && it.seenRent && rl.rent.d > it.seenRent)); };
 
   /** 화면에 보일 단지: 폴더·지역·상태·보기 조건 → 정렬 */
+  /* 엑셀식 열 필터: 열마다 값 꺼내는 법 (cc = 이번에 계산해 둔 값) */
+  let cc = new Map(), tf = null;
+  const CC = (it) => cc.get(it.id) || compute(it);
+  function trkCols() {
+    const N = ColFilter.numCol, T = ColFilter.txtCol;
+    const out = {
+      band: { label: '가격대', get: (it) => CC(it).band, num: (it) => CC(it).base },
+      si: T('시', (it) => U.siGu(it.sido, it.sgg)[0]), gu: T('구', (it) => U.siGu(it.sido, it.sgg)[1]), dong: T('동', (it) => it.dong), zone: T('생활권', (it) => it.zone),
+      name: T('단지명', (it) => it.name), year: N('연식', (it) => it.buildYear || null, 'n'), age: N('연차', (it) => (it.buildYear ? CONFIG.toAge(it.buildYear) : null), 'n'),
+      hh: N('세대수', (it) => parseInt(it.households, 10) || null, 'n'), area: { label: '평형', get: (it) => `${it.g}㎡ (${pyeong(it)})`, num: (it) => it.g },
+      struct: T('구조', (it) => it.structure), rooms: N('방', (it) => parseInt(it.rooms, 10) || null, 'n'), baths: N('화', (it) => parseInt(it.baths, 10) || null, 'n'),
+      peak: N('전고점', (it) => CC(it).peak), drop: N('전고 대비 하락률', (it) => CC(it).drop, 'pct'), trough: N('전저점', (it) => CC(it).trough), rise: N('전저 대비 상승률', (it) => CC(it).rise, 'pct'),
+      ask: N('호가-실거래', (it) => CC(it).askGap, 'diff'),
+    };
+    const F = [['s', '매매', 'eok'], ['sn', '매매 개수', 'n'], ['sd', '매매 전월 대비', 'diff'], ['r', '전세', 'eok'], ['rn', '전세 개수', 'n'], ['rd', '전세 전월 대비', 'diff'],
+      ['gap', '매-전(투자금)', 'eok'], ['gd', '투자금 전월 대비', 'diff'], ['ratio', '전세가율', 'rat'], ['rtd', '전세가율 전월 대비', 'pctp']];
+    months.forEach((m, k) => F.forEach(([f, n, kind]) => { out[`m${m}_${f}`] = N(`${ymLabel(m)} ${n}`, (it) => CC(it).groups[k]?.[f] ?? null, kind); }));
+    out.memo = T('메모', (it) => it.memo);
+    out.folder = T('폴더', (it) => it.folders.join(', '));
+    return out;
+  }
+  const TF = () => tf || (tf = ColFilter.create({ key: 'trk', cols: trkCols, bar: 'trkCfBar', sortSel: 'trkSort', onChange: () => { checked.clear(); render(); } }));
+
   function visible() {
     const show = $('trkShow').value, sort = $('trkSort').value, m0 = months[0];
     let list = inScope();
     const c = new Map(list.map(it => [it.id, compute(it)]));
+    cc = c;
     if (show === 'empty') list = list.filter(it => m0 && it.quotes[m0]?.s == null);
     if (show === 'down') list = list.filter(it => c.get(it.id).groups[0]?.sd < 0);
     if (show === 'rentup') list = list.filter(it => c.get(it.id).groups[0]?.rd > 0);
@@ -357,8 +382,7 @@ const Tracking = (() => {
     const num = (v, none) => (v == null || isNaN(v) ? none : v);
     const key = { price: (it) => -num(c.get(it.id).base, -1), up: (it) => -num(c.get(it.id).groups[0]?.sd, -1e12), down: (it) => num(c.get(it.id).groups[0]?.sd, 1e12),
       diff: (it) => -num(c.get(it.id).askGap, -1e12), gappct: (it) => -num(Math.abs(gapPct(c.get(it.id)) ?? NaN), -1), name: () => 0 }[sort];
-    if (key) list = [...list].sort((a, b) => key(a) - key(b) || a.name.localeCompare(b.name, 'ko') || a.g - b.g);
-    return list;
+    return TF().apply(list, (l) => (key ? [...l].sort((a, b) => key(a) - key(b) || a.name.localeCompare(b.name, 'ko') || a.g - b.g) : l));
   }
 
   /** 실거래 읽기 — 최근 매매·전세 실거래, 전고점·전저점. popup=true 면 결과 창을 띄움 */
@@ -501,12 +525,13 @@ const Tracking = (() => {
     if (card) return renderCards(list);
 
     const fx = (label, cls = '') => `<th rowspan="2" class="${cls}">${label}</th>`;
-    const head = `<thead><tr>${fx('<input type="checkbox" id="trkAll">', 'c')}${fx('가격대')}${fx('시', 'l')}${fx('구', 'l')}${fx('동', 'l')}${fx('생활권', 'l info')}${fx('단지명', 'l name')}` +
-      `${fx('연식')}${fx('연차')}${fx('세대수', 'info')}${fx('평형')}${fx('구조', 'info')}${fx('방', 'info')}${fx('화', 'info')}${fx('링크', 'info')}` +
-      `${fx('전고점')}${fx('전고 대비 하락률')}${fx('전저점')}${fx('전저 대비 상승률')}${fx('호가-실거래')}` +
+    const b = (k) => TF().btn(k);
+    const head = `<thead><tr>${fx('<input type="checkbox" id="trkAll" title="보이는(걸러진) 단지 전체 선택">', 'c')}${fx('가격대' + b('band'))}${fx('시' + b('si'), 'l')}${fx('구' + b('gu'), 'l')}${fx('동' + b('dong'), 'l')}${fx('생활권' + b('zone'), 'l info')}${fx('단지명' + b('name'), 'l name')}` +
+      `${fx('연식' + b('year'))}${fx('연차' + b('age'))}${fx('세대수' + b('hh'), 'info')}${fx('평형' + b('area'))}${fx('구조' + b('struct'), 'info')}${fx('방' + b('rooms'), 'info')}${fx('화' + b('baths'), 'info')}${fx('링크', 'info')}` +
+      `${fx('전고점' + b('peak'))}${fx('전고 대비 하락률' + b('drop'))}${fx('전저점' + b('trough'))}${fx('전저 대비 상승률' + b('rise'))}${fx('호가-실거래' + b('ask'))}` +
       months.map((m, k) => `<th colspan="10" class="grp c">${ymLabel(m)}${k === 0 ? ' · 최신' : ''} <button class="mini" data-delmonth="${m}" title="이 달 기록 삭제">×</button></th>`).join('') +
-      fx('메모', 'l') + fx('지도', 'c') + '</tr><tr>' +
-      months.map(() => GROUP.map((n, i) => `<th class="${[0, 1, 3, 4].includes(i) ? 'in' : ''}${i === 0 ? ' gl' : ''}">${n}${i === 0 || i === 3 ? '(억)' : ''}</th>`).join('')).join('') + '</tr></thead>';
+      fx('메모' + b('memo'), 'l') + fx('지도', 'c') + '</tr><tr>' +
+      months.map((m) => GROUP.map((n, i) => `<th class="${[0, 1, 3, 4].includes(i) ? 'in' : ''}${i === 0 ? ' gl' : ''}">${n}${i === 0 || i === 3 ? '(억)' : ''}${b(`m${m}_${MF[i]}`)}</th>`).join('')).join('') + '</tr></thead>';
 
     const fixed = (it, f) => { const v = String(it[f] || '').trim(); if (!v) return '<span class="hint" style="margin:0">-</span>';
       const est = (f === 'rooms' || f === 'baths') && it.af?.[f];
@@ -645,11 +670,11 @@ const Tracking = (() => {
     const head = [...FIXED.map(n => (n === '구조' ? '구조(계,복)' : n)), ...months.flatMap(() => GROUP), ...tail];
     const rows = list.map(it => {
       const c = compute(it), [si, gu] = U.siGu(it.sido, it.sgg);
-      return { sort: c.base || 0, row: [c.band, si, gu, it.dong, it.zone, it.name, it.buildYear || '', it.buildYear ? CONFIG.toAge(it.buildYear) : '', it.households, pyeong(it),
+      return { row: [c.band, si, gu, it.dong, it.zone, it.name, it.buildYear || '', it.buildYear ? CONFIG.toAge(it.buildYear) : '', it.households, pyeong(it),
         it.structure, it.rooms, it.baths, link(it), c.peak ?? '', r1(c.drop), c.trough ?? '', r1(c.rise),
         ...c.groups.flatMap(g => [g.s ?? '', g.sn ?? '', g.sd ?? '', g.r ?? '', g.rn ?? '', g.rd ?? '', g.gap ?? '', g.gd ?? '', r1(g.ratio), r1(g.rtd)]),
         c.askGap ?? '', c.realSale?.price ?? '', U.date(c.realSale?.d), c.realRent?.price ?? '', U.date(c.realRent?.d), it.memo || '', it.folders.join(', ')] };
-    }).sort((a, b) => b.sort - a.sort).map(x => x.row);
+    }).map(x => x.row);                                                 // 화면에서 거르고 정렬한 순서 그대로
     U.download(`시세트래킹_${curFolder ? curFolder.replace(/[\\/:*?"<>|]/g, '_') + '_' : ''}${U.stamp()}`, [
       { name: '시세트래킹', rows: [top, head, ...rows] },
       { name: '설명', rows: [['항목', '설명'], ['금액 단위', '만원'], ['매매·전세·개수', '그 달에 직접 적은 가격과 매물 수'],

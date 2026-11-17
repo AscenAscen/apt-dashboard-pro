@@ -8,6 +8,9 @@
   --sub: #9aa0a9;
   --accent: #4f9cff;     /* 강조(매매) */
   --rent: #f5a742;       /* 전세 */
+  --c-sale: #d95926;     /* 그래프: 매매 */
+  --c-rent: #199e70;     /* 그래프: 전세 */
+  --c-quote: #3987e5;    /* 그래프: 내 호가 */
   --up: #ff5c5c;         /* 상승(빨강) */
   --down: #4f9cff;       /* 하락(파랑) */
   --danger: #ff5c5c;
@@ -22,10 +25,10 @@
 /* ── 배경 테마: 오른쪽 위 "배경" 에서 고릅니다. 색을 바꾸거나 새 테마를 추가하려면 여기를 고치세요 ── */
 [data-theme="dark"]  { --bg: #1b1d21; --panel: #24272c; --panel2: #2d3138; --line: #3b4048; --hover: #2a2e34; --sel: #2b3a4f; --group: #1f2226; }
 [data-theme="navy"]  { --bg: #0b1424; --panel: #111d33; --panel2: #18273f; --line: #263a5a; --hover: #16243c; --sel: #1d3357; --group: #0d182b; --sub: #9db0cc; }
-[data-theme="white"] { --bg: #f3f5f8; --panel: #ffffff; --panel2: #eef1f5; --line: #d6dbe2; --text: #16181d; --sub: #5d6573;
+[data-theme="white"] { --c-sale: #eb6834; --c-rent: #1baf7a; --c-quote: #2a78d6; --bg: #f3f5f8; --panel: #ffffff; --panel2: #eef1f5; --line: #d6dbe2; --text: #16181d; --sub: #5d6573;
   --accent: #1a6fe0; --rent: #c26a00; --up: #d92b2b; --down: #1a6fe0; --danger: #d92b2b; --on-accent: #ffffff;
   --hover: #f1f5fb; --sel: #dfeafb; --group: #e7ebf1; --in-border: #9fbbe6; --scheme: light; }
-[data-theme="cream"] { --bg: #f6f1e7; --panel: #fffdf8; --panel2: #f1eadc; --line: #ddd3c0; --text: #2a2620; --sub: #6f6658;
+[data-theme="cream"] { --c-sale: #eb6834; --c-rent: #1baf7a; --c-quote: #2a78d6; --bg: #f6f1e7; --panel: #fffdf8; --panel2: #f1eadc; --line: #ddd3c0; --text: #2a2620; --sub: #6f6658;
   --accent: #1f6fbf; --rent: #b8620a; --up: #cf2f2f; --down: #1f6fbf; --danger: #cf2f2f; --on-accent: #ffffff;
   --hover: #f7f1e4; --sel: #e9e0cc; --group: #ebe3d2; --in-border: #c9b890; --scheme: light; }
 [data-theme="mint"]  { --bg: #eef6f3; --panel: #ffffff; --panel2: #e6f1ec; --line: #cfe0d8; --text: #15211c; --sub: #557066;
@@ -395,7 +398,7 @@ label.findlab input { width: 100%; }
 .ml-exit { display: none; }
 /* 깔끔하게 캡처 모드: 지도 패널만 화면 전체로 */
 .ml-capturing { position: fixed !important; inset: 0; z-index: 3000; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: var(--bg); }
-.ml-capturing > :not(.kmap):not(.ml-exit) { display: none !important; }
+.ml-capturing > :not(.kmap):not(.ml-exit):not(.pmwrap) { display: none !important; }
 .ml-capturing .kmap { height: 100vh !important; height: 100dvh !important; border: 0; border-radius: 0; }
 .ml-capturing .ml-exit { display: block; position: absolute; top: 10px; left: 10px; z-index: 3100; min-height: 0; padding: 8px 14px; border-radius: 20px; background: #111; color: #fff; border: 1px solid #fff; font-weight: 700; font-size: 14px; opacity: .95; transition: opacity .6s; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
 .ml-capturing .ml-exit.dim { opacity: .12; }
@@ -582,3 +585,70 @@ tr.dim td { opacity: .55; }
 @media (max-width: 760px) { #cxModal { padding: 0; } .cxbox { border-radius: 0; margin: 0; min-height: 100vh; } .cxcols { grid-template-columns: 1fr; } .cxchart { height: 230px; } }
 .trkinfo { margin: 0 0 8px; } .trkinfo label { flex-direction: row; align-items: center; gap: 4px; }
 span.est { color: var(--sub); }
+
+/* ── 지도 라벨: 말풍선 카드 · 두 값 · 간단히 · 하락률/상승률 ── */
+.mllabel.ds-card { background: #0f1116; color: #f0efec; border: 1px solid #3a404c; border-left-width: 1px; border-radius: 10px; padding: 4px 9px 5px; box-shadow: 0 6px 16px rgba(0,0,0,.42); font-weight: 700; }
+.mllabel.multi { display: flex; flex-direction: column; gap: 1px; white-space: nowrap; text-align: left; }
+.mllabel .mlname { font-size: .78em; font-weight: 500; opacity: .72; }
+.mllabel .mlv { display: flex; align-items: center; gap: 4px; }
+.mllabel .mlv b { font-size: 1.12em; font-weight: 800; }
+.mllabel .mlv.sm b { font-size: .92em; font-weight: 700; }
+.mllabel .mlvd { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+.mllabel .mlk { font-size: .78em; opacity: .7; font-weight: 500; }
+.mllabel .mlsil { font-size: .68em; font-weight: 800; color: #1d2027; background: #f5a742; border-radius: 3px; padding: 0 3px; }
+.mllabel .mlsub { font-size: .76em; font-weight: 600; background: rgba(57,135,229,.22); border-radius: 4px; padding: 0 5px; align-self: flex-start; margin-top: 1px; }
+.mllabel .mlrate { font-size: .76em; font-weight: 800; margin-left: 4px; }
+.mllabel .mlrate.dn { color: #2f6fed; } .mllabel .mlrate.up { color: #e5484d; }
+.mllabel.ds-card .mlrate.dn, .mllabel.ds-dark .mlrate.dn, .mllabel.ds-fill .mlrate.dn { color: #79b8ff; }
+.mllabel.ds-card .mlrate.up, .mllabel.ds-dark .mlrate.up, .mllabel.ds-fill .mlrate.up { color: #ff7b72; }
+.mllabel.compact { display: flex; align-items: center; gap: 3px; padding: 2px 6px; font-weight: 800; }
+.mllabel.compact .mlc { border-bottom: 3px solid transparent; line-height: 1.15; }
+.mllabel.compact .mlsep { opacity: .4; font-weight: 400; }
+.kmap.muted img { filter: saturate(.35) brightness(.88) contrast(.95); }
+/* 시세지도: 지도 + 오른쪽 단지 목록 + 범례 */
+.pmwrap { display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap; }
+.pmmapbox { position: relative; flex: 999 1 560px; min-width: 0; }
+.pmlegend { position: absolute; left: 10px; bottom: 10px; z-index: 5; display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 10px; background: rgba(15,17,22,.9); color: #c8ccd4; border: 1px solid #3a404c; font-size: 11px; pointer-events: none; }
+.pmlegend b { color: #f0efec; font-size: 12px; }
+.pmlegend span { display: flex; align-items: center; gap: 5px; }
+.pmlegend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.pmlegend em.sil { font-style: normal; font-size: 9px; font-weight: 800; color: #1d2027; background: #f5a742; border-radius: 3px; padding: 0 3px; }
+.pmlegend em.hotbox { width: 11px; height: 11px; border-radius: 3px; box-shadow: 0 0 0 2px #ffd60a; display: inline-block; }
+.pmside { flex: 1 1 260px; max-width: 340px; display: flex; flex-direction: column; gap: 6px; max-height: 760px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; padding: 10px; background: var(--panel); }
+.pmsidehead { display: flex; flex-direction: column; gap: 2px; } .pmsidehead small { color: var(--sub); font-size: 11px; }
+.pmsi { display: flex; justify-content: space-between; gap: 8px; align-items: center; width: 100%; text-align: left; padding: 8px 6px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--text); cursor: pointer; min-height: 44px; }
+.pmsi:hover { background: var(--panel2); }
+.pmsi .l, .pmsi .r { display: flex; flex-direction: column; gap: 1px; } .pmsi .r { align-items: flex-end; }
+.pmsi small { color: var(--sub); font-size: 11px; } .pmsi em { font-style: normal; font-weight: 700; } .pmsi em.dn { color: #2f6fed; } .pmsi em.up { color: #e5484d; }
+.mllabel.flashlbl { outline: 3px solid #ffd60a !important; outline-offset: 2px; }
+.ml-capturing .pmwrap { display: block; } .ml-capturing .pmside { display: none; } .ml-capturing .pmmapbox { position: static; }
+.ml-capturing .pmlegend { position: fixed; z-index: 3050; }
+@media (max-width: 760px) { .pmside { max-width: none; max-height: 360px; } }
+
+/* 그래프 공통 */
+.ckrange { display: inline-flex; gap: 4px; } .ckrange .ckr { height: 28px; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; }
+.ckrange .ckr.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.ckspark { color: var(--sub); vertical-align: middle; }
+.cxchartbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.cxstat .ckspark { margin-top: 4px; }
+/* 엑셀식 열 필터 (공통) */
+.cfbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 4px;font-size:12.5px;min-height:24px}
+.cfbar.on .cfstat{color:#2563eb;font-weight:500}
+.cfbar .cfstat.hint{margin:0}
+.cfbar a{color:#2563eb;font-weight:600}
+@media (min-width:761px){.cfbar:not(.on) .cfstat.hint{opacity:.75}}
+button.colf.so{background:#e8f0ff;border-color:#2563eb;color:#2563eb}
+button.colf.on.so{background:#2563eb;color:#fff}
+.colpop.cfx{width:260px;max-height:460px}
+.colpop .cfsort{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.colpop .cfsort button,.colpop .cfend button,.colpop .cfcols button{font-size:12.5px;padding:3px 8px;border:1px solid #ccc;background:#f7f7f7;border-radius:4px;cursor:pointer;color:#222}
+.colpop .cfsort button.on{background:#2563eb;color:#fff;border-color:#2563eb}
+.colpop .cfend button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+.colpop .cfq{width:100%;box-sizing:border-box;margin-bottom:6px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;color:#222;background:#fff}
+.colpop .cflist .cfall{border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:2px;font-weight:600}
+.colpop .cflist .cfblank span{color:#888}
+.colpop .cflist label span{overflow:hidden;text-overflow:ellipsis}
+.colpop .cfcols{display:flex;flex-direction:column;gap:3px}
+.colpop .cfcols button{text-align:left}
+.colpop .cfcols button.on{border-color:#2563eb;color:#2563eb;font-weight:600}
+@media (max-width:760px){.colpop.cfx{width:calc(100vw - 24px);max-height:70vh}.colpop .cflist{max-height:45vh}.colpop .cflist label{padding:6px 0}}

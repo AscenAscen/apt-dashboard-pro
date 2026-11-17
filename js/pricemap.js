@@ -24,7 +24,7 @@ const PriceMap = (() => {
 
   const eok = (v) => (v == null ? '-' : +(v / 10000).toFixed(2) + '억');
   const opts = () => Store.get(SKEY, {});
-  const saveOpts = () => Store.set(SKEY, { ...opts(), folder: $('pmFolder').value, zone: $('pmZone').value, band: $('pmBand').value, show: $('pmShow').value, name: $('pmName').value, month: $('pmMonth').value, lm: $('pmLm').checked ? 1 : 0 });
+  const saveOpts = () => Store.set(SKEY, { ...opts(), folder: $('pmFolder').value, zone: $('pmZone').value, band: $('pmBand').value, show: $('pmShow').value, name: $('pmName').value, month: $('pmMonth').value, lm: $('pmLm').checked ? 1 : 0, sub: $('pmSub').value });
   const setOf = (k) => new Set(Store.get(k, []));
   const landMap = () => Store.get(LAND, {});
   const landSet = () => new Set(Object.keys(landMap()));
@@ -82,6 +82,32 @@ const PriceMap = (() => {
   }
 
   /** 라벨에 쓸 글자 */
+  const C_S = '#d95926', C_R = '#199e70';                       // 매매 주황 · 전세 청록 (그래프와 같은 색)
+  const eokS = (v) => (v == null ? '-' : +(v / 10000).toFixed(2) + '억');
+  /** 라벨 내용: text(한 줄, 예전 모양) + name·lines·sub·compact(말풍선 카드·두 값 모드) */
+  function labelOf(r, dup) {
+    const mode = $('pmShow').value, nm = $('pmName').value, base = textOf(r, dup);
+    const name = nm === 'val' ? '' : r.name + (dup ? ` ${CONFIG.toPyeong(r.g)}평` : '');
+    const S = { label: '매', val: eokS(r.s), col: C_S, real: r.s != null && !r.sQ }, R = { label: '전', val: eokS(r.r), col: C_R, real: r.r != null && !r.rQ };
+    if (mode === 'none' || nm === 'name') return { ...base };
+    if (mode === 'sr' || mode === 'srg') {
+      const lines = mode === 'sr' ? [S, R] : [{ ...S, label: '', big: true }, { ...R, label: '전세', big: false }];
+      let sub = '';
+      if (mode === 'srg') { const sb = $('pmSub').value, g = r.gap == null ? '-' : eokS(r.gap), rt = r.ratio == null ? '-' : r.ratio.toFixed(0) + '%';
+        sub = sb === 'g' ? `투자금 ${g}` : sb === 'r' ? `전세가율 ${rt}` : `투자금 ${g} · ${rt}`; }
+      const text = `${name} 매 ${S.val}${S.real ? '·실' : ''} / 전 ${R.val}${R.real ? '·실' : ''}`.trim();
+      return { text, real: S.real, name, lines, sub, compact: [{ val: S.val.replace('억', ''), col: C_S }, { val: R.val.replace('억', ''), col: C_R }] };
+    }
+    const one = mode === 's' ? S : mode === 'r' ? R : mode === 'gap' ? { label: '투자금', val: r.gap == null ? '-' : eokS(r.gap), col: '#3987e5', real: r.gap != null && !(r.sQ && r.rQ) }
+      : { label: '전세가율', val: r.ratio == null ? '-' : r.ratio.toFixed(0) + '%', col: '#3987e5', real: r.ratio != null && !(r.sQ && r.rQ) };
+    return { ...base, name, lines: [{ ...one, label: mode === 's' || mode === 'r' ? '' : one.label }], compact: [{ val: one.val, col: one.col }] };
+  }
+  /** 전고 대비 하락률 · 전저 대비 상승률 (시세트래킹 표와 같은 기준: 직접 고친 전고점·전저점 우선) */
+  function rates(r) {
+    const rl = r.rl || {}, rec = r.rec || {};
+    const peak = rec.peakO ?? rl.peak?.price ?? null, trough = rec.troughO ?? rl.trough?.price ?? null;
+    return { drop: r.s != null && peak ? (r.s / peak - 1) * 100 : null, rise: r.s != null && trough ? (r.s / trough - 1) * 100 : null };
+  }
   function textOf(r, dup) {
     const mode = $('pmShow').value, nm = $('pmName').value;
     const sfx = dup ? ` ${CONFIG.toPyeong(r.g)}평` : '';
@@ -213,7 +239,9 @@ const PriceMap = (() => {
     if (!map) {
       applySize();
       map = KMap.create($('pmMap'), first, 7);
-      ctrl = MapLabel.create({ key: 'map', map, panel: $('pmPanel'), ctl: $('pmCtl'), onPick: (it) => { if (!it.user) popup(it); },
+      ctrl = MapLabel.create({ key: 'map', map, panel: $('pmPanel'), ctl: $('pmCtl'),
+        onPreset: (k) => { if (k === 'field') { $('pmShow').value = 'sr'; $('pmSubWrap').hidden = true; saveOpts(); setTimeout(draw, 50); } },   // 임장용 = 매매 + 전세
+        onPick: (it) => { if (!it.user) popup(it); },
         onAdd: (pos) => {
           const text = (prompt('라벨에 적을 글자 (예: GTX-A 예정역, 학원가, 재개발 구역)') || '').trim(); if (!text) return;
           const l = Store.get(UKEY, []); l.push({ id: 'u:' + Date.now().toString(36), lat: +pos.lat.toFixed(6), lng: +pos.lng.toFixed(6), text }); Store.set(UKEY, l);
@@ -226,9 +254,9 @@ const PriceMap = (() => {
     const hot = setOf(TCKEY);
     const cnt = new Map(); ok.forEach(r => cnt.set(`${r.code}|${r.key}`, (cnt.get(`${r.code}|${r.key}`) || 0) + 1));
     const items = ok.map(r => {
-      const t = textOf(r, cnt.get(`${r.code}|${r.key}`) > 1);
-      return { id: r.id, pos: r.pos, text: t.text, color: t.real ? '#f5a742' : '#4f9cff', rank: hot.has(r.id) ? 1 : 0, cls: hot.has(r.id) ? 'mlhot' : '',
-        badge: r.drop != null && r.drop <= -5 ? `▼${Math.abs(r.drop).toFixed(0)}%` : '' };
+      const t = labelOf(r, cnt.get(`${r.code}|${r.key}`) > 1), rt = rates(r);
+      return { id: r.id, pos: r.pos, text: t.text, name: t.name, lines: t.lines, sub: t.sub, compact: t.compact, drop: rt.drop, rise: rt.rise,
+        color: t.real ? '#f5a742' : '#4f9cff', rank: hot.has(r.id) ? 1 : 0, cls: hot.has(r.id) ? 'mlhot' : '' };
     }).concat(okL.map(L => ({ id: 'lm:' + L.id, lm: L.id, pos: L.pos, text: `★ ${L.name}`, color: '#8e8e93', rank: -1, cls: 'mllm' })));
     map.relayout();
     baseItems = items;
@@ -236,14 +264,34 @@ const PriceMap = (() => {
     if (typeof PmArea !== 'undefined') PmArea.attach(map, () => lastRows);
     renderList();
     const hidNow = setOf(HKEY), shownRows = ok.filter(r => !hidNow.has(r.id));
+    side(shownRows); legend();
     notFound = ok.length < rows.length ? ` · 위치를 못 찾은 ${rows.length - ok.length}개 제외` : '';
-    $('pmTable').innerHTML = '<thead><tr><th class="l">지역</th><th class="l">단지</th><th>평형</th><th>매매</th><th>매매 기준</th><th>전세</th><th>전세 기준</th><th>매-전</th><th>전세가율</th><th>전고 대비</th><th class="l">폴더</th></tr></thead><tbody>' +
-      shownRows.map(r => `<tr><td class="l">${U.esc(r.sgg)} ${U.esc(r.dong)}</td><td class="l">${U.esc(r.name)}</td><td>${r.g}㎡</td><td>${r.s == null ? '-' : U.price(r.s)}</td><td>${r.s == null ? '' : r.sQ ? '호가' : '실거래'}</td><td>${r.r == null ? '-' : U.price(r.r)}</td><td>${r.r == null ? '' : r.rQ ? '호가' : '실거래'}</td>` +
-        `<td>${r.gap == null ? '-' : U.price(r.gap)}</td><td>${r.ratio == null ? '-' : r.ratio.toFixed(0) + '%'}</td><td>${U.pct(r.drop)}</td><td class="l">${U.esc((r.rec.folders || []).join(', '))}</td></tr>`).join('') + '</tbody>';
+    tblRows = shownRows; drawTable();
     const pts = [...ok, ...okL].map(r => r.pos);
     if (pts.length > 1) KMap.fit(map, pts); else { map.setCenter(KMap.LL(pts[0])); map.setLevel(5); }
     refreshMap();
     if (!$('pmCard').innerHTML && ok[0]) card(ok[0]);
+  }
+
+  /* ── 지도 아래 표 (엑셀식 열 필터는 표에만 적용 — 지도 라벨은 그대로) ── */
+  let tblRows = [], pf = null;
+  function pmCols() {
+    const N = ColFilter.numCol, T = ColFilter.txtCol;
+    return {
+      reg: T('지역', (r) => `${r.sgg} ${r.dong}`), name: T('단지', (r) => r.name), area: { label: '평형', get: (r) => `${r.g}㎡`, num: (r) => r.g },
+      s: N('매매', (r) => r.s), sQ: T('매매 기준', (r) => (r.s == null ? '' : r.sQ ? '호가' : '실거래')),
+      r: N('전세', (r) => r.r), rQ: T('전세 기준', (r) => (r.r == null ? '' : r.rQ ? '호가' : '실거래')),
+      gap: N('매-전', (r) => r.gap), ratio: N('전세가율', (r) => r.ratio, 'rat'), drop: N('전고 대비', (r) => r.drop, 'pct'),
+      folder: T('폴더', (r) => (r.rec.folders || []).join(', ')),
+    };
+  }
+  const PF = () => pf || (pf = ColFilter.create({ key: 'pm', cols: pmCols, bar: 'pmCfBar', onChange: drawTable }));
+  function drawTable() {
+    const list = PF().apply(tblRows), b = (k) => PF().btn(k);
+    $('pmTable').innerHTML = `<thead><tr><th class="l">지역${b('reg')}</th><th class="l">단지${b('name')}</th><th>평형${b('area')}</th><th>매매${b('s')}</th><th>매매 기준${b('sQ')}</th><th>전세${b('r')}</th><th>전세 기준${b('rQ')}</th><th>매-전${b('gap')}</th><th>전세가율${b('ratio')}</th><th>전고 대비${b('drop')}</th><th class="l">폴더${b('folder')}</th></tr></thead><tbody>` +
+      list.map(r => `<tr><td class="l">${U.esc(r.sgg)} ${U.esc(r.dong)}</td><td class="l">${U.esc(r.name)}</td><td>${r.g}㎡</td><td>${r.s == null ? '-' : U.price(r.s)}</td><td>${r.s == null ? '' : r.sQ ? '호가' : '실거래'}</td><td>${r.r == null ? '-' : U.price(r.r)}</td><td>${r.r == null ? '' : r.rQ ? '호가' : '실거래'}</td>` +
+        `<td>${r.gap == null ? '-' : U.price(r.gap)}</td><td>${r.ratio == null ? '-' : r.ratio.toFixed(0) + '%'}</td><td>${U.pct(r.drop)}</td><td class="l">${U.esc((r.rec.folders || []).join(', '))}</td></tr>`).join('') +
+      (tblRows.length && !list.length ? '<tr><td colspan="11" class="hint">필터에 맞는 단지가 없습니다.</td></tr>' : '') + '</tbody>';
   }
 
   /* ── 단지 추가: 검색해서 고른 단지를 시세트래킹 '지도 추가' 폴더에 담음 ── */
@@ -280,6 +328,20 @@ const PriceMap = (() => {
     return n;
   }
 
+  /** 범례 카드 (지도 왼쪽 아래 · 캡처에도 남음) */
+  function legend() {
+    const mode = $('pmShow').value, two = mode === 'sr' || mode === 'srg', it = (dot, t) => `<span><i style="background:${dot}"></i>${t}</span>`;
+    $('pmLegend').innerHTML = '<b>범례</b>' + (two ? it(C_S, '매매') + it(C_R, '전세') : it('#4f9cff', '내가 적은 호가') + it('#f5a742', '최근 실거래로 대신')) +
+      (two ? '<span><em class="sil">실</em> 호가 없어 실거래로 대신</span>' : '') + '<span><em class="hotbox"></em> 시세트래킹에서 체크</span>' +
+      '<span><em style="color:#2f6fed;font-style:normal;font-weight:800">▼</em> 전고 대비 · <em style="color:#e5484d;font-style:normal;font-weight:800">▲</em> 전저 대비</span>' +
+      ($('pmLm').checked ? '<span>★ 랜드마크</span>' : '');
+  }
+  /** 오른쪽 단지 목록: 전고 대비 많이 빠진 순, 누르면 그 단지로 이동 */
+  function side(rows) {
+    const list = rows.map(r => ({ r, ...rates(r) })).sort((a, b) => (a.drop ?? 1e9) - (b.drop ?? 1e9));
+    $('pmSideList').innerHTML = list.map(({ r, drop, rise }) => `<button type="button" class="pmsi" data-go="${U.esc(r.id)}"><span class="l"><b>${U.esc(r.name)}</b><small>${CONFIG.toPyeong(r.g)}평${r.buildYear ? ` · ${r.buildYear}년` : ''}${r.hh ? ` · ${r.hh.toLocaleString()}세대` : ''}</small></span>` +
+      `<span class="r"><b>${r.s == null ? '-' : eokS(r.s)}</b><small>${drop == null ? '' : `<em class="dn">▼${Math.abs(drop).toFixed(1)}%</em>`}${rise == null ? '' : ` <em class="up">▲${Math.abs(rise).toFixed(0)}%</em>`}</small></span></button>`).join('') || '<p class="hint">표시할 단지가 없습니다.</p>';
+  }
   function drawer(open) { const d = $('pmDrawer'); d.hidden = open == null ? !d.hidden : !open; $('btnPmDrawer').classList.toggle('on', !d.hidden); }
   function init() {
     const o = opts();
@@ -312,6 +374,16 @@ const PriceMap = (() => {
     $('btnPmDrawer').onclick = () => drawer();
     $('btnPmDrawerClose').onclick = () => drawer(false);
     $('pmPop').onclick = popAct;
+    $('pmSideList').onclick = (e) => {
+      const b = e.target.closest('[data-go]'); if (!b || !map) return;
+      const r = lastRows.find(x => x.id === b.dataset.go); if (!r || !r.pos) return;
+      map.setCenter(KMap.LL(r.pos)); if (map.getLevel() > 4) map.setLevel(4);
+      setTimeout(() => { const el = [...document.querySelectorAll('#pmMap .mllabel')].find(x => x.textContent.includes(r.name)); if (el) { el.classList.add('flashlbl'); setTimeout(() => el.classList.remove('flashlbl'), 2200); } }, 500);
+    };
+    const subVis = () => { $('pmSubWrap').hidden = $('pmShow').value !== 'srg'; };
+    $('pmSub').value = opts().sub || 'gr'; subVis();
+    $('pmSub').onchange = () => { saveOpts(); if (map) draw(); };
+    $('pmShow').addEventListener('change', subVis);
     $('pmPop').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('#ppS, #ppR')) $('pmPop').querySelector('[data-pp="save"]')?.click(); });
     document.addEventListener('keydown', (e) => { if (e.key !== 'Escape' || document.querySelector('.ml-capturing')) return; if (!$('pmPop').hidden) closePop(); else if (!$('pmDrawer').hidden) drawer(false); });
     // 저장함: 라벨 위치·모양·메모 라벨·표시 설정을 통째로 (예: "2026-11 평촌 지도")

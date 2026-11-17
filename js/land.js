@@ -84,21 +84,23 @@ const Land = (() => {
   }
 
   function info(l) {
-    const p = price(l), rl = Real.get(l.id) || {}, peak = rl.peak?.price;
-    return { p, rl, drop: p && peak ? (p.v / peak - 1) * 100 : null };
+    const p = price(l), rl = Real.get(l.id) || {}, tr = Tracking.has(l.id) ? Tracking.rec(l.id) : null;     // 시세트래킹에서 직접 고친 전고점·전저점이 있으면 그 값
+    const peak = tr?.peakO ?? rl.peak?.price, trough = tr?.troughO ?? rl.trough?.price;
+    return { p, rl, peak, trough, drop: p && peak ? (p.v / peak - 1) * 100 : null, rise: p && trough ? (p.v / trough - 1) * 100 : null };
   }
   function table(list) {
-    $('ldTable').innerHTML = '<thead><tr><th>등급</th><th class="l">지역</th><th class="l">단지</th><th>평형</th><th>지금 가격</th><th>최근 실거래</th><th>전고점</th><th>전고 대비</th><th>12개월 실거래</th><th>세대수</th><th class="c">관리</th></tr></thead><tbody>' +
+    $('ldTable').innerHTML = '<thead><tr><th>등급</th><th class="l">지역</th><th class="l">단지</th><th>평형</th><th>지금 가격</th><th>최근 실거래</th><th>전고점</th><th>전고 대비</th><th>전저점</th><th>전저 대비</th><th>12개월 실거래</th><th>세대수</th><th class="c">관리</th></tr></thead><tbody>' +
       list.map(l => { const x = info(l); return `<tr data-id="${U.esc(l.id)}"><td><select class="st" data-grade>${CONFIG.GRADES.map(g => `<option value="${g.k}" ${g.k === l.grade ? 'selected' : ''}>${g.k}</option>`).join('')}</select></td>` +
         `<td class="l">${U.esc(l.sgg)} ${U.esc(l.dong)}</td><td class="l"><b style="color:${grade(l.grade).color}">●</b> <a href="#" class="cxlink" data-cx="${U.esc(l.id)}">${U.esc(l.name)}</a></td><td>${l.g}㎡<small>${CONFIG.toPyeong(l.g)}평</small></td>` +
         `<td class="sale">${x.p ? U.price(x.p.v) + (x.p.quoted ? '' : ' <span class="star">실</span>') : '-'}</td><td>${x.rl.sale ? `${U.price(x.rl.sale.price)}<small>${U.date(x.rl.sale.d)}${Kit.badge(x.rl.sale.d)}</small>` : '-'}</td>` +
-        `<td>${x.rl.peak ? `${U.price(x.rl.peak.price)}<small>${U.date(x.rl.peak.d)}</small>` : '-'}</td><td class="${U.cls(x.drop)}">${U.pct(x.drop)}</td><td>${Kit.spark(x.rl.mon || [])}</td><td>${x.rl.hh ? x.rl.hh.toLocaleString() : '-'}</td>` +
+        `<td>${x.peak ? `${U.price(x.peak)}<small>${x.rl.peak && x.rl.peak.price === x.peak ? U.date(x.rl.peak.d) : '직접 입력'}</small>` : '-'}</td><td class="${U.cls(x.drop)}">${U.pct(x.drop)}</td>` +
+        `<td>${x.trough ? `${U.price(x.trough)}<small>${x.rl.trough && x.rl.trough.price === x.trough ? U.date(x.rl.trough.d) : '직접 입력'}</small>` : '-'}</td><td class="${U.cls(x.rise)}">${U.pct(x.rise)}</td><td>${Kit.spark(x.rl.mon || [])}</td><td>${x.rl.hh ? x.rl.hh.toLocaleString() : '-'}</td>` +
         `<td class="c"><button class="mini" data-track>${Tracking.has(l.id) ? '★' : '트래킹 담기'}</button> <button class="mini danger" data-del>빼기</button></td></tr>`; }).join('') + '</tbody>';
   }
   function excel() {
     const list = all();
-    U.download(`랜드마크_${U.stamp()}`, [{ name: '랜드마크 단지', rows: [['등급', '시도', '시군구', '동', '단지', '전용㎡', '지금 가격(만원)', '호가 여부', '최근 실거래(만원)', '전고점(만원)', '전고 대비(%)', '세대수'],
-      ...list.map(l => { const x = info(l); return [l.grade, l.sido, l.sgg, l.dong, l.name, l.g, x.p?.v ?? '', x.p ? (x.p.quoted ? '호가' : '실거래') : '', x.rl.sale?.price ?? '', x.rl.peak?.price ?? '', x.drop == null ? '' : +x.drop.toFixed(1), x.rl.hh || '']; })] }]);
+    U.download(`랜드마크_${U.stamp()}`, [{ name: '랜드마크 단지', rows: [['등급', '시도', '시군구', '동', '단지', '전용㎡', '지금 가격(만원)', '호가 여부', '최근 실거래(만원)', '전고점(만원)', '전고 대비(%)', '전저점(만원)', '전저 대비(%)', '세대수'],
+      ...list.map(l => { const x = info(l); return [l.grade, l.sido, l.sgg, l.dong, l.name, l.g, x.p?.v ?? '', x.p ? (x.p.quoted ? '호가' : '실거래') : '', x.rl.sale?.price ?? '', x.peak ?? '', x.drop == null ? '' : +x.drop.toFixed(1), x.trough ?? '', x.rise == null ? '' : +x.rise.toFixed(1), x.rl.hh || '']; })] }]);
   }
 
   /* ── 랜드마크 시세 기록 (달마다 적는 호가. 시세트래킹과 따로) ── */
@@ -169,7 +171,9 @@ const Land = (() => {
       // 라벨(겹침 방지·끌어 옮기기·크기·캡처 모드)은 js/maplabel.js — 시세지도와 같은 도구
       ctrl = MapLabel.create({ key: 'land', map: kmap, panel: $('ldPanel'), ctl: $('ldCtl'), onPick: (it) => { const l = all().find(x => x.id === it.id); if (l) card(l); } });
     }
-    ctrl.set(ok.map(l => { const p = price(l); return { id: l.id, pos: l.pos, text: `${l.name}${p ? ' ' + Kit.eok(p.v, 1) : ''}`, color: grade(l.grade).color, rank: rank(l.grade) }; }));
+    ctrl.set(ok.map(l => { const p = price(l), x = info(l), col = grade(l.grade).color, v = p ? Kit.eok(p.v, 1) : '-';
+      return { id: l.id, pos: l.pos, text: `${l.name}${p ? ' ' + v : ''}`, color: col, rank: rank(l.grade),
+        name: l.name, lines: [{ label: '', val: v, col, real: !!p && !p.quoted }], compact: [{ val: v, col }], drop: x.drop, rise: x.rise }; }));
     kmap.relayout();
     if (ok.length > 1) KMap.fit(kmap, ok.map(l => l.pos)); else { kmap.setCenter(KMap.LL(ok[0].pos)); kmap.setLevel(5); }
     if (!$('ldCard').innerHTML) card(ok[0]);

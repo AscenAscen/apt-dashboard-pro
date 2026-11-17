@@ -233,7 +233,7 @@ const Market = (() => {
       options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'nearest', intersect: false },
         scales: { x: { type: 'linear', ticks: { color: col('--sub'), callback: (v) => `${String(Math.floor(v / 12)).slice(2)}.${String(Math.floor(v % 12) + 1).padStart(2, '0')}`, stepSize: 6 }, grid: { color: col('--line') } },
           y: { ticks: { color: col('--sub') }, grid: { color: col('--line') } } },
-        plugins: { legend: { labels: { color: col('--text') } }, tooltip: { callbacks: { title: (items) => { const v = items[0].parsed.x; return `${Math.floor(v / 12)}년 ${Math.floor(v % 12) + 1}월`; } } } } } });
+        plugins: { ckCross: true, ckEnd: { dec: 1 }, legend: { labels: { color: col('--text') } }, tooltip: { callbacks: { title: (items) => { const v = items[0].parsed.x; return `${Math.floor(v / 12)}년 ${Math.floor(v % 12) + 1}월`; } } } } } });
   }
 
   /* ── KB 엑셀: 날짜가 세로, 지역이 가로로 놓인 표를 읽음 ── */

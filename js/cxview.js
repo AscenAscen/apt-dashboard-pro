@@ -65,7 +65,9 @@ const CxView = (() => {
     const kakao = `https://map.kakao.com/?q=${encodeURIComponent(`${c.sgg} ${c.dong} ${c.name}`)}`;
     const chips = [...c.areas].sort((a, b) => a[0] - b[0]).map(([g, n]) => `<button class="chip${g === c.g ? ' on' : ''}" data-cxg="${g}">${g}㎡ · ${CONFIG.toPyeong(g)}평 <b>${n}</b></button>`).join('');
     const turn = c.hh && c.n12 ? c.n12 / c.hh * 100 : null;
-    const stat = (k, v, sub = '') => `<div class="cxstat"><span>${k}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+    const stat = (k, v, sub = '', sp = '') => `<div class="cxstat"><span>${k}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ''}${sp}</div>`;
+    const mon = (arr, f) => { const out = [], t = new Date(); for (let i = 23; i >= 0; i--) { const d = new Date(t.getFullYear(), t.getMonth() - i, 1), ym = d.getFullYear() * 100 + d.getMonth() + 1, xs = arr.filter(z => Math.floor(z.d / 100) === ym); out.push(f(xs)); } return out; };
+    const spS = CK.spark(mon(c.S.filter(t => !t.direct), xs => (xs.length ? xs.reduce((a, z) => a + z.price, 0) / xs.length : null))), spN = CK.spark(mon(c.S, xs => xs.length));
     const recent = c.S.map(t => ({ ...t, k: '매매' })).concat(c.R.map(t => ({ ...t, k: '전세' }))).sort((a, b) => b.d - a.d).slice(0, 20);
     const hist = c.ms.filter(m => c.qs[m] && (c.qs[m].s != null || c.qs[m].r != null)).slice(0, 12);
     $('cxBody').innerHTML = `
@@ -75,15 +77,15 @@ const CxView = (() => {
           <a class="btn" href="${link}" target="_blank" rel="noopener">네이버 부동산</a><a class="btn" href="${kakao}" target="_blank" rel="noopener">카카오맵</a></div></div>
       <div class="chips cxareas">${chips || '<span class="hint">2020년 이후 거래가 없습니다.</span>'}</div>
       <div class="cxstats">
-        ${stat('최근 매매 실거래', eok(c.last?.price), c.last ? U.date(c.last.d) + (c.last.floor ? ` · ${c.last.floor}층` : '') : '')}
+        ${stat('최근 매매 실거래', eok(c.last?.price), c.last ? U.date(c.last.d) + (c.last.floor ? ` · ${c.last.floor}층` : '') : '', spS)}
         ${stat('최근 전세 실거래', eok(c.lastR?.price), c.lastR ? U.date(c.lastR.d) : '')}
         ${stat('내 최신 호가', c.qS ? eok(c.qs[c.qS].s) : '-', c.qS ? Tracking.ymLabel(c.qS) + (c.qR ? ` · 전세 ${eok(c.qs[c.qR].r)}` : '') : c.rec ? '아직 안 적음' : '시세트래킹에 담으면 적을 수 있어요')}
         ${stat('전고점 (2020년~)', eok(c.peak?.price), c.peak ? U.date(c.peak.d) : '')}
         ${stat('전고점 대비', `<span class="${U.cls(c.drop)}">${pct(c.drop, 1)}</span>`, c.trough ? `전저점 ${eok(c.trough.price)} (${U.date(c.trough.d)})` : '')}
         ${stat('전세가율', c.ratio == null ? '-' : c.ratio.toFixed(0) + '%', c.gap == null ? '' : `투자금 ${eok(c.gap)}`)}
-        ${stat('1년 매매 거래', `${c.n12}건`, turn == null ? (c.hh ? '' : '세대수를 알면 회전율 계산') : `회전율 ${turn.toFixed(1)}% (세대수 대비)`)}
+        ${stat('1년 매매 거래', `${c.n12}건`, turn == null ? (c.hh ? '' : '세대수를 알면 회전율 계산') : `회전율 ${turn.toFixed(1)}% (세대수 대비)`, spN)}
       </div>
-      ${c.S.length || c.R.length ? '<div class="cxchart"><canvas id="cxChart"></canvas></div>' : ''}
+      ${c.S.length || c.R.length ? '<div class="cxchartbar"><span class="hint" style="margin:0">점 = 실거래 · 굵은 선 = 3개월 평균 · 파란 선 = 내 호가 · 빨간 점선 = 전고점</span><span class="ckrange" id="cxRange"></span></div><div class="cxchart"><canvas id="cxChart"></canvas></div>' : ''}
       <div class="cxcols">
         <div><h4>최근 거래 ${recent.length}건</h4><div class="tablewrap short"><table class="grid"><thead><tr><th>계약일</th><th>구분</th><th>층</th><th>가격</th><th></th></tr></thead><tbody>${recent.map(t => `<tr class="${t.direct ? 'dim' : ''}"><td>${U.date(t.d)}</td><td>${t.k}</td><td>${t.floor ?? ''}</td><td class="${t.k === '매매' ? 'sale' : 'rent'}">${eok(t.price)}</td><td>${t.direct ? '직거래' : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="hint">거래 없음</td></tr>'}</tbody></table></div></div>
         <div><h4>내 기록</h4>${c.rec ? `<label class="cxmemo">메모 <textarea id="cxMemo" rows="3" placeholder="임장 소감, 중개사 통화 내용 등">${U.esc(c.rec.memo || '')}</textarea></label><button data-cxa="memo">메모 저장</button>
@@ -91,25 +93,30 @@ const CxView = (() => {
           : '<p class="hint">시세트래킹에 담으면 메모와 호가를 적을 수 있습니다.</p>'}</div>
       </div>
       <div class="cxsim" id="cxSim"><h4>비슷한 단지</h4><div id="cxSimCtl"></div><div id="cxSimOut" class="hint">찾는 중…</div></div>`;
-    drawChart(c);
+    const yrs = $('cxRange') ? CK.range($('cxRange'), 'cx', (y) => drawChart(c, y)) : null;
+    drawChart(c, yrs);
   }
-  function drawChart(c) {
+  function drawChart(c, years) {
     if (chart) { chart.destroy(); chart = null; }
-    if (typeof Chart === 'undefined' || (!c.S.length && !c.R.length)) return;
-    const cs = getComputedStyle(document.documentElement), col = (v, d) => (cs.getPropertyValue(v) || d).trim();
-    const pts = (a) => a.map(t => ({ x: x(t.d), y: t.price / 10000, t }));
+    if (typeof Chart === 'undefined' || !$('cxChart') || (!c.S.length && !c.R.length)) return;
+    const S = CK.C.sale(), R = CK.C.rent(), Q = CK.C.quote();
+    const now = new Date(), minX = years ? now.getFullYear() + now.getMonth() / 12 - years : -Infinity;
+    const pts = (a) => a.map(t => ({ x: x(t.d), y: t.price / 10000, t })).filter(p => p.x >= minX);
+    const sale = pts(c.S.filter(t => !t.direct)), rent = pts(c.R);
     const sets = [
-      { label: '매매', data: pts(c.S.filter(t => !t.direct)), backgroundColor: '#f5a742', pointRadius: 3 },
-      { label: '매매(직거래)', data: pts(c.S.filter(t => t.direct)), backgroundColor: 'rgba(245,167,66,.25)', pointRadius: 3 },
-      { label: '전세', data: pts(c.R), backgroundColor: '#34c759', pointRadius: 2.5 }];
-    const qm = [...c.ms].filter(m => c.qs[m] && c.qs[m].s != null).sort((a, b) => a - b);
-    if (qm.length) sets.push({ type: 'line', label: '내 호가', data: qm.map(m => ({ x: Math.floor(m / 100) + (m % 100 - 1) / 12 + .5 / 12, y: c.qs[m].s / 10000 })), borderColor: '#4f9cff', backgroundColor: '#4f9cff', pointRadius: 4, tension: 0 });
-    if (c.peak) { const xs = sets.flatMap(s => s.data.map(p => p.x)); sets.push({ type: 'line', label: '전고점', data: [{ x: Math.min(...xs), y: c.peak.price / 10000 }, { x: Math.max(...xs), y: c.peak.price / 10000 }], borderColor: 'rgba(255,59,48,.7)', borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 }); }
-    chart = new Chart($('cxChart'), { type: 'scatter', data: { datasets: sets },
-      options: { responsive: true, maintainAspectRatio: false, animation: false,
-        scales: { x: { ticks: { color: col('--sub', '#999'), callback: (v) => (Number.isInteger(v) ? v + '년' : '') , stepSize: 1 }, grid: { color: 'rgba(128,128,128,.15)' } },
-          y: { ticks: { color: col('--sub', '#999'), callback: (v) => v + '억' }, grid: { color: 'rgba(128,128,128,.15)' } } },
-        plugins: { legend: { labels: { color: col('--text', '#ddd'), usePointStyle: true } },
+      { label: '매매 실거래', data: sale, backgroundColor: CK.alpha(S, .45), borderColor: 'transparent', pointRadius: 3, ckNoEnd: true },
+      { label: '매매(직거래)', data: pts(c.S.filter(t => t.direct)), backgroundColor: CK.alpha(S, .18), borderColor: 'transparent', pointRadius: 3, pointStyle: 'triangle', ckNoEnd: true },
+      { label: '전세 실거래', data: rent, backgroundColor: CK.alpha(R, .45), borderColor: 'transparent', pointRadius: 2.5, ckNoEnd: true },
+      { label: '매매 3개월 평균', data: CK.ma(sale, 'year'), showLine: true, borderColor: S, backgroundColor: S, pointRadius: 0, borderWidth: 2.5, endLabel: '매매' },
+      { label: '전세 3개월 평균', data: CK.ma(rent, 'year'), showLine: true, borderColor: R, backgroundColor: R, pointRadius: 0, borderWidth: 2.5, endLabel: '전세' }];
+    const qm = [...c.ms].filter(m => c.qs[m] && c.qs[m].s != null).sort((a, b) => a - b).map(m => ({ x: Math.floor(m / 100) + (m % 100 - 1) / 12 + .5 / 12, y: c.qs[m].s / 10000 })).filter(p => p.x >= minX);
+    if (qm.length) sets.push({ label: '내 호가', data: qm, showLine: true, borderColor: Q, backgroundColor: Q, pointRadius: 4, pointBorderColor: CK.C.panel(), pointBorderWidth: 2, tension: 0, endLabel: '호가' });
+    const fmtX = (v) => (Number.isInteger(v) ? v + '년' : '');
+    chart = new Chart($('cxChart'), { type: 'scatter', data: { datasets: sets.filter(d => d.data.length) },
+      options: { responsive: true, maintainAspectRatio: false,
+        scales: { x: { min: years ? Math.floor(minX * 4) / 4 : undefined, ticks: { callback: fmtX, stepSize: years === 1 ? .25 : 1 } }, y: { ticks: { callback: (v) => v + '억' } } },
+        plugins: { ckPeak: c.peak ? [{ y: c.peak.price / 10000, text: `전고점 ${U.price(c.peak.price)} · ${U.date(c.peak.d)}` }] : [], ckEnd: { unit: '억', dec: 2 },
+          legend: { labels: { filter: (it) => !/직거래/.test(it.text) } },
           tooltip: { callbacks: { label: (it) => { const t = it.raw.t; return t ? `${it.dataset.label} ${U.date(t.d)} ${U.price(t.price)}${t.floor ? ` · ${t.floor}층` : ''}` : `${it.dataset.label} ${it.raw.y.toFixed(2)}억`; } } } } } });
   }
 

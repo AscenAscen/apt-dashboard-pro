@@ -116,14 +116,15 @@ const Trends = (() => {
     const yms = [...per.keys()].sort((a, b) => a - b).slice(-36);
     const rowsM = yms.map(ym => { const m = per.get(ym), ms = median(m.s), mr = median(m.r); return { ym, ratio: ms && mr && m.s.length >= 3 && m.r.length >= 3 ? mr / ms * 100 : null, high: m.n >= 5 ? m.h / m.n * 100 : null, ns: m.s.length, nr: m.r.length, h: m.h, n: m.n }; });
     const lab = (ym) => `${String(ym).slice(2, 4)}.${String(ym).slice(4)}`;
+    drawFlow(yms, per);
     if (chart2) chart2.destroy();
     chart2 = new Chart($('trChart2'), { type: 'line', data: { labels: rowsM.map(r => lab(r.ym)), datasets: [
-      { label: '전세가율 (%)', data: rowsM.map(r => r.ratio == null ? null : +r.ratio.toFixed(1)), borderColor: col('--rent'), backgroundColor: col('--rent'), borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true, yAxisID: 'y' },
-      { label: '신고가 비율 (%)', data: rowsM.map(r => r.high == null ? null : +r.high.toFixed(1)), borderColor: col('--accent'), backgroundColor: col('--accent'), borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true, yAxisID: 'y2' }] },
+      { label: '전세가율 (%)', data: rowsM.map(r => r.ratio == null ? null : +r.ratio.toFixed(1)), borderColor: CK.C.rent(), backgroundColor: CK.C.rent(), borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true, yAxisID: 'y' },
+      { label: '신고가 비율 (%)', data: rowsM.map(r => r.high == null ? null : +r.high.toFixed(1)), borderColor: CK.C.quote(), backgroundColor: CK.C.quote(), borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true, yAxisID: 'y2' }] },
       options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
         scales: { x: { ticks: { color: col('--sub') }, grid: { color: col('--line') } }, y: { position: 'left', title: { display: true, text: '전세가율 %', color: col('--sub') }, ticks: { color: col('--sub') }, grid: { color: col('--line') } },
           y2: { position: 'right', min: 0, title: { display: true, text: '신고가 비율 %', color: col('--sub') }, ticks: { color: col('--sub') }, grid: { drawOnChartArea: false } } },
-        plugins: { legend: { labels: { color: col('--text') } } } } });
+        plugins: { legend: { labels: { color: col('--text') } }, ckCross: true } } });
     $('trMonthly').innerHTML = '<thead><tr><th>월</th><th>매매 건수</th><th>전세 건수</th><th>전세가율</th><th>신고가 수</th><th>신고가 비율</th></tr></thead><tbody>' +
       [...rowsM].reverse().map(r => `<tr><td>${lab(r.ym)}</td><td>${r.ns}</td><td>${r.nr}</td><td>${r.ratio == null ? '-' : r.ratio.toFixed(1) + '%'}</td><td>${r.h}</td><td>${r.high == null ? '-' : r.high.toFixed(0) + '%'}</td></tr>`).join('') + '</tbody>';
     // ② 오른 단지 · 내린 단지: 최근 N개월 중간값 vs 그 앞 N개월 중간값 (같은 단지·평형)
@@ -156,6 +157,27 @@ const Trends = (() => {
       cmp.map(c => `<tr${c.r[0] === code ? ' style="font-weight:700"' : ''}><td class="l">${U.esc(c.r[2])}${c.full ? '' : ' <span class="tag prov">수집 중</span>'}</td><td>${c.v3.toLocaleString()}</td><td class="${U.cls(c.vchg)}">${U.pct(c.vchg)}</td><td>${c.r3.toLocaleString()}</td><td>${c.nh}</td><td>${c.high == null ? '-' : c.high.toFixed(0) + '%'}</td><td>${c.p == null ? '-' : Math.round(c.p).toLocaleString()}</td><td class="${U.cls(c.pchg)}">${U.pct(c.pchg)}</td></tr>`).join('') + '</tbody>';
   }
 
+  /** 매매·전세 흐름 (84㎡ 환산 중간값) + 사이 색칠 = 투자금 */
+  let chart3 = null, flowArgs = null;
+  function drawFlow(yms, per, years) {
+    flowArgs = [yms, per];
+    if (!$('trChart3')) return;
+    if (years === undefined) years = CK.range($('trRange'), 'trends', (y) => drawFlow(flowArgs[0], flowArgs[1], y));
+    const use = years ? yms.slice(-years * 12) : yms;
+    const lab = (ym) => `${String(ym).slice(2, 4)}.${String(ym).slice(4)}`;
+    const v = (ym, k) => { const a = per.get(ym)[k]; return a.length >= 3 ? +(median(a) * 84 / 10000).toFixed(2) : null; };
+    const S = use.map(ym => v(ym, 's')), R = use.map(ym => v(ym, 'r'));
+    const lastS = [...S].reverse().find(x => x != null), lastR = [...R].reverse().find(x => x != null);
+    if (chart3) chart3.destroy();
+    chart3 = new Chart($('trChart3'), { type: 'line', data: { labels: use.map(lab), datasets: [
+      { label: '매매 (84㎡ 환산)', data: S, borderColor: CK.C.sale(), backgroundColor: CK.C.sale(), pointRadius: 0, borderWidth: 2.5, spanGaps: true, endLabel: '매매' },
+      { label: '전세 (84㎡ 환산)', data: R, borderColor: CK.C.rent(), backgroundColor: CK.C.rent(), pointRadius: 0, borderWidth: 2.5, spanGaps: true, endLabel: '전세' }] },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { ticks: { callback: (x) => x + '억' } } },
+        plugins: { ckCross: true, ckEnd: { unit: '억', dec: 2 },
+          ckBand: { from: 0, to: 1, label: lastS != null && lastR != null ? `투자금 ${(lastS - lastR).toFixed(2)}억` : '' },
+          tooltip: { callbacks: { label: (c) => `${c.dataset.label} ${c.raw == null ? '-' : c.raw + '억'}`, footer: (it) => { const a = it[0] && S[it[0].dataIndex], b = it[0] && R[it[0].dataIndex]; return a != null && b != null ? `투자금 ${(a - b).toFixed(2)}억 · 전세가율 ${Math.round(b / a * 100)}%` : ''; } } } } } });
+  }
   function drawChart(vol) {
     const yms = [...vol.keys()].sort((a, b) => a - b);
     const css = getComputedStyle(document.documentElement), col = (n) => css.getPropertyValue(n).trim();
@@ -165,8 +187,8 @@ const Trends = (() => {
       data: {
         labels: yms.map(ym => `${String(ym).slice(2, 4)}.${String(ym).slice(4)}`),
         datasets: [
-          { label: '매매 건수', data: yms.map(ym => vol.get(ym)[0]), backgroundColor: col('--accent') },
-          { label: '전세 건수', data: yms.map(ym => vol.get(ym)[1]), backgroundColor: col('--rent') },
+          { label: '매매 건수', data: yms.map(ym => vol.get(ym)[0]), backgroundColor: CK.C.sale() },
+          { label: '전세 건수', data: yms.map(ym => vol.get(ym)[1]), backgroundColor: CK.C.rent() },
         ],
       },
       options: {

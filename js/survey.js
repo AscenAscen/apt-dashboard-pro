@@ -12,19 +12,31 @@ const Survey = (() => {
   const checked = new Set(), openGu = new Set();
   let ui = Store.get('apt.svUi', { info: false });
   let cmpLast = null;
-  let colF = {}, colCode = null;          // 엑셀식 열 필터: 열 키 → 보일 값 Set (지역이 바뀌면 초기화)
-  const COLS = {                          // 열 필터: 행에서 값 꺼내기 (r: 단지·평형, c: compute 결과)
-    status: { label: '상태', get: (r, c) => c.rc.status || '(없음)' },
-    dong: { label: '동', get: (r) => r.dong || '(없음)' },
-    zone: { label: '생활권', get: (r, c) => c.rc.zone || '(없음)' },
-    year: { label: '연식', get: (r) => (r.buildYear ? String(r.buildYear) : '(없음)') },
-    area: { label: '평형', get: (r) => `${r.g}㎡` },
-    house: { label: '세대수', get: (r, c) => String(parseInt(c.rc.households, 10) || r.hh || '(모름)') },
-    struct: { label: '구조', get: (r, c) => c.rc.structure || Kit.autoInfo(r).structure || '(모름)' },
-    rooms: { label: '방', get: (r, c) => String(c.rc.rooms || Kit.autoInfo(r).rooms || '(모름)') },
-    baths: { label: '화', get: (r, c) => String(c.rc.baths || Kit.autoInfo(r).baths || '(모름)') },
-    cand: { label: '후보', get: (r, c) => (c.rc.cand ? '후보' : '일반') },
-  };
+  let colCode = Store.get('apt.svCfCode', null), sf = null;   // 엑셀식 열 필터 (다른 지역으로 바꾸면 값 필터만 초기화)
+  const RC = (r) => (r._c || compute(r));
+  function svCols() {
+    const N = ColFilter.numCol, T = ColFilter.txtCol, m = month();
+    const ai = (r, f) => { const v = RC(r).rc[f]; return v != null && String(v).trim() !== '' ? String(v).trim() : (Kit.autoInfo(r)[f] || ''); };
+    const out = {
+      cand: T('후보', (r) => (RC(r).rc.cand ? '후보' : '일반')), status: T('상태', (r) => RC(r).rc.status),
+      band: { label: '가격대', get: (r) => RC(r).band, num: (r) => RC(r).base },
+      si: T('시', () => U.siGu(reg[1], reg[2])[0]), gu: T('구', () => U.siGu(reg[1], reg[2])[1]), dong: T('동', (r) => r.dong), zone: T('생활권', (r) => RC(r).rc.zone),
+      name: T('단지명', (r) => r.name), year: N('연식', (r) => r.buildYear || null, 'n'), age: N('연차', (r) => (r.buildYear ? CONFIG.toAge(r.buildYear) : null), 'n'),
+      house: N('세대수', (r) => parseInt(RC(r).rc.households, 10) || r.hh || null, 'n'), area: { label: '평형', get: (r) => `${r.g}㎡ (${CONFIG.toPyeong(r.g)}평)`, num: (r) => r.g },
+      struct: T('구조', (r) => ai(r, 'structure')), rooms: N('방', (r) => parseInt(ai(r, 'rooms'), 10) || null, 'n'), baths: N('화', (r) => parseInt(ai(r, 'baths'), 10) || null, 'n'),
+      peak: N('전고점', (r) => RC(r).peak), drop: N('전고 대비 하락률', (r) => RC(r).drop, 'pct'), trough: N('전저점', (r) => RC(r).trough), rise: N('전저 대비 상승률', (r) => RC(r).rise, 'pct'),
+      ask: N('호가-실거래', (r) => RC(r).askGap, 'diff'),
+    };
+    if (m) {
+      const F = [['s', '매매', 'eok', (c) => c.q.s], ['sn', '매매 개수', 'n', (c) => c.q.sn], ['sd', '매매 전월 대비', 'diff', (c) => c.sd], ['r', '전세', 'eok', (c) => c.q.r], ['rn', '전세 개수', 'n', (c) => c.q.rn],
+        ['rd', '전세 전월 대비', 'diff', (c) => c.rd], ['gap', '매-전(투자금)', 'eok', (c) => c.gap], ['gd', '투자금 전월 대비', 'diff', (c) => c.gd], ['ratio', '전세가율', 'rat', (c) => c.ratio], ['rtd', '전세가율 전월 대비', 'pctp', (c) => c.rtd]];
+      F.forEach(([f, n, kind, g]) => { out['q_' + f] = N(`${Tracking.ymLabel(m)} ${n}`, (r) => g(RC(r)) ?? null, kind); });
+    }
+    out.sale = N('최근 매매 실거래', (r) => r.sale?.price ?? null); out.rent = N('최근 전세 실거래', (r) => r.rent?.price ?? null);
+    out.memo = T('메모', (r) => RC(r).rc.memo);
+    return out;
+  }
+  const SF = () => sf || (sf = ColFilter.create({ key: 'sv', cols: svCols, bar: 'svCfBar', sortSel: 'svSort', onChange: () => apply() }));
 
   const eok = (v) => (v == null ? '' : String(+(v / 10000).toFixed(4)));
   const eokT = (v) => (v == null ? '-' : +(v / 10000).toFixed(2) + '억');
@@ -67,26 +79,7 @@ const Survey = (() => {
     let timer;
     ['svFind', 'svMin', 'svMax', 'svYear', 'svHouse', 'svHouseMax', 'svAreaMin', 'svAreaMax'].forEach(id => { $(id).oninput = () => { clearTimeout(timer); timer = setTimeout(apply, 300); }; });
     $('svAreaUnit').onchange = apply;
-    // 열 필터 팝업: 값 검색·모두 선택/해제·적용·지우기, 바깥을 누르면 닫힘
-    const pop = $('svColPop');
-    pop.onclick = (e) => {
-      const t = e.target, key = pop.dataset.key;
-      if (t.dataset.cfClose != null) { pop.hidden = true; return; }
-      if (t.dataset.cfAll != null || t.dataset.cfNone != null) { pop.querySelectorAll('.cflist label').forEach(l => { if (l.style.display !== 'none') l.querySelector('input').checked = t.dataset.cfAll != null; }); return; }
-      if (t.dataset.cfClear != null) { delete colF[key]; pop.hidden = true; apply(); return; }
-      if (t.dataset.cfOk != null) {
-        const boxes = [...pop.querySelectorAll('.cflist input')], picked = boxes.filter(b => b.checked).map(b => b.value);
-        if (picked.length === boxes.length) delete colF[key]; else colF[key] = new Set(picked);
-        pop.hidden = true; apply();
-      }
-    };
-    pop.oninput = (e) => {
-      if (e.target.id !== 'svColQ') return;
-      const q = e.target.value.trim().toLowerCase();
-      pop.querySelectorAll('.cflist label').forEach(l => { l.style.display = !q || l.textContent.toLowerCase().includes(q) ? '' : 'none'; });
-    };
     document.addEventListener('mousedown', (e) => {
-      if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('button.colf')) pop.hidden = true;
       const ab = $('svAreaBox'); if (ab.open && !ab.contains(e.target)) ab.open = false;   // 평형 목록도 바깥을 누르면 접힘
     });
     $('btnSvMore').onclick = () => { shown += PAGE; render(); };
@@ -201,7 +194,7 @@ const Survey = (() => {
     fillMonths(ym);
     $('svDong').value = dong || ''; $('svOnlyQuoted').checked = true; $('svUnfilled').checked = false; $('svCand').checked = false; $('svRecent').checked = false;
     ['svFind', 'svMin', 'svMax', 'svYear', 'svHouse', 'svHouseMax', 'svAreaMin', 'svAreaMax'].forEach(id => { $(id).value = ''; });
-    colF = {}; fillAreas(true); $('svHouseNa').checked = false; $('svZone').value = ''; $('svStatus').value = '*';
+    SF().reset(); fillAreas(true); $('svHouseNa').checked = false; $('svZone').value = ''; $('svStatus').value = '*';
     apply();
     $('svBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -332,7 +325,7 @@ const Survey = (() => {
       if (touched) Tracking.save();
       const dongs = [...new Set(rows.map(r => r.dong))].sort((a, b) => a.localeCompare(b, 'ko'));
       $('svDong').innerHTML = '<option value="">전체</option>' + dongs.map(d => `<option>${U.esc(d)}</option>`).join('');
-      if (colCode !== code) { colF = {}; colCode = code; }       // 다른 지역으로 바꾸면 열 필터 초기화
+      if (colCode !== code) { if (colCode != null) SF().reset(); colCode = code; Store.set('apt.svCfCode', code); }   // 다른 지역으로 바꾸면 값 필터 초기화
       checked.clear();
       fillAreas(false);
       $('svEmpty').hidden = true; $('svBody').hidden = false;
@@ -421,7 +414,6 @@ const Survey = (() => {
     });
     view = base.filter(r => {
       const c = r._c;
-      for (const k in colF) if (!colF[k].has(COLS[k].get(r, c))) return false;     // 엑셀식 열 필터
       if (find && !Alias.hit(r.code, r.key, r.name, '', find)) return false;
       if (!isNaN(year) && !(r.buildYear >= year)) return false;
       if (zone && c.rc.zone !== zone) return false;
@@ -447,8 +439,9 @@ const Survey = (() => {
       gap: (r) => num(r._c.gap, 1e12), year: (r) => -(r.buildYear || 0),
       chg: (r) => -Math.abs(num(r._c.sd, 0)), ask: (r) => -num(r._c.askGap, -1e12),
     }[by];
-    if (by === 'zone') view.sort((a, b) => (a._c.rc.zone || '힣').localeCompare(b._c.rc.zone || '힣', 'ko') || a.name.localeCompare(b.name, 'ko') || a.g - b.g);
-    else view.sort((a, b) => (key ? key(a) - key(b) : 0) || a.name.localeCompare(b.name, 'ko') || a.g - b.g);
+    const sortFn = (l) => { if (by === 'zone') l.sort((a, b) => (a._c.rc.zone || '힣').localeCompare(b._c.rc.zone || '힣', 'ko') || a.name.localeCompare(b.name, 'ko') || a.g - b.g);
+      else l.sort((a, b) => (key ? key(a) - key(b) : 0) || a.name.localeCompare(b.name, 'ko') || a.g - b.g); return l; };
+    view = SF().apply(view, sortFn);                               // 엑셀식 열 필터·머리글 정렬
     shown = PAGE;
     render();
   }
@@ -467,41 +460,18 @@ const Survey = (() => {
     $('svNotice').onclick = (e) => { if (e.target.dataset.act === 'backup') Vault.copyCode(); };
   }
 
-  // 열 필터 팝업 열기: 그 열에 있는 값을 개수와 함께 체크박스로 보여 줌
-  function openColPop(key, btn) {
-    const pop = $('svColPop');
-    if (!pop.hidden && pop.dataset.key === key) { pop.hidden = true; return; }
-    const col = COLS[key], cnt = new Map();
-    base.forEach(r => { const v = col.get(r, r._c || compute(r)); cnt.set(v, (cnt.get(v) || 0) + 1); });
-    const vals = [...cnt.keys()].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
-    const on = (v) => !colF[key] || colF[key].has(v);
-    pop.innerHTML = `<div class="cfh">${col.label} 필터</div>
-      <input type="search" id="svColQ" placeholder="값 검색">
-      <div class="cfbtns"><button type="button" data-cf-all>모두 선택</button><button type="button" data-cf-none>모두 해제</button></div>
-      <div class="cflist">${vals.map(v => `<label><input type="checkbox" value="${U.esc(v)}" ${on(v) ? 'checked' : ''}> ${U.esc(v)} <small>${cnt.get(v)}</small></label>`).join('')}</div>
-      <div class="cfend"><button type="button" data-cf-clear>필터 지우기</button><button type="button" data-cf-close>닫기</button><button type="button" data-cf-ok>적용</button></div>`;
-    pop.dataset.key = key;
-    btn.scrollIntoView({ block: 'nearest' });                 // 머리글이 화면 밖이면 먼저 보이게
-    const rc = btn.getBoundingClientRect();
-    pop.hidden = false;
-    const h = pop.offsetHeight;
-    pop.style.left = Math.max(8, Math.min(rc.left, window.innerWidth - 250)) + 'px';
-    pop.style.top = Math.max(8, Math.min(rc.bottom + 4, window.innerHeight - h - 8)) + 'px';
-    pop.querySelector('#svColQ').focus();
-  }
-
   function render() {
     const list = view.slice(0, shown), m = month();
     $('svTitle').textContent = `${reg[1]} ${reg[2]} — 단지·평형 ${view.length.toLocaleString()}개` + (view.length !== rows.length ? ` (전체 ${rows.length.toLocaleString()}개 중)` : '');
     $('btnSvInfo').textContent = ui.info ? '단지 정보 접기' : '단지 정보 펼치기';
     const G = Tracking.GROUP;
     const fx = (label, cls = '') => `<th rowspan="2" class="${cls}">${label}</th>`;
-    const cfb = (k) => `<button class="colf${colF[k] ? ' on' : ''}" data-cf="${k}" title="이 열의 값으로 거르기">▾</button>`;
-    const head = `<thead><tr>${fx('<input type="checkbox" id="svAll" title="보이는 줄 전체 선택">', 'c')}${fx('후보' + cfb('cand'), 'c')}${fx('상태' + cfb('status'))}${fx('가격대')}${fx('시', 'l')}${fx('구', 'l')}${fx('동' + cfb('dong'), 'l')}${fx('생활권' + cfb('zone'), 'l info')}${fx('단지명', 'l name')}` +
-      `${fx('연식' + cfb('year'))}${fx('연차')}${fx('세대수' + cfb('house'))}${fx('평형' + cfb('area'))}${fx('구조' + cfb('struct'), 'info')}${fx('방' + cfb('rooms'), 'info')}${fx('화' + cfb('baths'), 'info')}${fx('링크')}${fx('전고점')}${fx('전고 대비 하락률')}${fx('전저점')}${fx('전저 대비 상승률')}${fx('호가-실거래')}` +
+    const cfb = (k) => SF().btn(k), QF = ['s', 'sn', 'sd', 'r', 'rn', 'rd', 'gap', 'gd', 'ratio', 'rtd'];
+    const head = `<thead><tr>${fx('<input type="checkbox" id="svAll" title="보이는 줄 전체 선택">', 'c')}${fx('후보' + cfb('cand'), 'c')}${fx('상태' + cfb('status'))}${fx('가격대' + cfb('band'))}${fx('시' + cfb('si'), 'l')}${fx('구' + cfb('gu'), 'l')}${fx('동' + cfb('dong'), 'l')}${fx('생활권' + cfb('zone'), 'l info')}${fx('단지명' + cfb('name'), 'l name')}` +
+      `${fx('연식' + cfb('year'))}${fx('연차' + cfb('age'))}${fx('세대수' + cfb('house'))}${fx('평형' + cfb('area'))}${fx('구조' + cfb('struct'), 'info')}${fx('방' + cfb('rooms'), 'info')}${fx('화' + cfb('baths'), 'info')}${fx('링크')}${fx('전고점' + cfb('peak'))}${fx('전고 대비 하락률' + cfb('drop'))}${fx('전저점' + cfb('trough'))}${fx('전저 대비 상승률' + cfb('rise'))}${fx('호가-실거래' + cfb('ask'))}` +
       (m ? `<th colspan="10" class="grp c">${Tracking.ymLabel(m)} 기록</th>` : '<th class="grp c">먼저 위에서 [달 추가]를 눌러 기록할 달을 만드세요</th>') +
-      fx('최근 매매 실거래') + fx('최근 전세 실거래') + fx('메모', 'l') + fx('지도', 'c') + '</tr><tr>' +
-      (m ? G.map((n, i) => `<th class="${[0, 1, 3, 4].includes(i) ? 'in' : ''}${i === 0 ? ' gl' : ''}">${n}${i === 0 || i === 3 ? '(억)' : ''}</th>`).join('') : '<th></th>') + '</tr></thead>';
+      fx('최근 매매 실거래' + cfb('sale')) + fx('최근 전세 실거래' + cfb('rent')) + fx('메모' + cfb('memo'), 'l') + fx('지도', 'c') + '</tr><tr>' +
+      (m ? G.map((n, i) => `<th class="${[0, 1, 3, 4].includes(i) ? 'in' : ''}${i === 0 ? ' gl' : ''}">${n}${i === 0 || i === 3 ? '(억)' : ''}${cfb('q_' + QF[i])}</th>`).join('') : '<th></th>') + '</tr></thead>';
     const [si, gu] = U.siGu(reg[1], reg[2]);
     const pk = (t) => (t ? `${U.price(t.price)}<small>${U.date(t.d)}</small>` : '-');
     const body = list.map((r, i) => {
@@ -534,7 +504,6 @@ const Survey = (() => {
     $('svNote').textContent = view.length > list.length ? `${view.length.toLocaleString()}개 중 ${list.length.toLocaleString()}개를 표시했습니다. 조건으로 좁히거나 [더 보기]를 누르세요. (엑셀에는 좁힌 결과 전체가 들어갑니다)` : (view.length ? '' : '조건에 맞는 단지가 없습니다.');
     $('btnSvMore').hidden = view.length <= list.length;
     progress();
-    table.querySelectorAll('button.colf').forEach(b => { b.onclick = (e) => { e.stopPropagation(); openColPop(b.dataset.cf, b); }; });
     table.querySelector('#svAll').onclick = (e) => { list.forEach(r => (e.target.checked ? checked.add(r.id) : checked.delete(r.id))); render(); $('svAll').checked = e.target.checked; };
     const tbody = table.querySelector('tbody');
     tbody.onclick = (e) => {

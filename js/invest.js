@@ -145,12 +145,30 @@ const Invest = (() => {
   function cell(c, strong) {
     return `<td class="r">${eok(c.sale)}<small class="hint" style="margin:0"> ${c.ns ? c.ns + '건' : ''}</small></td><td class="r">${eok(c.rent)}<small class="hint" style="margin:0"> ${c.nr ? c.nr + '건' : ''}</small></td><td class="r"${strong ? ' style="font-weight:700"' : ''}>${c.inv == null ? '<span class="hint" style="margin:0">-</span>' : U.price(c.inv)}</td>`;
   }
+  let ivSz = 84, ivChart = null;
+  /** 월별 평균 매매·전세 선 + 사이 색칠(투자금) */
+  function drawIv() {
+    if (ivChart) { ivChart.destroy(); ivChart = null; }
+    if (typeof Chart === 'undefined' || !$('ivChart')) return;
+    const asc = [...rows].sort((a, b) => a.m - b.m), lab = (m) => `${String(m).slice(2, 4)}.${String(m).slice(4)}`;
+    const S = asc.map(r => (r[ivSz] && r[ivSz].sale != null ? +(r[ivSz].sale / 10000).toFixed(2) : null)), R = asc.map(r => (r[ivSz] && r[ivSz].rent != null ? +(r[ivSz].rent / 10000).toFixed(2) : null));
+    const lS = [...S].reverse().find(x => x != null), lR = [...R].reverse().find(x => x != null);
+    ivChart = new Chart($('ivChart'), { type: 'line', data: { labels: asc.map(r => lab(r.m)), datasets: [
+      { label: `전용 ${ivSz}㎡ 평균 매매가`, data: S, borderColor: CK.C.sale(), backgroundColor: CK.C.sale(), pointRadius: 2, spanGaps: true, endLabel: '매매' },
+      { label: `전용 ${ivSz}㎡ 평균 전세가`, data: R, borderColor: CK.C.rent(), backgroundColor: CK.C.rent(), pointRadius: 2, spanGaps: true, endLabel: '전세' }] },
+      options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+        scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { ticks: { callback: (x) => x + '억' } } },
+        plugins: { ckCross: true, ckEnd: { unit: '억', dec: 2 }, ckBand: { from: 0, to: 1, label: lS != null && lR != null ? `투자금 ${(lS - lR).toFixed(2)}억` : '' },
+          tooltip: { callbacks: { label: (c) => `${c.dataset.label} ${c.raw == null ? '-' : c.raw + '억'}`, footer: (it) => { const a = it[0] && S[it[0].dataIndex], b = it[0] && R[it[0].dataIndex]; return a != null && b != null ? `투자금 ${(a - b).toFixed(2)}억` : ''; } } } } } });
+  }
   function render() {
     if (!rows.length) { $('ivOut').innerHTML = '<p class="empty">이 기간에 전용 59·84㎡ 거래가 없습니다.</p>'; return; }
     const head = '<thead><tr><th rowspan="2">월</th>' + SIZES.slice().reverse().map(s => `<th colspan="3">전용 ${s.k}㎡</th>`).join('') + '</tr><tr>' + SIZES.map(() => '<th>평균 매매가</th><th>평균 전세가</th><th>투자금</th>').join('') + '</tr></thead>';
     const order = SIZES.slice().reverse();
     const body = rows.map(r => `<tr><td>${lab(r.m)}</td>${order.map(s => cell(r[s.k], true)).join('')}</tr>`).join('');
-    $('ivOut').innerHTML = `<div class="bar"><strong>${U.esc(title)}</strong><span class="hint" style="margin:0">— 직거래 제외 · 투자금 = 평균 매매가 − 평균 전세가 · 단위 만원(억)</span></div><div class="tablewrap"><table class="data" id="ivTable">${head}<tbody>${body}</tbody></table></div>`;
+    $('ivOut').innerHTML = `<div class="bar"><strong>${U.esc(title)} — 매매·전세와 투자금</strong><span class="grow"></span><span class="ckrange" id="ivSz"><button type="button" class="ckr${ivSz === 84 ? ' on' : ''}" data-sz="84">84㎡</button><button type="button" class="ckr${ivSz === 59 ? ' on' : ''}" data-sz="59">59㎡</button></span></div><div class="chartbox"><canvas id="ivChart"></canvas></div>` + `<div class="bar"><strong>${U.esc(title)}</strong><span class="hint" style="margin:0">— 직거래 제외 · 투자금 = 평균 매매가 − 평균 전세가 · 단위 만원(억)</span></div><div class="tablewrap"><table class="data" id="ivTable">${head}<tbody>${body}</tbody></table></div>`;
+    drawIv();
+    $('ivSz').onclick = (e) => { const b = e.target.closest('[data-sz]'); if (!b) return; ivSz = +b.dataset.sz; $('ivSz').querySelectorAll('.ckr').forEach(x => x.classList.toggle('on', x === b)); drawIv(); };
   }
   function excel() {
     if (!rows.length) return U.toast('먼저 [조회]를 눌러 주세요.');

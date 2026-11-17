@@ -7,10 +7,11 @@
    ───────────────────────────────────────────────────────── */
 const MapLabel = (() => {
   const KEY = 'apt.mapLabel.v1';
-  const DEF = { s: 1, f: 12, ff: '', ds: '', ic: 0, bd: 0 };
+  const DEF = { s: 1, f: 12, ff: '', ds: 'card', ic: 0, bd: 0, dr: 0, ri: 0, zs: 1, mu: 1 };   // dr 하락률 · ri 상승률 · zs 축소하면 간단히 · mu 지도 바탕 흐리게
+  const ZLV = 7;                  // 카카오 지도 레벨이 이 값 이상(멀리 봄)이면 '간단히' 모양
   // 라벨 프리셋 — 크기·글자·모양·아이콘을 한 번에 바꿈
-  const PRESETS = [{ k: '', name: '(프리셋 고르기)' }, { k: 'report', name: '보고서용 (깔끔·중간 크기)', v: { s: 1.1, f: 14, ds: '', ff: 'pretendard', ic: 0, bd: 1 } },
-    { k: 'field', name: '임장용 (크고 진하게·상태 아이콘)', v: { s: 1.3, f: 17, ds: 'fill', ff: '', ic: 1, bd: 1 } }, { k: 'simple', name: '간단히 (작은 글자만)', v: { s: 0.8, f: 11, ds: 'text', ff: '', ic: 0, bd: 0 } }];
+  const PRESETS = [{ k: '', name: '(프리셋 고르기)' }, { k: 'report', name: '보고서용 (깔끔·중간 크기)', v: { s: 1.1, f: 14, ds: '', ff: 'pretendard', ic: 0 } },
+    { k: 'field', name: '임장용 (크게 · 말풍선 카드)', v: { s: 1.3, f: 17, ds: 'card', ff: '', ic: 0 } }, { k: 'simple', name: '간단히 (작은 글자만)', v: { s: 0.8, f: 11, ds: 'text', ff: '', ic: 0 } }];
   // 글씨체 (무료 글꼴. 고르는 순간에만 인터넷에서 내려받습니다) — 줄을 추가하면 목록에 나옵니다
   const FONTS = [
     { k: '', name: '기본 글씨', fam: 'system-ui, sans-serif' },
@@ -21,7 +22,7 @@ const MapLabel = (() => {
     { k: 'dohyeon', name: '도현 (굵은 제목체)', fam: "'Do Hyeon', sans-serif", css: 'https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap' },
   ];
   // 라벨 모양 — 색·모서리는 css/style.css 의 .mllabel.ds-… 에서 바꿉니다
-  const DESIGNS = [{ k: '', name: '기본 (흰 바탕 + 색 띠)' }, { k: 'dark', name: '진한 바탕' }, { k: 'fill', name: '색 채움' }, { k: 'pill', name: '둥근 알약' }, { k: 'line', name: '테두리만' }, { k: 'text', name: '글자만 (상자 없음)' }];
+  const DESIGNS = [{ k: 'card', name: '말풍선 카드 (추천)' }, { k: '', name: '기본 (흰 바탕 + 색 띠)' }, { k: 'dark', name: '진한 바탕' }, { k: 'fill', name: '색 채움' }, { k: 'pill', name: '둥근 알약' }, { k: 'line', name: '테두리만' }, { k: 'text', name: '글자만 (상자 없음)' }];
   const loaded = new Set();
   function useFont(k) {
     const f = FONTS.find(x => x.k === k) || FONTS[0];
@@ -92,7 +93,7 @@ const MapLabel = (() => {
     const rows = new Map();
     let edit = false, sel = null, cap = false, timer = null, drag = null, adding = false, fade = null;
     const gKey = `${key}:_g`, iKey = (id) => `${key}:${id}`;
-    const G = () => ({ ...DEF, ...(rd()[gKey] || {}) });
+    const G = () => { const g = { ...DEF, ...(rd()[gKey] || {}) }; if (g.dr == null || (g.bd && (rd()[gKey] || {}).dr == null)) g.dr = g.bd ? 1 : 0; return g; };   // 예전 '하락률 뱃지' 켜 둔 분은 하락률 켬
     const I = (id) => rd()[iKey(id)] || {};
     const setG = (patch) => { const a = rd(); a[gKey] = { ...(a[gKey] || {}), ...patch }; wr(a); };
     function setI(id, patch, del = []) {
@@ -111,7 +112,10 @@ const MapLabel = (() => {
       <label class="inline">글씨체 <select data-ml="ff">${FONTS.map(f => `<option value="${f.k}">${f.name}</option>`).join('')}</select></label>
       <label class="inline">라벨 모양 <select data-ml="ds">${DESIGNS.map(d => `<option value="${d.k}">${d.name}</option>`).join('')}</select></label>
       <label class="inline">프리셋 <select data-ml="preset">${PRESETS.map(p => `<option value="${p.k}">${p.name}</option>`).join('')}</select></label>
-      <label class="inline"><input type="checkbox" data-ml="bd"> 하락률 뱃지</label>
+      <label class="inline"><input type="checkbox" data-ml="dr"> 전고 대비 하락률 ▼</label>
+      <label class="inline"><input type="checkbox" data-ml="ri"> 전저 대비 상승률 ▲</label>
+      <label class="inline" title="지도를 멀리 볼 때 이름을 빼고 가격만 작게 보여 라벨이 겹치지 않게 합니다"><input type="checkbox" data-ml="zs"> 축소하면 간단히 보기</label>
+      <label class="inline" title="지도 바탕색을 낮춰 라벨이 돋보이게 합니다 (캡처에도 그대로)"><input type="checkbox" data-ml="mu"> 지도 바탕 흐리게</label>
       ${o.onAdd ? '<button data-ml="add" title="누른 뒤 지도의 원하는 곳을 한 번 누르면 메모 라벨이 생깁니다">＋ 라벨 추가</button>' : ''}
       <button data-ml="unhide" title="숨긴 라벨을 모두 다시 보이게 합니다">숨긴 라벨 보이기</button>
       <button data-ml="reset" title="손으로 옮긴 라벨을 모두 자동 배치로 되돌립니다">위치 초기화</button>
@@ -137,7 +141,8 @@ const MapLabel = (() => {
       const g = G();
       q('scale').value = Math.round(g.s * 100); v('scale').textContent = Math.round(g.s * 100) + '%';
       q('font').value = g.f; v('font').textContent = g.f + 'px';
-      q('ff').value = g.ff || ''; q('ds').value = g.ds || ''; q('bd').checked = !!g.bd; q('preset').value = '';
+      q('ff').value = g.ff || ''; q('ds').value = g.ds || ''; q('dr').checked = !!g.dr; q('ri').checked = !!g.ri; q('zs').checked = !!g.zs; q('mu').checked = !!g.mu; q('preset').value = '';
+      map.getNode().classList.toggle('muted', !!g.mu);
       q('edit').checked = edit; v('hint').hidden = !edit;
       if (q('add')) q('add').classList.toggle('on', adding);
       const pop = ctl.querySelector('.mlpop'), r = sel && rows.get(sel);
@@ -170,18 +175,53 @@ const MapLabel = (() => {
       el.addEventListener('pointercancel', (e) => onUp(e, row, true));
       return row;
     }
+    /** 라벨 안 글자 채우기.
+        item: text(한 줄) · name(단지명) · lines[{k,label,val,col,real,big}] · sub(아랫줄) · compact[{val,col}] · drop · rise (%) */
+    const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+    function rates(it, g) {
+      const out = [];
+      if (g.dr && it.drop != null && isFinite(it.drop)) out.push(mk('span', 'mlrate dn', '▼' + Math.abs(it.drop).toFixed(0) + '%'));
+      if (g.ri && it.rise != null && isFinite(it.rise)) out.push(mk('span', 'mlrate up', '▲' + Math.abs(it.rise).toFixed(0) + '%'));
+      return out;
+    }
+    function fill(row, g, i) {
+      const it = row.item, el = row.el; el.textContent = '';
+      el.classList.remove('multi', 'compact');
+      if (i.t || !it.lines) { el.textContent = i.t || it.text; if (!i.t) rates(it, g).forEach(x => el.appendChild(x)); return; }
+      const far = g.zs && map.getLevel() >= ZLV && !edit;
+      if (far) {                                                    // 멀리 볼 때: 이름 없이 가격만 (두 값이면 반반 칩)
+        el.classList.add('compact');
+        const cs = it.compact || it.lines.slice(0, 1).map(l => ({ val: l.val, col: l.col }));
+        cs.forEach((c, n) => { const sp = mk('span', 'mlc', c.val); sp.style.borderBottomColor = c.col; el.appendChild(sp); if (n < cs.length - 1) el.appendChild(mk('span', 'mlsep', '│')); });
+        return;
+      }
+      const card = g.ds === 'card';
+      if (!card && it.lines.length < 2) { el.textContent = it.text; rates(it, g).forEach(x => el.appendChild(x)); return; }   // 예전 모양 · 한 값: 지금과 똑같이
+      el.classList.add('multi');
+      if (it.name) el.appendChild(mk('span', 'mlname', it.name));
+      it.lines.forEach((l, n) => {
+        const ln = mk('span', 'mlv' + (l.big === false ? ' sm' : ''));
+        const dot = mk('i', 'mlvd'); dot.style.background = l.col; ln.appendChild(dot);
+        if (l.label) ln.appendChild(mk('span', 'mlk', l.label));
+        ln.appendChild(mk('b', '', l.val));
+        if (l.real) ln.appendChild(mk('span', 'mlsil', '실'));
+        if (n === 0) rates(it, g).forEach(x => ln.appendChild(x));
+        el.appendChild(ln);
+      });
+      if (it.sub) el.appendChild(mk('span', 'mlsub', it.sub));
+    }
     function style(row) {
       const e = eff(row.item.id);
       const g = G(), i = I(row.item.id), col = i.c || row.item.color || '#ff3b30';
       row.el.style.fontSize = e.f + 'px'; row.el.style.transform = `scale(${e.s})`;
       row.el.style.fontFamily = useFont(g.ff || '');
       row.el.className = 'mllabel' + (g.ds ? ' ds-' + g.ds : '') + (row.item.cls ? ' ' + row.item.cls : '');
-      row.el.textContent = (i.t || row.item.text);
-      if (g.bd && row.item.badge && !i.t) { const b = document.createElement('span'); b.className = 'mlbadge'; b.textContent = row.item.badge; row.el.appendChild(b); }
+      fill(row, g, i);
       row.el.style.borderLeftColor = row.el.style.borderColor = ''; row.el.style.background = row.el.style.color = '';
       if (g.ds === 'fill') { row.el.style.background = col; row.el.style.borderColor = col; }
       else if (g.ds === 'line' || g.ds === 'pill') row.el.style.borderColor = col;
       else if (g.ds === 'text') row.el.style.color = col;
+      else if (g.ds === 'card') row.el.style.borderLeftColor = '';
       else row.el.style.borderLeftColor = col;
       row.dotEl.style.background = col; row.line.setOptions({ strokeColor: col });
       row.el.classList.toggle('hid', !!i.hide);
@@ -242,7 +282,7 @@ const MapLabel = (() => {
         if (!show) { if (row.lineOn) { row.line.setMap(null); row.lineOn = false; } continue; }
         const e = eff(it.id), dot = proj.containerPointFromCoords(LL(it.pos)), m = I(it.id);
         let w = row.el.offsetWidth, h = row.el.offsetHeight;
-        if (!w || !h) { unmeasured = true; w = Math.max(40, it.text.length * e.f * 0.95 + 14); h = e.f * 1.3 + 6; }
+        if (!w || !h) { unmeasured = true; w = Math.max(40, it.text.length * e.f * 0.95 + 14); h = (e.f * 1.3 + 6) * (it.lines && row.el.classList.contains('multi') ? it.lines.length + 1 : 1); }
         const f = m.dy != null ? proj.containerPointFromCoords(LL({ lat: it.pos.lat + m.dy, lng: it.pos.lng + m.dx })) : null;
         list.push({ id: it.id, x: dot.x, y: dot.y, w: w * e.s, h: h * e.s, fx: f ? f.x : null, fy: f ? f.y : null, order: rank });
         vis.add(it.id);
@@ -257,6 +297,8 @@ const MapLabel = (() => {
     }
     const queue = () => { clearTimeout(timer); timer = setTimeout(relayout, 30); };
     kakao.maps.event.addListener(map, 'idle', queue);
+    let lastLv = map.getLevel();
+    kakao.maps.event.addListener(map, 'zoom_changed', () => { const lv = map.getLevel(); if ((lv >= ZLV) !== (lastLv >= ZLV)) { for (const r of rows.values()) style(r); } lastLv = lv; });
 
     /* ── 항목 바꾸기 ── */
     function set(items) {
@@ -310,8 +352,8 @@ const MapLabel = (() => {
     });
     ctl.addEventListener('change', (e) => {
       const k = e.target.dataset.ml;
-      if (k === 'preset') { const pr = PRESETS.find(x => x.k === e.target.value); if (pr && pr.v) { setG(pr.v); for (const r of rows.values()) style(r); syncCtl(); queue(); setTimeout(relayout, 900); } return; }
-      if (k === 'ic' || k === 'bd') { setG({ [k]: e.target.checked ? 1 : 0 }); for (const r of rows.values()) style(r); queue(); return; }
+      if (k === 'preset') { const pr = PRESETS.find(x => x.k === e.target.value); if (pr && pr.v) { setG(pr.v); if (o.onPreset) o.onPreset(pr.k); for (const r of rows.values()) style(r); syncCtl(); queue(); setTimeout(relayout, 900); } return; }
+      if (['ic', 'bd', 'dr', 'ri', 'zs', 'mu'].includes(k)) { setG({ [k]: e.target.checked ? 1 : 0 }); for (const r of rows.values()) style(r); syncCtl(); queue(); return; }
       if (k === 'ff' || k === 'ds') { setG({ [k]: e.target.value }); for (const r of rows.values()) style(r); queue();
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(relayout, 60)); setTimeout(relayout, 900); }
     });

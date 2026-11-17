@@ -178,7 +178,7 @@ const Compare = (() => {
     let maxN = 1;
     res.forEach(r => {
       const c = col(COLORS[r.i]), label = `${NAMES[r.i]} ${r.name} ${r.g}㎡`;
-      if (mode !== 'point') sets.push({ label: label + ' (월평균)', data: r.mon, borderColor: c, backgroundColor: c, showLine: true, borderWidth: 2.5, pointRadius: 2, tension: 0.15, yAxisID: 'y', order: 1 });
+      if (mode !== 'point') sets.push({ label: label + ' (월평균)', data: r.mon, borderColor: c, backgroundColor: c, showLine: true, borderWidth: 2.5, pointRadius: 2, tension: 0.15, yAxisID: 'y', order: 1, endLabel: NAMES[r.i] });
       if (mode !== 'month') sets.push({ label: label + ' (실거래)', data: r.main.map(t => ({ x: toX(t.d), y: t.price / 10000, t })), backgroundColor: c + (mode === 'both' ? '66' : ''), borderColor: 'transparent', pointRadius: 2.5, pointStyle: r.i ? 'rect' : 'circle', yAxisID: 'y', order: 2 });
       if (opt.vol && r.mon.length) {
         maxN = Math.max(maxN, ...r.mon.map(p => p.n));
@@ -203,6 +203,7 @@ const Compare = (() => {
         },
         plugins: {
           legend: { labels: { color: col('--text'), usePointStyle: true, filter: (it, d) => d.datasets[it.datasetIndex].type !== 'bar' } },
+          ckEnd: { unit: '억', dec: 2 },
           tooltip: { callbacks: { label: (c) => (c.dataset.type === 'bar' ? `${c.dataset.label} ${c.raw.y}건 · ${String(c.raw.ym).slice(2, 4)}.${String(c.raw.ym).slice(4)}` : c.raw.t ? `${c.dataset.label} ${U.price(c.raw.t.price)} · ${U.date(c.raw.t.d)} · ${c.raw.t.floor}층` : `${c.dataset.label} ${U.price(Math.round(c.raw.y * 10000))} · ${String(c.raw.ym).slice(2, 4)}.${String(c.raw.ym).slice(4)} · ${c.raw.n}건`) } },
         },
       },

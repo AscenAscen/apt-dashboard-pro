@@ -329,16 +329,20 @@ const Search = (() => {
     const shortSpan = allX.length && Math.max(...allX) - Math.min(...allX) < 400 * 864e5;   // 약 1년 이하면 날짜까지 표시
     const css = getComputedStyle(document.documentElement);
     const col = (n) => css.getPropertyValue(n).trim();
+    const CS = CK.C.sale(), CR = CK.C.rent(), CQ = CK.C.quote();
+    const pk = p.sale.filter(t => !t.direct).reduce((m, t) => (!m || t.price > m.price ? t : m), null);
     if (chart) chart.destroy();
     chart = new Chart($('chart'), {
       type: 'scatter',
       data: {
         datasets: [
-          { label: '매매', data: pts(p.sale.filter(t => !t.direct)), backgroundColor: col('--accent'), borderColor: col('--accent'), pointRadius: dots ? 3 : 0, pointHitRadius: 8, showLine: line, borderWidth: 2 },
-          { label: '매매(직거래)', data: pts(p.sale.filter(t => t.direct)), backgroundColor: 'transparent', borderColor: col('--accent'), pointRadius: 3, pointStyle: 'triangle', hidden: p.noDirect },
-          { label: '전세', data: pts(p.rent), backgroundColor: col('--rent'), borderColor: col('--rent'), pointRadius: dots ? 2.5 : 0, pointHitRadius: 8, pointStyle: 'rect', showLine: line, borderWidth: 2 },
-          { label: '내가 적은 매매가', data: qpts('s'), backgroundColor: '#fff', borderColor: col('--accent'), borderWidth: 2, pointRadius: 5, pointStyle: 'rectRot' },
-          { label: '내가 적은 전세가', data: qpts('r'), backgroundColor: '#fff', borderColor: col('--rent'), borderWidth: 2, pointRadius: 5, pointStyle: 'rectRot' },
+          { label: '매매', data: pts(p.sale.filter(t => !t.direct)), backgroundColor: CK.alpha(CS, .5), borderColor: line ? CS : 'transparent', pointRadius: dots ? 3 : 0, pointHitRadius: 8, showLine: line, borderWidth: 2, ckNoEnd: true },
+          { label: '매매(직거래)', data: pts(p.sale.filter(t => t.direct)), backgroundColor: 'transparent', borderColor: CK.alpha(CS, .6), pointRadius: 3, pointStyle: 'triangle', hidden: p.noDirect, ckNoEnd: true },
+          { label: '전세', data: pts(p.rent), backgroundColor: CK.alpha(CR, .5), borderColor: line ? CR : 'transparent', pointRadius: dots ? 2.5 : 0, pointHitRadius: 8, showLine: line, borderWidth: 2, ckNoEnd: true },
+          ...(mode !== 'line' ? [{ label: '매매 3개월 평균', data: CK.ma(pts(p.sale.filter(t => !t.direct))), showLine: true, borderColor: CS, backgroundColor: CS, pointRadius: 0, borderWidth: 2.5, endLabel: '매매' },
+            { label: '전세 3개월 평균', data: CK.ma(pts(p.rent)), showLine: true, borderColor: CR, backgroundColor: CR, pointRadius: 0, borderWidth: 2.5, endLabel: '전세' }] : []),
+          { label: '내가 적은 매매가', data: qpts('s'), backgroundColor: CQ, borderColor: CK.C.panel(), borderWidth: 2, pointRadius: 5, pointStyle: 'rectRot', ckNoEnd: true },
+          { label: '내가 적은 전세가', data: qpts('r'), backgroundColor: CK.C.panel(), borderColor: CQ, borderWidth: 2, pointRadius: 5, pointStyle: 'rectRot', ckNoEnd: true },
         ].filter(d => d.data.length),
       },
       options: {
@@ -349,7 +353,8 @@ const Search = (() => {
         },
         plugins: {
           legend: { labels: { color: col('--text'), usePointStyle: true } },
-          tooltip: { callbacks: { label: (c) => `${c.dataset.label} ${U.price(c.raw.t.price)} · ${U.date(c.raw.t.d)} · ${c.raw.t.floor}층` } },
+          ckPeak: pk ? [{ y: pk.price / 10000, text: `기간 최고 ${U.price(pk.price)} · ${U.date(pk.d)}` }] : [], ckEnd: { unit: '억', dec: 2 },
+          tooltip: { callbacks: { label: (c) => (c.raw.t ? `${c.dataset.label} ${U.price(c.raw.t.price)} · ${U.date(c.raw.t.d)} · ${c.raw.t.floor}층` : `${c.dataset.label} ${(+c.raw.y).toFixed(2)}억`) } },
         },
       },
     });
