@@ -1,20 +1,21 @@
 /* ─────────────────────────────────────────────────────────
-   supply.js — [공급] 탭: 입주 물량(막대 + 적정 수요선) · 입주 단지 지도 · 입주 예정 표 · 분양가 vs 주변 시세
-   자료: data/supply.json (scripts/supply.py · 매주 자동), data/population.json (인구 CSV 를 올렸을 때)
+   supply.js — [공급] 탭 (청약홈): 입주 물량(막대 + 적정 수요선) · 입주 단지 지도 · 입주 예정 표
+   (분양가 vs 주변 시세는 [공급지도] 탭으로 옮김 → js/supplycmp.js)
+   자료: data/supply.json (scripts/supply.py · 매주 자동), data/population.json (scripts/population.py · 매월 자동)
          주변 시세는 실거래 파일(data/sale)로 화면에서 계산
    ───────────────────────────────────────────────────────── */
 const Supply = (() => {
   const $ = (id) => document.getElementById(id);
-  const SK = 'apt.supply.v1';
+  const SK = 'apt.supplyApi.v1';                          // ([공급지도] 탭의 apt.supply.v1 과 겹치지 않게)
   const DEMAND = 0.005;                                    // 적정 수요 = 인구 × 0.5% (1년)
   let st = {}, items = [], status = null, pop = null, K = null;
-  let chart = null, map = null, marks = [], f1 = null, f2 = null, rows1 = [], rows2 = [], open2 = new Set(), drawn = false, cmpSeq = 0;
+  let chart = null, map = null, marks = [], f1 = null, rows1 = [], drawn = false;
   const geo = new Map();                                    // 이번 접속 동안만 기억 (카카오 정책)
   const eok = (v) => (v == null ? '-' : (v / 10000).toFixed(2) + '억');
   const nowYm = () => { const t = new Date(); return t.getFullYear() * 100 + t.getMonth() + 1; };
   const ymTxt = (m) => (m ? `${Math.floor(m / 100)}.${String(m % 100).padStart(2, '0')}` : '-');
   const save = () => Store.set(SK, st);
-  const DEF = () => ({ regs: ['g:seoul'], unit: 'y', noReb: false, period: null, pubYears: 2, scope: 'dong', age: 'new', py: '' });
+  const DEF = () => ({ regs: ['g:seoul'], unit: 'y', noReb: false, period: null });
 
   /* ── 지역 ── */
   const codes = () => new Set(st.regs.flatMap(t => K.codesOf(t)));
@@ -65,7 +66,7 @@ const Supply = (() => {
             tooltip: { filter: (c) => c.dataset.type === 'bar', callbacks: { label: (c) => { const m = chart.$m, s = m.sum.get(m.ks[c.dataIndex]); return `${s.n}개 단지 · ${s.hh.toLocaleString()}세대${s.reb ? ` (정비사업 ${s.reb.toLocaleString()})` : ''}${m.demand ? ` · 적정 대비 ${Math.round(s.hh / m.demand * 100)}%` : ''}`; } } },
           },
           onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
-          onClick: (e, els) => { const el = els.find(x => x.datasetIndex === 0) || els[0]; if (!el) return; const k = chart.$m.ks[el.index]; st.period = st.period === k ? null : k; save(); refresh(false); },
+          onClick: (e, els) => { const el = els.find(x => x.datasetIndex === 0) || els[0]; if (!el) return; const k = chart.$m.ks[el.index]; st.period = st.period === k ? null : k; save(); refresh(); },
         },
       });
       chart.$m = meta;
@@ -78,11 +79,7 @@ const Supply = (() => {
         : `<span class="hint" style="margin:0">적정 수요선은 인구 자료가 있어야 보입니다${pop && pop.pop ? ' (고른 지역 중 인구 자료가 없는 곳이 있음)' : ''}.</span>` + (pop && pop.pop ? '' : POPHELP));
   }
 
-  const POPHELP = `<details class="sphelp"><summary>인구 자료 올리는 방법 (1년에 한 번이면 충분)</summary><ol>
-    <li><b>jumin.mois.go.kr</b> (행정안전부 주민등록 인구통계) → <b>주민등록 인구 및 세대현황</b></li>
-    <li>행정구역 <b>전국</b>, <b>전체 시군구 현황</b>(또는 시군구 단위) 체크 → 조회 → <b>CSV 파일 다운로드</b> (화면 이름은 조금 다를 수 있습니다)</li>
-    <li>GitHub 저장소에서 <b>Add file → Upload files</b> → 맨 위 칸에 <b>population/</b> 을 적고 CSV 를 올림 → <b>Commit changes</b></li>
-    <li>자동으로 변환되고 몇 분 뒤 이 화면에 적정 수요선이 생깁니다 (Ctrl+Shift+R)</li></ol></details>`;
+  const POPHELP = '<span class="hint" style="margin:0;flex-basis:100%">인구는 실거래 자동 수집 때 한 달에 한 번 행정안전부 자료로 받습니다 (data/population_status.json 에서 결과 확인).</span>';
 
   /* ── ③ 지도 / ④ 입주 예정 표 ── */
   function listRows() {
@@ -155,75 +152,6 @@ const Supply = (() => {
     msg.textContent = l.length ? `${pts.length}곳 표시${l.length > pts.length ? ` (위치를 못 찾은 곳 ${l.length - pts.length})` : ''}${(Supply._l1 || rows1).length > 150 ? ' · 많아서 앞쪽 150곳만' : ''} · 점 크기 = 세대수` : '지도에 표시할 단지가 없습니다.';
   }
 
-  /* ── ⑤ 분양가 vs 주변 시세 ── */
-  const norm = (s) => String(s || '').replace(/\s|\(.*?\)|아파트/g, '');
-  async function buildCmp() {
-    const seq = ++cmpSeq;
-    const from = String(Math.floor(nowYm() / 100) - st.pubYears) + String(nowYm() % 100).padStart(2, '0') + '01';
-    const l = inScope().filter(it => it.pub && (st.pubYears >= 7 || it.pub >= from) && it.m && it.m.length);
-    const need = [...new Set(l.map(it => it.c))];
-    $('spEmpty2').hidden = false; $('spEmpty2').textContent = need.length ? `주변 실거래 불러오는 중… (0/${need.length} 지역)` : '';
-    const sale = await K.sale(need, (i, n) => { $('spEmpty2').textContent = `주변 실거래 불러오는 중… (${i}/${n} 지역)`; });
-    if (seq !== cmpSeq) return;
-    const t = new Date(), since = (t.getFullYear() - 1) * 10000 + (t.getMonth() + 1) * 100 + t.getDate();
-    const minYear = t.getFullYear() - 10;
-    const out = [];
-    for (const it of l) {
-      const m = sale.get(it.c) || new Map(), mt = K.meta(it.c) || { by: {} };
-      for (const [ty, area, n, price] of it.m) {
-        if (!area || !price) continue;
-        const pc = Home.pyClass(area);
-        if (st.py && pc !== st.py) continue;
-        const comp = [];
-        m.forEach(o => {
-          if (Math.abs(o.area - area) > 3) return;
-          const p = Data.parseKey(o.key);
-          if (st.scope === 'dong' && p.dong !== it.dg) return;
-          if (norm(p.name) && norm(it.nm).includes(norm(p.name))) return;            // 자기 단지(입주 뒤 거래) 빼기
-          const by = mt.by[o.key];
-          if (st.age === 'new' && !(by && by >= minYear)) return;
-          const tr = o.tr.filter(x => x.d >= since && !x.direct);
-          if (!tr.length) return;
-          const last = tr[tr.length - 1];
-          comp.push({ name: p.name, dong: p.dong, area: o.area, by, avg: tr.reduce((a, x) => a + x.price, 0) / tr.length, n: tr.length, last });
-        });
-        const avg = comp.length ? comp.reduce((a, x) => a + x.avg, 0) / comp.length : null;
-        out.push({ rid: `${it.id}#${ty}`, it, ty, area, n, price, pc, comp, avg, diff: avg ? (price / avg - 1) * 100 : null, cr: it.cm ? it.cm[ty] ?? null : null });
-      }
-    }
-    rows2 = out;
-    drawCmp();
-  }
-  function cols2() {
-    const N = ColFilter.numCol, T = ColFilter.txtCol;
-    return {
-      si: T('시', r => siGu(r.it)[0]), gu: T('구', r => siGu(r.it)[1]), dong: T('동', r => r.it.dg), name: T('단지', r => r.it.nm),
-      ty: { label: '주택형', get: r => `${r.ty.replace(/^0+/, '')} (${CONFIG.toPyeong(r.area)}평)`, num: r => r.area }, pc: T('평형 구분', r => Home.pyName(r.pc)),
-      pub: { label: '공고일', get: r => (r.it.pub ? `${r.it.pub.slice(0, 4)}.${r.it.pub.slice(4, 6)}` : ''), num: r => +r.it.pub || null },
-      mv: { label: '입주 예정', get: r => ymTxt(r.it.mv), num: r => r.it.mv },
-      price: N('분양가', r => r.price), avg: N('주변 시세', r => r.avg), diff: N('주변 대비', r => r.diff, 'pct'),
-      cnt: N('비교 단지', r => r.comp.length, 'n'), cr: N('경쟁률', r => r.cr, 'n'),
-    };
-  }
-  const F2 = () => f2 || (f2 = ColFilter.create({ key: 'sup2', cols: cols2, bar: 'spCfBar2', onChange: drawCmp }));
-  function drawCmp() {
-    const l = F2().apply(rows2, (x) => [...x].sort((a, b) => (b.it.pub || '').localeCompare(a.it.pub || '') || a.it.nm.localeCompare(b.it.nm, 'ko') || a.area - b.area));
-    $('spCmpTitle').textContent = `분양가 vs 주변 시세 (${l.length.toLocaleString()}개 주택형)`;
-    $('spEmpty2').hidden = l.length > 0; $('spEmpty2').textContent = rows2.length ? '필터에 맞는 주택형이 없습니다.' : '고른 지역·기간에 분양 공고가 없습니다.';
-    const b = (k) => F2().btn(k), c = cols2();
-    const th = (k, cls = '') => `<th class="${cls}">${c[k].label}${b(k)}</th>`;
-    $('spTable2').innerHTML = `<thead><tr>${th('si', 'l')}${th('gu', 'l')}${th('dong', 'l')}${th('name', 'l name')}${th('ty')}${th('pc')}${th('pub')}${th('mv')}${th('price')}${th('avg')}${th('diff')}${th('cnt')}${th('cr')}</tr></thead><tbody>` +
-      l.map(r => { const [si, gu] = siGu(r.it), weak = r.comp.length < 3;
-        let h = `<tr data-r="${U.esc(r.rid)}" class="click${weak ? ' old' : ''}"><td class="l">${U.esc(si)}</td><td class="l">${U.esc(gu)}</td><td class="l">${U.esc(r.it.dg)}</td><td class="l name">${U.esc(r.it.nm)}</td>` +
-          `<td>${U.esc(r.ty.replace(/^0+/, ''))}<small>${CONFIG.toPyeong(r.area)}평</small></td><td>${Home.pyName(r.pc)}</td><td>${r.it.pub ? r.it.pub.slice(2, 4) + '.' + r.it.pub.slice(4, 6) : '-'}</td><td>${ymTxt(r.it.mv)}</td>` +
-          `<td class="sale"><b>${eok(r.price)}</b></td><td>${eok(r.avg)}</td><td class="${U.cls(r.diff)}">${r.diff == null ? '-' : U.pct(r.diff)}</td><td>${r.comp.length}${weak ? ' <small>비교 부족</small>' : ''} ${r.comp.length ? (open2.has(r.rid) ? '▴' : '▾') : ''}</td><td>${r.cr == null ? '-' : r.cr.toFixed(1) + ':1'}</td></tr>`;
-        if (open2.has(r.rid) && r.comp.length) h += `<tr class="hmsub"><td colspan="13">${r.comp.sort((a, b) => b.avg - a.avg).map(x => `<span>${U.esc(x.dong)} ${U.esc(x.name)} ${Math.round(x.area)}㎡ · 평균 <b>${eok(x.avg)}</b> (${x.n}건, 최근 ${U.date(x.last.d)}) · ${x.by || '-'}년</span>`).join('<br>')}</td></tr>`;
-        return h; }).join('') + '</tbody>';
-    cards($('spCards2'), $('spTable2'), l.map(r => ({ title: `${r.it.nm} ${r.ty.replace(/^0+/, '')}`, sub: `${siGu(r.it).filter(Boolean).join(' ')} ${r.it.dg} · 공고 ${r.it.pub ? r.it.pub.slice(0, 4) + '.' + r.it.pub.slice(4, 6) : '-'}`,
-      kv: [['분양가', eok(r.price)], ['주변', eok(r.avg)], ['주변 대비', r.diff == null ? '-' : U.pct(r.diff)], ['비교', r.comp.length + '곳'], ['경쟁률', r.cr == null ? '-' : r.cr.toFixed(1) + ':1']] })));
-    Supply._l2 = l;
-  }
-
   /* 휴대폰: 표 대신 카드 */
   function cards(box, table, list) {
     const narrow = window.innerWidth <= 760;
@@ -233,21 +161,16 @@ const Supply = (() => {
       `<div class="hmrc2">${x.kv.map(([k, v]) => `<span>${k} <b>${U.esc(v)}</b></span>`).join('')}</div></div>`).join('');
   }
 
-  function excel(which) {
-    const l = which === 1 ? Supply._l1 || [] : Supply._l2 || [], c = which === 1 ? cols1() : cols2();
-    const ks = Object.keys(c);
-    const money = ['price', 'avg'];
-    const rows = [ks.map(k => c[k].label), ...l.map(r => ks.map(k => { if (money.includes(k)) { const v = c[k].num(r); return v == null ? '' : +(v / 10000).toFixed(2); } if (k === 'diff') { const v = c[k].num(r); return v == null ? '' : +v.toFixed(1); } return c[k].get(r); }))];
-    U.download(`공급_${which === 1 ? '입주예정' : '분양가비교'}_${U.stamp ? U.stamp() : ''}`, [{ name: which === 1 ? '입주예정' : '분양가비교', rows }]);
+  function excel() {
+    const l = Supply._l1 || [], c = cols1(), ks = Object.keys(c);
+    const rows = [ks.map(k => c[k].label), ...l.map(r => ks.map(k => c[k].get(r)))];
+    U.download(`공급_입주예정_${U.stamp()}`, [{ name: '입주예정', rows }]);
   }
 
   /* ── 고르는 줄 ── */
   function syncControls() {
     document.querySelectorAll('#spUnit button').forEach(b => b.classList.toggle('on', b.dataset.u === st.unit));
-    document.querySelectorAll('#spScope button').forEach(b => b.classList.toggle('on', b.dataset.s === st.scope));
-    document.querySelectorAll('#spAge button').forEach(b => b.classList.toggle('on', b.dataset.a === st.age));
-    document.querySelectorAll('#spPy button').forEach(b => b.classList.toggle('on', b.dataset.p === st.py));
-    $('spNoReb').checked = st.noReb; $('spPubYears').value = String(st.pubYears);
+    $('spNoReb').checked = st.noReb;
     $('spChips').innerHTML = st.regs.map(t => `<span class="hmchip">${U.esc(K.tokLabel(t))}<button data-rm="${t}" title="빼기">✕</button></span>`).join('') || '<span class="hint" style="margin:0">지역을 추가하세요</span>';
     $('spCondSum').textContent = [st.regs.map(K.tokLabel).join(', ') || '지역 없음', st.unit === 'h' ? '반기별' : '연도별', st.noReb ? '정비사업 제외' : ''].filter(Boolean).join(' · ');
   }
@@ -265,13 +188,12 @@ const Supply = (() => {
       (subs.length ? `<div class="hmpr hmgus">${subs.map(r => `<label class="inline"><input type="checkbox" data-gu="${r[0]}"${st.regs.includes('c:' + r[0]) ? ' checked' : ''}> ${U.esc(K.tokLabel('c:' + r[0]))}</label>`).join('')}</div>` : '') +
       '<div class="hmpr" style="justify-content:flex-end"><button class="mini" data-close="1">닫기</button></div>';
   }
-  const regChanged = () => { st.period = null; save(); regPop(); refresh(true); };
+  const regChanged = () => { st.period = null; save(); regPop(); refresh(); };
 
-  function refresh(cmp) {
+  function refresh() {
     syncControls();
     drawBars();
     rows1 = listRows(); drawList(); drawMap();
-    if (cmp !== false) buildCmp();
   }
 
   function setup() {
@@ -293,22 +215,26 @@ const Supply = (() => {
   async function init() {
     K = Home.kit;
     await K.regReady();
-    st = Object.assign(DEF(), Store.get(SK, {}) || {});
+    let saved = Store.get(SK, null);
+    if (!saved) {                                           // 예전 버전은 apt.supply.v1 에 설정을 같이 저장했음 → 설정 칸만 옮겨 옴
+      const old = Store.get('apt.supply.v1', {}) || {};
+      saved = {}; ['regs', 'unit', 'noReb'].forEach(k => { if (old[k] != null) saved[k] = old[k]; });
+    }
+    st = Object.assign(DEF(), saved);
     const [sp, ss, pp] = await Promise.all([Data.json('supply.json', null), Data.json('supply_status.json', null), Data.json('population.json', null)]);
-    items = (sp && sp.items) || []; status = ss; pop = pp && pp.pop ? pp : null;
+    items = (sp && sp.items) || []; status = ss;
+    pop = null;                                             // 인구: 자동 수집 형식 { ym, byCode: { 코드: { pop } } } (예전 CSV 형식 { pop: { 코드: 인구 } } 도 읽음)
+    if (pp && pp.byCode) { pop = { ym: +pp.ym || null, pop: {} }; for (const c in pp.byCode) if (pp.byCode[c] && pp.byCode[c].pop) pop.pop[c] = pp.byCode[c].pop; }
+    else if (pp && pp.pop) pop = pp;
     $('spInfo').textContent = items.length
       ? `자료 기준 ${sp.asOf || '-'} · 청약홈 분양 공고 ${items.length.toLocaleString()}건 (2020.02~) · 세대수는 일반분양 기준${pop ? ` · 인구 ${ymTxt(pop.ym)} 기준` : ''}`
       : '';
     setup();
     if (window.innerWidth <= 760) $('spCond').open = false;
 
-    $('spUnit').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.unit = b.dataset.u; st.period = null; save(); refresh(false); };
-    $('spNoReb').onchange = () => { st.noReb = $('spNoReb').checked; save(); refresh(true); };
-    $('spPeriodClear').onclick = () => { st.period = null; save(); refresh(false); };
-    $('spPubYears').onchange = () => { st.pubYears = +$('spPubYears').value; save(); buildCmp(); };
-    $('spScope').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.scope = b.dataset.s; save(); syncControls(); buildCmp(); };
-    $('spAge').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.age = b.dataset.a; save(); syncControls(); buildCmp(); };
-    $('spPy').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.py = b.dataset.p; save(); syncControls(); buildCmp(); };
+    $('spUnit').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.unit = b.dataset.u; st.period = null; save(); refresh(); };
+    $('spNoReb').onchange = () => { st.noReb = $('spNoReb').checked; save(); refresh(); };
+    $('spPeriodClear').onclick = () => { st.period = null; save(); refresh(); };
     $('spChips').onclick = (e) => { const b = e.target.closest('[data-rm]'); if (b) { st.regs = st.regs.filter(t => t !== b.dataset.rm); regChanged(); } };
     $('spAddReg').onclick = () => { const p = $('spRegPop'); p.hidden = !p.hidden; if (!p.hidden) regPop(); };
     $('spRegPop').onclick = (e) => {
@@ -322,16 +248,11 @@ const Supply = (() => {
       if (gc) { const t = 'c:' + gc; st.regs = e.target.checked ? [...st.regs.filter(x => x !== 'g:all' && x !== t), t] : st.regs.filter(x => x !== t); regChanged(); }
     };
     document.addEventListener('mousedown', (e) => { const p = $('spRegPop'); if (!p.hidden && !p.contains(e.target) && e.target.id !== 'spAddReg') p.hidden = true; });
-    $('spTable2').onclick = (e) => { const tr = e.target.closest('tr[data-r]'); if (!tr || e.target.closest('button.colf')) return; const id = tr.dataset.r; open2.has(id) ? open2.delete(id) : open2.add(id); drawCmp(); };
-    $('spExcel1').onclick = () => excel(1);
-    $('spExcel2').onclick = () => excel(2);
+    $('spExcel1').onclick = excel;
     // 탭이 처음 보일 때 지도 그리기 (숨긴 상태에서는 지도 크기를 잴 수 없음)
     new MutationObserver(() => { if (!$('tab-supply').hidden && items.length) { drawn = true; setTimeout(drawMap, 50); } }).observe($('tab-supply'), { attributes: true, attributeFilter: ['hidden'] });
-    if (items.length) refresh(!$('tab-supply').hidden);
+    if (items.length) refresh();
     else syncControls();
-    // 분양가 비교는 무거우니 탭을 처음 열 때 계산
-    let once = false;
-    new MutationObserver(() => { if (!$('tab-supply').hidden && items.length && !once) { once = true; buildCmp(); } }).observe($('tab-supply'), { attributes: true, attributeFilter: ['hidden'] });
   }
 
   return { init, _st: () => st };

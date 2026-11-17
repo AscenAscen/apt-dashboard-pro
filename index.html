@@ -30,6 +30,7 @@
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
     <button data-tab="supply">공급</button>
+    <button data-tab="supplymap">공급지도</button>
     <button data-tab="invest">투자금</button>
     <button data-tab="market">시장 신호</button>
     <button data-tab="my">내 분석</button>
@@ -71,7 +72,16 @@
       </div>
       <div class="hmrow">
         <span class="hmk">평형</span>
-        <span class="seg" id="hmPy"><button data-p="" class="on">전체</button><button data-p="s">소형</button><button data-p="59">59</button><button data-p="74">74</button><button data-p="84">84</button><button data-p="L">대형</button></span>
+        <span class="seg" id="hmPy" title="여러 개 고를 수 있습니다"><button data-p="" class="on">전체</button><button data-p="s">소형</button><button data-p="59">59</button><button data-p="74">74</button><button data-p="84">84</button><button data-p="L">대형</button></span>
+      </div>
+      <div class="hmrow">
+        <span class="hmk">세대수</span>
+        <span class="seg" id="hmHh" title="단지 전체 세대수 기준"><button data-h="" class="on">전체</button><button data-h="300">300↑</button><button data-h="500">500↑</button><button data-h="1000">1,000↑</button><button data-h="2000">2,000↑</button></span>
+        <span class="hmhhin">직접 <input type="number" id="hmHhMin" min="0" step="50" placeholder="최소"> ~ <input type="number" id="hmHhMax" min="0" step="50" placeholder="최대"> 세대</span>
+        <span class="hmk">연식</span>
+        <span class="seg" id="hmAge"><button data-a="" class="on">전체</button><button data-a="5">5년 이내</button><button data-a="10">10년 이내</button><button data-a="15">15년 이내</button><button data-a="20+">20년 넘음</button></span>
+      </div>
+      <div class="hmrow">
         <span class="hmk">보기</span>
         <span class="seg" id="hmView"><button data-v="month" class="on">이달 거래된 단지만</button><button data-v="all">지역 전체 단지</button></span>
         <label class="inline" id="hmYearsWrap" hidden>기간 <select id="hmYears"><option value="1">최근 1년</option><option value="2">최근 2년</option><option value="3">최근 3년</option></select></label>
@@ -104,7 +114,7 @@
 
   <!-- ⑤ 단지 표 -->
   <section class="panel">
-    <div class="bar hmtitle"><strong>⑤</strong> <select class="hmtb" data-t="band"></select> <select class="hmtk"><option value="sale">매매</option><option value="rent">전세</option></select> <strong id="hmTblTitle">거래 단지</strong><span class="grow"></span></div>
+    <div class="bar hmtitle"><strong>⑤</strong> <select class="hmtb" data-t="band"></select> <select class="hmtk"><option value="sale">매매</option><option value="rent">전세</option></select> <select class="hmth" title="단지 전체 세대수"></select> <strong id="hmTblTitle">거래 단지</strong><span class="grow"></span></div>
     <div class="hmtools">
       <label class="inline">정렬 <select id="hmSort"><option value="drop">전고 대비 낮은 순</option><option value="pdesc">가격 높은 순</option><option value="pasc">가격 낮은 순</option><option value="cnt">거래 많은 순</option><option value="name">단지명</option></select></label>
       <button id="hmOnlyHigh" class="mini" title="신고가 단지만 보기">🔴 신고가만</button>
@@ -118,7 +128,7 @@
     <div class="tablewrap tall"><table id="hmTable" class="hmtable"></table></div>
     <div id="hmCardList" class="hmcardlist" hidden></div>
     <p class="empty" id="hmEmpty" hidden></p>
-    <p class="hint">NEW 지난 방문 뒤 새로 신고 · 🔴 신고가 · 🔵 급락(직전 거래보다 10% 넘게 쌈) · ⭐ 내 단지(시세트래킹) · 저층 1~3층 · 직 직거래 · 🟠 이달 거래 있음. 단지 이름을 누르면 실거래 조회, 건수 ▾ 를 누르면 그 달 거래가 펼쳐집니다.</p>
+    <p class="hint">NEW 지난 방문 뒤 새로 신고 · 🔴 신고가 · 🔵 급락(직전 거래보다 10% 넘게 쌈) · ⭐ 내 단지(시세트래킹) · 저층 1~3층 · 직 직거래 · 🟠 이달 거래 있음 · 👑 대장 단지(같은 구 200세대 이상 중 최근 1년 ㎡당 평균 매매가 1위). 세대수는 단지 전체 세대수(K-apt) 기준이며, 세대수를 고르면 세대수를 모르는 단지는 빠집니다. 단지 이름을 누르면 실거래 조회, 건수 ▾ 를 누르면 그 달 거래가 펼쳐집니다.</p>
   </section>
 
   <!-- ⑥ 지역별 거래 현황 -->
@@ -807,22 +817,79 @@
     <p class="empty" id="spEmpty1" hidden></p>
   </section>
 
-  <section class="panel">
-    <div class="bar"><strong id="spCmpTitle">분양가 vs 주변 시세</strong><span class="grow"></span><button id="spExcel2" class="mini">엑셀</button></div>
-    <div class="hmrow">
-      <span class="hmk">공고</span><select id="spPubYears"><option value="1">최근 1년</option><option value="2" selected>최근 2년</option><option value="3">최근 3년</option><option value="7">전체</option></select>
-      <span class="hmk">비교 범위</span><span class="seg" id="spScope"><button data-s="dong" class="on">같은 동</button><button data-s="gu">같은 구</button></span>
-      <span class="hmk">비교 대상</span><span class="seg" id="spAge"><button data-a="new" class="on">신축 10년 이내</button><button data-a="all">전체</button></span>
-      <span class="hmk">평형</span><span class="seg" id="spPy"><button data-p="" class="on">전체</button><button data-p="s">소형</button><button data-p="59">59</button><button data-p="74">74</button><button data-p="84">84</button><button data-p="L">대형</button></span>
-    </div>
-    <div id="spCfBar2" class="cfbar"></div>
-    <div class="tablewrap tall"><table id="spTable2" class="hmtable"></table></div>
-    <div id="spCards2" class="hmcardlist" hidden></div>
-    <p class="empty" id="spEmpty2" hidden></p>
-    <p class="hint">분양가 = 주택형별 최고 분양가(발코니 확장·옵션 제외). 주변 시세 = 비교 범위 안 비슷한 평형(±3㎡) 단지들의 최근 12개월 매매 실거래 평균(직거래 제외). 주변 대비 − 는 주변보다 싸게 분양, + 는 비싸게 분양. 비교 단지가 3곳 미만이면 흐리게 보입니다. 줄을 누르면 비교에 쓴 단지가 펼쳐집니다.</p>
-  </section>
   </div>
 </main>
+
+<!-- ═══════════════ 공급지도 (부동산지인 입주물량 엑셀 + 분양가 vs 주변 시세) ═══════════════ -->
+<main id="tab-supplymap" class="tab" hidden>
+  <section class="panel">
+    <div class="bar"><strong>🏗️ 공급지도 (부동산지인 입주물량)</strong><span class="grow"></span>
+      <button id="btnSmUpload" class="primary">📂 엑셀 올리기</button></div>
+    <p class="hint">부동산지인에서 내려받은 입주물량 엑셀을 그대로 올리세요. 지역마다 따로 올리면 합쳐집니다. 자료는 <b>이 브라우저에만</b> 저장되고, 전체 백업에 함께 들어갑니다.</p>
+    <div class="spfiles" id="smFiles"></div>
+    <input type="file" id="smFile" accept=".xlsx,.xls,.csv" multiple hidden>
+  </section>
+  <section class="panel empty" id="smEmpty">아직 공급 자료가 없습니다.<br>부동산지인 입주물량 화면에서 엑셀을 내려받아 <button id="btnSmUpload2" class="primary">📂 엑셀 올리기</button> 를 누르세요.</section>
+  <div id="smBody" hidden>
+    <section class="panel">
+      <div class="filters">
+        <label>시도 <select id="smSido"></select></label>
+        <label id="smDongWrap" hidden>읍면동 <select id="smDong"></select></label>
+        <div class="checks">
+          <label><input type="checkbox" id="smNoRent"> 임대 제외</label>
+        </div>
+      </div>
+      <div class="chips spsggs" id="smSggs" aria-label="시군구 (여러 개 고르면 합산)"></div>
+      <p class="hint" style="margin-bottom:0">시군구를 여러 개 누르면 합쳐서 봅니다. [전체]를 누르면 시도 전체.</p>
+    </section>
+    <section class="panel">
+      <div class="filters pmbar"><b>🗺️ 공급 지도</b>
+        <label class="inline chk"><input type="checkbox" id="smSmall"> 100세대 미만도 표시</label>
+        <span class="hint" id="smGeo" style="margin:0"></span>
+        <span class="grow"></span>
+        <button id="btnSmFit">전체 보기</button>
+        <button id="btnSmDrawer">🎨 라벨 꾸미기</button>
+      </div>
+      <div class="pmmapbox"><div class="kmap spmap" id="smMap"></div><div class="pmlegend splegend" id="smLegend" aria-label="범례"></div></div>
+      <div class="spunfound" id="smUnfound" hidden></div>
+      <div id="smCard" style="margin-top:10px"></div>
+      <p class="hint">멀리 보면 구별 합계, 가까이 보면 단지 라벨이 나옵니다. 라벨을 누르면 자세한 정보가 나옵니다. 위치는 카카오 주소 검색으로 그때그때 찾습니다.</p>
+    </section>
+    <section class="panel"><div class="cards spcards" id="smCards"></div></section>
+    <section class="panel">
+      <div class="cxchartbar"><b>📊 공급 그래프</b>
+        <span class="grow"></span>
+        <label class="inline">적정 수요 = 인구 × <input type="number" id="smRatio" min="0.1" max="5" step="0.1" style="width:64px">%</label>
+        <span class="ckrange" id="smView"><button type="button" class="ckr" data-view="year">연도별</button><button type="button" class="ckr" data-view="month">월별</button></span>
+      </div>
+      <div class="spchart" id="smChartBox"></div>
+      <p class="hint" id="smChartNote"></p>
+    </section>
+    <section class="panel">
+      <div class="bar"><b>📋 단지 목록</b><span class="hint" id="smTableCount" style="margin:0"></span><span class="grow"></span><button id="btnSmExcel">엑셀 다운로드</button></div>
+      <div class="tablewrap short"><table id="smTable" data-title="공급 단지"></table></div>
+    </section>
+    <section class="panel" id="bcPanel">
+      <div class="bar"><b>💰 분양가 vs 주변 시세</b> <span class="hint" id="bcScope" style="margin:0"></span><span class="grow"></span><button id="bcExcel" class="mini">엑셀</button></div>
+      <div class="bcrow">
+        <span class="bck">공고</span><select id="bcPubYears"><option value="1">최근 1년</option><option value="2" selected>최근 2년</option><option value="3">최근 3년</option><option value="7">전체</option></select>
+        <span class="bck">비교 범위</span><span class="bcseg" id="bcScopeSeg"><button data-s="dong" class="on">같은 동</button><button data-s="gu">같은 구</button></span>
+        <span class="bck">비교 대상</span><span class="bcseg" id="bcAge"><button data-a="new" class="on">신축 10년 이내</button><button data-a="all">전체</button></span>
+        <span class="bck">평형</span><span class="bcseg" id="bcPy"><button data-p="" class="on">전체</button><button data-p="s">소형</button><button data-p="59">59</button><button data-p="74">74</button><button data-p="84">84</button><button data-p="L">대형</button></span>
+      </div>
+      <div id="bcCfBar" class="cfbar"></div>
+      <div class="tablewrap tall"><table id="bcTable" class="hmtable"></table></div>
+      <div id="bcCards" class="hmcardlist" hidden></div>
+      <p class="empty" id="bcEmpty" hidden></p>
+      <p class="hint">자료: 청약홈 분양 공고(매주 자동 수집) · 지역은 위에서 고른 시도·시군구를 따릅니다. 분양가 = 주택형별 최고 분양가(발코니 확장·옵션 제외). 주변 시세 = 비교 범위 안 비슷한 평형(±3㎡) 단지들의 최근 12개월 매매 실거래 평균(직거래 제외). 주변 대비 − 는 주변보다 싸게 분양(파랑), + 는 비싸게 분양(빨강). 비교 단지가 3곳 미만이면 흐리게 보입니다. 줄을 누르면 비교에 쓴 단지가 펼쳐집니다.</p>
+    </section>
+  </div>
+  <aside class="drawer" id="smDrawer" hidden>
+    <div class="drawhead"><strong>🎨 라벨 꾸미기</strong><span class="grow"></span><button id="btnSmDrawerClose">닫기 ✕</button></div>
+    <div id="smDrawerBody"></div>
+  </aside>
+</main>
+
 
 <main id="tab-invest" class="tab" hidden>
   <section class="panel filters">
@@ -1240,7 +1307,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

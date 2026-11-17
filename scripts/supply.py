@@ -124,9 +124,18 @@ def ym(v):
 
 # ───────────── 주소 → 지역 코드 (data/regions.json) ─────────────
 SIDO_ALIAS = {"강원도": "강원특별자치도", "전라북도": "전북특별자치도", "제주도": "제주특별자치도"}
+SIDO_SHORT = {"서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구", "인천광역시": "인천", "광주광역시": "광주", "대전광역시": "대전", "울산광역시": "울산",
+              "세종특별자치시": "세종", "경기도": "경기", "강원특별자치도": "강원", "충청북도": "충북", "충청남도": "충남", "전북특별자치도": "전북",
+              "전라남도": "전남", "경상북도": "경북", "경상남도": "경남", "제주특별자치도": "제주"}
+# 주소에 시군구 없이 신도시·지구 이름만 있을 때 (시도 앞 두 글자, 시군구)
+AREA_HINTS = {"영종": ("인천", "중구"), "검단": ("인천", "서구"), "청라": ("인천", "서구"), "송도": ("인천", "연수구"),
+              "과천지식정보타운": ("경기", "과천시"), "고덕강일": ("서울", "강동구"), "내포신도시": ("충청남", "홍성군")}
+# 2026년 인천 행정구역 개편: 새 구 → 실거래 자료가 쓰는 예전 구 (두 곳에 걸치면 동 이름으로 고름)
+INCHEON_NEW = {"서해구": ["서구"], "검단구": ["서구"], "영종구": ["중구"], "제물포구": ["중구", "동구"]}
 
 
 def build_matcher():
+    """주소 → (지역 [코드, 시도, 시군구], 동). 시도가 빠진 주소·붙여 쓴 주소·구 없이 시만 쓴 주소·새 구 이름도 최대한 맞춤"""
     try:
         regions = json.load(open(os.path.join(DATA, "regions.json"), encoding="utf-8"))
     except Exception:
@@ -135,41 +144,121 @@ def build_matcher():
     for r in regions:
         by_sido.setdefault(r[1], []).append(r)
     sidos = list(by_sido)
+    dong_cache = {}
+
+    def dongs_of(code):                                   # 그 지역 실거래에 나오는 동 이름들 (구 고르기용)
+        if code not in dong_cache:
+            try:
+                idx = json.load(open(os.path.join(DATA, "index", code + ".json"), encoding="utf-8"))
+                dong_cache[code] = {k.split("|")[0] for k in (idx.get("c") or {})}
+            except Exception:
+                dong_cache[code] = set()
+        return dong_cache[code]
 
     def norm_sido(t):
         t = SIDO_ALIAS.get(t, t)
         if t in by_sido:
             return t
-        for s in sidos:                                   # "서울" → "서울특별시", 통합 시도 이름도 앞 두 글자로
-            if s.startswith(t[:2]):
+        if t == "광주시":                                  # 경기도 광주시와 헷갈림 → 시도로 보지 않음
+            return None
+        short = re.sub(r"(특별자치시|특별자치도|특별시|광역시|도|시)$", "", t)
+        if not (t.endswith(("특별시", "광역시", "특별자치시", "특별자치도", "도")) or (t.endswith("시") and len(t) <= 3) or len(t) == 2):
+            return None
+        for s in sidos:
+            if len(short) >= 2 and (s.startswith(short) or SIDO_SHORT.get(s) == short):
                 return s
         return None
 
-    def match(addr):
-        toks = (addr or "").replace(",", " ").split()
+    DONG_RE = r"(동|가|읍|면|리)\d*$"
+    city_names = {re.sub(r"(시|군|구)$", "", r[2].split()[0]) for r in regions if r[2]}
+
+    def sh_city_conflict(t):                               # 그 토큰이 실제 시군 이름이면 시도로 보지 않음 (예: 광주시)
+        return re.sub(r"(시|군)$", "", t) in city_names
+
+    def match(addr, inner=True):
+        if inner:                                          # 괄호 안에 온전한 주소가 있으면 그것을 먼저 씀
+            for pin in re.findall(r"\(([^()]*?)\)", addr or ""):
+                p0 = pin.split()[0] if pin.split() else ""
+                if norm_sido(p0) or p0.startswith("전남광주"):
+                    r0, d0 = match(pin, False)
+                    if r0:
+                        return r0, d0
+        a = (addr or "").replace(",", " ").replace("[", " [")
+        pm = re.search(r"\(([가-힣0-9]+?(?:동|가|읍|면|리))[\s,)]", addr or "")   # 도로명 주소 괄호 안 동 이름
+        pdong = pm.group(1) if pm else ""
+        toks = []
+        for t in a.split():
+            t = re.sub(r"특례시$", "시", t)                   # 수원특례시 → 수원시
+            m2 = re.fullmatch(r"([가-힣]+?(?:시|군|구))([가-힣0-9]+?(?:동|가|읍|면))", t)   # 동래구사직동 → 동래구 사직동
+            toks += [m2.group(1), m2.group(2)] if m2 else [t]
         if not toks:
             return None, ""
+        if toks[0].startswith("전남광주"):                    # 광주·전남 통합 이름 → 예전 시도 (광주 5개 구면 광주광역시)
+            if len(toks) > 1 and re.fullmatch(r"광주(시|광역시)?", toks[1]):
+                toks = ["광주광역시"] + toks[2:]
+            elif len(toks) > 1 and toks[1] in ("동구", "서구", "남구", "북구", "광산구"):
+                toks = ["광주광역시"] + toks[1:]
+            else:
+                toks = ["전라남도"] + toks[1:]
         sido = norm_sido(toks[0])
+        if not sido and re.search(r"(시|도)$", toks[0]):        # '인천검단시' 처럼 시도 이름이 앞에 붙은 경우
+            sido = next((sd for sd, sh in SIDO_SHORT.items() if toks[0].startswith(sh) and toks[0] != sh + "시" and sd in by_sido), None)
+            if sido and sh_city_conflict(toks[0]):
+                sido = None
+        if sido and sido.startswith("인천") and len(toks) > 1 and toks[1] in INCHEON_NEW:     # 인천 새 구 → 예전 구
+            cand = INCHEON_NEW[toks[1]]
+            d0 = toks[2] if len(toks) > 2 else pdong
+            pick_gu = next((g for g in cand if any(r[2] == g and d0 in dongs_of(r[0]) for r in by_sido.get(sido, []))), cand[0])
+            toks = [toks[0], pick_gu] + toks[2:]
         cands = by_sido.get(sido, regions) if sido else regions
-        best, blen = None, 0
+        start = 1 if sido else 0
+        best, score, at, blen = None, 0, 0, 0
         for r in cands:
             st = r[2].split()
             if not st:
                 continue
-            for i in range(1, min(4, len(toks))):
-                if toks[i:i + len(st)] == st and len(st) > blen:
-                    best, blen, at = r, len(st), i
+            for i in range(start, min(start + 3, len(toks))):
+                if toks[i:i + len(st)] == st and 10 + len(st) > score:            # 시군구 이름이 그대로 있음
+                    best, score, at, blen = r, 10 + len(st), i, len(st)
+        if best is None:                                   # 구 없이 '고양시'만 / '화성 봉담2지구' / '시흥장현' 처럼 쓴 경우 → 시 단위로 찾고 동으로 구 고르기
+            city = []
+            for i in range(start, min(start + 2, len(toks))):
+                t = toks[i]
+                for r in cands:
+                    c0 = r[2].split()[0]
+                    base = re.sub(r"(시|군|구)$", "", c0)
+                    if t == c0 or (len(base) >= 2 and t.startswith(base) and not t.startswith(base + "구")):
+                        city.append((r, i))
+                if city:
+                    break
+            if city:
+                i = city[0][1]
+                rest0 = [x for x in toks[i + 1:i + 3]] + ([pdong] if pdong else [])
+                d0 = next((x for x in rest0 if re.search(DONG_RE, x)), "")
+                pickr = next((r for r, _ in city if d0 and d0 in dongs_of(r[0])), city[0][0])
+                best, at, blen = pickr, i, 1
+        if best is None:                                   # 신도시·지구 이름으로 짐작 (예: 인천 영종지구 → 중구)
+            joined = "".join(toks)
+            for kw, (sd, sg) in AREA_HINTS.items():
+                if kw in joined and (not sido or sido.startswith(sd)):
+                    r = next((x for x in regions if x[1].startswith(sd) and x[2] == sg), None)
+                    if r:
+                        return r, pdong
         if best is None and sido and sido.startswith("세종"):
             best = (by_sido.get(sido) or [None])[0]
             at, blen = 0, 1
         if best is None:
             return None, ""
         rest = toks[at + blen:]
+        while rest and re.search(r"(구|시)$", rest[0]) and not re.search(r"(동|가)\d*$", rest[0]):   # 실거래 지역에 없는 새 구는 건너뜀
+            rest = rest[1:]
         dong = ""
-        if rest and re.search(r"(동|가|읍|면|리)\d*$", rest[0]):
+        if rest and re.search(DONG_RE, rest[0]):
             dong = rest[0]
             if re.search(r"(읍|면)$", dong) and len(rest) > 1 and re.search(r"리$", rest[1]):
                 dong += " " + rest[1]
+        if not dong and pdong:
+            dong = pdong
         return best, dong
     return match
 
@@ -195,6 +284,14 @@ def main():
 
     match = build_matcher()
     items = dict(old)
+    fixed = 0
+    for it in items.values():                     # 예전에 지역을 못 찾은 공고는 주소로 다시 맞춰 봄
+        if not it.get("c") and it.get("ad"):
+            reg, dong = match(it["ad"])
+            if reg:
+                it.update({"c": reg[0], "sd": reg[1], "sg": reg[2], "dg": dong}); fixed += 1
+    if fixed:
+        status["notes"].append("예전에 지역을 못 찾은 공고 %d건을 다시 맞췄습니다." % fixed)
     first = not old
     since = START
     if old:

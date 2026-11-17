@@ -788,3 +788,110 @@ button.colf.on.so{background:#2563eb;color:#fff}
 #tab-supply .hmrc2{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;color:var(--sub)}
 #tab-supply .spsteps{line-height:1.9;margin:6px 0 0 18px}
 @media (max-width:760px){#tab-supply .spbarbox{height:190px}#tab-supply .spmap{height:300px}#tab-supply .hmregpop{position:fixed;left:4vw;top:12vh;max-height:76vh;overflow:auto}}
+
+
+/* ═══ 공급지도 탭 (js/supplymap.js · 부동산지인 엑셀) ═══ */
+.spfiles { display: flex; flex-wrap: wrap; gap: 6px; }
+.spfile { display: inline-flex; align-items: center; gap: 6px; background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 4px 3px 12px; font-size: 13px; }
+.spsggs { margin-top: 10px; } .spsggs button { padding: 5px 12px; } .spsggs small { margin-left: 4px; font-size: 11px; color: var(--sub); }
+.spsggs button.on small { color: var(--on-accent); }
+.spcards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 0; }
+.spcards .card.p0 { border-top: 3px solid #E24B4A; } .spcards .card.p1 { border-top: 3px solid #EF9F27; } .spcards .card.p2 { border-top: 3px solid #7F77DD; }
+.spcards .card em { font-style: normal; font-weight: 700; margin-left: 4px; }
+.spchart { position: relative; height: 340px; }
+.spchart .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.spmap { height: 560px; }
+.spmap.picking, .spmap.picking * { cursor: crosshair !important; }
+.spmap.spdark img { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.88) saturate(.55); }
+.splegend .sub { color: #9aa0a9; margin-top: 2px; }
+.spunfound { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--rent); border-radius: 10px; }
+.spunfound small { color: var(--sub); margin-left: 4px; }
+.spcard .spkv { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 6px; font-size: 13px; color: var(--sub); }
+.spcard .spkv b { color: var(--text); margin-left: 4px; }
+.spchip { color: #fff; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 700; }
+.spdotmini { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.spchg { color: var(--rent) !important; font-weight: 700; }
+#smTable td:nth-child(-n+3), #smTable td:nth-child(7), #smTable td:nth-child(8), #smTable th:nth-child(-n+3) { text-align: left; }
+#smTable tbody tr { cursor: pointer; }
+#smTable .warn { color: var(--rent); }
+.spseg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.spseg button { border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+.spseg button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+.spmy { display: inline-flex; gap: 2px; align-items: center; }
+#smDrawer .drawsec label:not(.inline) { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--sub); }
+
+/* 공급 지도 라벨 — 색은 js 에서 입주시기별로 넣고, 모양만 여기서 정함 */
+.splbl { position: relative; font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif; line-height: 1.25; white-space: nowrap; cursor: pointer; transition: transform .12s ease; transform-origin: 50% 100%; color: #2C2C2A; }
+.splbl.hv:hover { transform: scale(1.08); z-index: 999; }
+.splbl .spdotonly { display: none; }
+.splbl.sp-dot .spfull { display: none; }
+.splbl.sp-dot .spdotonly { display: block; }
+.splbl .spd { display: block; border-radius: 50%; border: 2px solid #fff; flex: none; }
+.splbl.sh .spbox, .splbl.sh .pin-h, .splbl.sh .pin-c, .splbl.sh .spd { box-shadow: 0 2px 6px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.06); }
+.splbl .spbox { display: inline-flex; align-items: center; }
+.spfull { display: flex; flex-direction: column; align-items: center; }
+/* 투톤 */
+.spbox.tt { overflow: hidden; }
+.spbox.tt .tt-l { padding: .32em .7em; align-self: stretch; display: flex; align-items: center; }
+.spbox.tt .tt-r { padding: .32em .8em; display: inline-flex; gap: .45em; align-items: center; }
+.spbox.tt .tt-b { border-radius: 999px; padding: .05em .55em; font-size: .9em; }
+.splbl .spstem { width: 2px; height: 8px; }
+.splbl .spfoot { width: 8px; height: 8px; border-radius: 50%; border: 2px solid #fff; margin-top: -2px; }
+/* 아이콘 카드 */
+.spbox.cd { gap: .6em; padding: .45em .9em .45em .45em; }
+.spbox.cd .cd-i { width: 2.1em; height: 2.1em; border-radius: .6em; display: flex; align-items: center; justify-content: center; font-size: 1em; }
+.spbox.cd .cd-s { font-size: .9em; font-weight: 400; }
+.splbl .sptail { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 7px solid #ccc; }
+/* 핀 */
+.pinwrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.pin-c { padding: .15em .6em; font-size: .92em; }
+.pin-h { border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+.pin-h span { transform: rotate(45deg); font-weight: 700; font-size: .92em; }
+/* 태그 */
+.spbox.tg { gap: .5em; padding: .3em .75em; }
+.spbox.tg .tg-d { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.spbox.tg b { font-weight: inherit; }
+.spbox.tg .tg-s { opacity: .45; margin: 0 .35em; }
+/* 미니멀 */
+.spbox.mn { gap: 6px; }
+.spbox.mn .mn-t { padding: 1px 6px; }
+.splbl:has(.spbox.mn) { transform-origin: 0 50%; }
+/* 구별 합계 */
+.splbl.gu { transform-origin: 50% 50%; }
+.spbox.gub { flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.spbox.gub b { font-size: 14px; }
+.spbox.gub span { display: flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+.spbox.gub i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+@media (max-width: 760px) { .spchart { height: 260px; } .spmap { height: 420px !important; } }
+.splbl.gu .gus { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.splbl.gu .gus b { margin-left: 3px; }
+.splbl.sp-hide { visibility: hidden; }
+
+/* 공급지도 · 분양가 vs 주변 시세 (js/supplycmp.js) */
+#bcPanel .bcrow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:6px 0}
+#bcPanel .bck{font-size:12.5px;color:var(--sub)}
+#bcPanel .bcseg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+#bcPanel .bcseg button{border:0;border-radius:0;background:transparent;padding:5px 11px;font-size:13px;color:var(--text);cursor:pointer}
+#bcPanel .bcseg button+button{border-left:1px solid var(--line)}
+#bcPanel .bcseg button.on{background:var(--c-sale);color:#fff}
+#bcPanel .hmtable td,#bcPanel .hmtable th{white-space:nowrap}
+#bcPanel .hmtable td{text-align:right;font-variant-numeric:tabular-nums}
+#bcPanel .hmtable td.l{text-align:left}
+#bcPanel .hmtable td.name a{color:inherit;font-weight:600}
+#bcPanel .hmtable td small{color:var(--sub);margin-left:3px}
+#bcPanel .hmtable td.sale b{color:var(--c-sale)}
+#bcPanel .hmtable tr.old td{opacity:.55}
+#bcPanel .hmtable tr.click{cursor:pointer}
+#bcPanel .hmtable tr.hmsub td{font-size:12.5px;color:var(--sub);text-align:left;background:rgba(127,127,127,.06);white-space:normal;line-height:1.7}
+#bcPanel .hmcardlist{display:flex;flex-direction:column;gap:7px}
+#bcPanel .hmrc{border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px}
+#bcPanel .hmrc small{color:var(--sub)}
+#bcPanel .hmrc2{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:4px;color:var(--sub)}
+/* 예전 공급지도 스타일의 .spmap 높이가 [공급] 탭 지도에 번지지 않게 */
+#tab-supply .spmap{height:420px !important}
+@media (max-width:760px){#tab-supply .spmap{height:300px !important}}
+#tab-home .hmcard.dim{opacity:.4}
+#tab-home .hmhhin{font-size:12.5px;color:var(--sub);display:inline-flex;align-items:center;gap:4px}
+#tab-home .hmhhin input{width:74px;padding:4px 6px}
+#tab-home .hmtitle select.hmth{font-weight:600}
+#tab-home .hmhhin + .hmk{margin-left:14px}

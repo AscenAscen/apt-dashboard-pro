@@ -32,7 +32,7 @@ const Home = (() => {
   const meta = new Map();                                   // 지역코드 → { by: 연식표, hh: 세대수표 }
   const seenPrev = new Map();                               // 이번 접속 전에 본 거래 (NEW 표시용)
 
-  const DEF = () => ({ kind: 'sale', ym: ymAdd(nowYm(), -1), regs: ['g:seoul'], py: '', view: 'month', years: 1, low: false, direct: false, bands: [], metric: 'n', onlyHigh: false, folder: '' });
+  const DEF = () => ({ kind: 'sale', ym: ymAdd(nowYm(), -1), regs: ['g:seoul'], pys: [], hhMin: null, hhMax: null, age: '', view: 'month', years: 1, low: false, direct: false, bands: [], metric: 'n', onlyHigh: false, folder: '' });
   const save = () => Store.set(SK, st);
 
   /* ── 지역 ── */
@@ -161,6 +161,7 @@ const Home = (() => {
           r.high = peak != null && rep.price > peak;
           r.fall = r.prevr != null && r.prevr <= -10;
           r.mine = Tracking.has(o.id);
+          r.leader = leaderOf(o.code)?.key === o.key;
           extras(r, kind, end);
           out.push(r);
         });
@@ -197,6 +198,7 @@ const Home = (() => {
         r.high = peak != null && rep.price > peak;
         r.fall = r.prevr != null && r.prevr <= -10;
         r.mine = Tracking.has(o.id);
+        r.leader = leaderOf(o.code)?.key === o.key;
         extras(r, kind, end);
         out.push(r);
       });
@@ -204,8 +206,54 @@ const Home = (() => {
     return out;
   }
 
+  /* ── 평형·세대수·연식 조건 ── */
+  const thisYear = new Date().getFullYear();
+  function condOk(r, skipPy) {
+    if (!skipPy && st.pys.length && !st.pys.includes(r.pc)) return false;
+    if (st.hhMin != null || st.hhMax != null) {             // 세대수를 고르면 세대수 모르는 단지는 뺌
+      if (!r.hh) return false;
+      if (st.hhMin != null && r.hh < st.hhMin) return false;
+      if (st.hhMax != null && r.hh > st.hhMax) return false;
+    }
+    if (st.age) {
+      if (!r.by) return false;
+      const age = thisYear - r.by;
+      if (st.age === '20+' ? age <= 20 : age > +st.age) return false;
+    }
+    return true;
+  }
+  function hhText() {
+    if (st.hhMin == null && st.hhMax == null) return '';
+    if (st.hhMax == null) return `${st.hhMin.toLocaleString()}세대↑`;
+    if (st.hhMin == null) return `${st.hhMax.toLocaleString()}세대↓`;
+    return `${st.hhMin.toLocaleString()}~${st.hhMax.toLocaleString()}세대`;
+  }
+  const ageText = () => (!st.age ? '' : st.age === '20+' ? '20년 넘음' : `${st.age}년 이내`);
+  const HHB = [[2000, '2,000세대↑'], [1000, '1,000~1,999'], [500, '500~999'], [300, '300~499'], [0, '300 미만']];
+  const hhBucket = (h) => (h ? HHB.findIndex(([m]) => h >= m) : 5);
+
+  /* ── 대장 단지 👑: 같은 구(지역 코드)에서 200세대 이상 중 최근 1년 ㎡당 평균 매매가 1위 ── */
+  const leaders = new Map();                                 // 지역코드 → { key, ppm, name }
+  function leaderOf(code) {
+    if (leaders.has(code)) return leaders.get(code);
+    const m = built.sale.get(code), mt = meta.get(code);
+    if (!m || !mt) return null;
+    const t = new Date(), since = (t.getFullYear() - 1) * 10000 + (t.getMonth() + 1) * 100 + t.getDate();
+    const acc = new Map();                                   // 단지 key → [합(만원/㎡), 건수]
+    m.forEach(o => {
+      const k = mt.kp[o.key]; const hh = k ? +k[0] || 0 : 0;
+      if (hh < 200) return;
+      o.tr.forEach(x => { if (x.d >= since && !x.direct && o.area) { const a = acc.get(o.key) || [0, 0]; a[0] += x.price / o.area; a[1]++; acc.set(o.key, a); } });
+    });
+    let best = null;
+    acc.forEach(([s, n], key) => { if (n >= 2) { const ppm = s / n; if (!best || ppm > best.ppm) best = { key, ppm, n }; } });
+    if (best) best.name = Data.parseKey(best.key).name;
+    leaders.set(code, best);
+    return best;
+  }
+
   /* ── 표 열 (엑셀식 필터와 공용) ── */
-  const tagsOf = (r) => [r.isNew && 'NEW', r.high && '신고가', r.fall && '급락', r.mine && '내 단지', r.rep.floor != null && r.rep.floor <= 3 && '저층', r.rep.direct && '직거래', st.view === 'all' && r.thisMonth && '이달 거래'].filter(Boolean);
+  const tagsOf = (r) => [r.isNew && 'NEW', r.leader && '대장', r.high && '신고가', r.fall && '급락', r.mine && '내 단지', r.rep.floor != null && r.rep.floor <= 3 && '저층', r.rep.direct && '직거래', st.view === 'all' && r.thisMonth && '이달 거래'].filter(Boolean);
   function cols() {
     const N = ColFilter.numCol, T = ColFilter.txtCol, rent = st.kind === 'rent', all = st.view === 'all';
     const c = {
@@ -221,6 +269,7 @@ const Home = (() => {
     if (rent) { c.sale = N('최근 매매가', r => r.sale); c.ratio = N('전세가율', r => r.ratio, 'rat'); c.gap = N('매-전(투자금)', r => r.gap); }
     c.tags = T('표시', r => tagsOf(r).join(', '));
     c.mine = T('내 단지', r => (r.mine ? '내 단지' : '아님'));
+    c.leader = T('대장 단지', r => (r.leader ? '👑 대장' : '-'));
     return c;
   }
   const HF = () => hf || (hf = ColFilter.create({ key: 'home', cols, bar: 'hmCfBar', sortSel: 'hmSort', onChange: () => { shown = 300; drawTable(); } }));
@@ -240,12 +289,12 @@ const Home = (() => {
     const M = st.ym;
     const mRows = monthRows(M, st.kind, true);
     const base = st.view === 'all' ? allRows(M, st.kind) : mRows;
-    const pyOk = (r) => !st.py || r.pc === st.py;
+    const pyOk = (r) => condOk(r);
     const bOk = (r) => !st.bands.length || st.bands.includes(r.band);
     rowsNow = base.filter(pyOk);
     drawBars(rowsNow, mRows.filter(pyOk));
     drawSummary(mRows.filter(r => pyOk(r) && bOk(r)), monthRows(ymAdd(M, -1), st.kind, false).filter(r => pyOk(r) && bOk(r)));
-    drawCards(mRows.filter(bOk));
+    drawCards(mRows.filter(r => bOk(r) && condOk(r, true)));         // 카드는 평형별이라 평형 조건만 빼고 적용
     tblRows = st.bands.length ? rowsNow.filter(bOk) : [];
     drawTable();
     if ($('hmRegDet').open) drawRegions();
@@ -253,14 +302,15 @@ const Home = (() => {
 
   function drawBars(rows, mRows) {
     const ct = new Array(BANDS.length).fill(0), tr = new Array(BANDS.length).fill(0), hi = new Array(BANDS.length).fill(0), n = new Array(BANDS.length).fill(0);
-    rows.forEach(r => { ct[r.band]++; tr[r.band] += st.view === 'all' ? 1 : r.cnt; });
+    const hb = BANDS.map(() => [0, 0, 0, 0, 0, 0]);
+    rows.forEach(r => { ct[r.band]++; tr[r.band] += st.view === 'all' ? 1 : r.cnt; hb[r.band][hhBucket(r.hh)]++; });
     mRows.forEach(r => { n[r.band] += r.cnt; if (r.high) hi[r.band]++; });
     const vals = st.metric === 't' ? tr : ct;
     const C = st.kind === 'rent' ? CK.C.rent() : CK.C.sale(), gray = CK.alpha(CK.C.sub(), 0.35);
     const colors = vals.map((_, i) => (!st.bands.length || st.bands.includes(i) ? C : gray));
-    $('hmBarTitle').textContent = `억대별 분포 · ${st.kind === 'rent' ? '전세' : '매매'} · ${ymText(st.ym)}${st.view === 'all' ? ` · 지역 전체(최근 ${st.years}년)` : ''}${st.bands.length ? ' · ' + st.bands.map(b => BANDS[b].l).join('·') + ' 선택' : ''}`;
+    $('hmBarTitle').textContent = `억대별 분포 · ${st.kind === 'rent' ? '전세' : '매매'} · ${ymText(st.ym)}${[st.pys.map(pyName).join('·'), hhText(), ageText()].filter(Boolean).map(x => ' · ' + x).join('')}${st.view === 'all' ? ` · 지역 전체(최근 ${st.years}년)` : ''}${st.bands.length ? ' · ' + st.bands.map(b => BANDS[b].l).join('·') + ' 선택' : ''}`;
     $('hmBandClear').hidden = !st.bands.length;
-    if (chart) { chart.data.datasets[0].data = vals; chart.data.datasets[0].backgroundColor = colors; chart.$meta = { ct, n, hi, tr }; chart.update('none'); return; }
+    if (chart) { chart.data.datasets[0].data = vals; chart.data.datasets[0].backgroundColor = colors; chart.$meta = { ct, n, hi, tr, hb }; chart.update('none'); return; }
     chart = new Chart($('hmBarChart'), {
       type: 'bar',
       data: { labels: BANDS.map(b => b.s), datasets: [{ data: vals, backgroundColor: colors, borderRadius: { topLeft: 4, topRight: 4 }, maxBarThickness: 26 }] },
@@ -269,7 +319,8 @@ const Home = (() => {
         scales: { x: { grid: { display: false }, ticks: { autoSkip: window.innerWidth <= 760, maxRotation: 0, font: { size: window.innerWidth <= 760 ? 10 : 11 } } }, y: { beginAtZero: true, ticks: { maxTicksLimit: 4, precision: 0 } } },
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { title: (it) => BANDS[it[0].dataIndex].l, label: (it) => { const m = chart.$meta, i = it.dataIndex; return `${m.ct[i]}곳 · ${st.view === 'all' ? '' : m.tr[i] + '건 · '}신고가 ${m.hi[i]}곳`; } } },
+          tooltip: { callbacks: { title: (it) => BANDS[it[0].dataIndex].l, label: (it) => { const m = chart.$meta, i = it.dataIndex; return `${m.ct[i]}곳 · ${st.view === 'all' ? '' : m.tr[i] + '건 · '}신고가 ${m.hi[i]}곳`; },
+            afterLabel: (it) => { const h = chart.$meta.hb[it.dataIndex]; const parts = HHB.map(([, t], k) => (h[k] ? `${t} ${h[k]}곳` : '')).concat(h[5] ? [`세대수 모름 ${h[5]}곳`] : []).filter(Boolean); return parts.length ? parts : ''; } } },
         },
         onHover: (e, els) => { e.native.target.style.cursor = els.length || (e.y > chart.chartArea.bottom) ? 'pointer' : 'default'; },
         onClick: (e, els) => {
@@ -280,7 +331,7 @@ const Home = (() => {
         },
       },
     });
-    chart.$meta = { ct, n, hi, tr };
+    chart.$meta = { ct, n, hi, tr, hb };
   }
   function pickBand(i, multi) {
     if (multi) st.bands = st.bands.includes(i) ? st.bands.filter(x => x !== i) : [...st.bands, i].sort((a, b) => a - b);
@@ -293,7 +344,7 @@ const Home = (() => {
     const n = cur.reduce((t, r) => t + r.cnt, 0), np = prev.reduce((t, r) => t + r.cnt, 0);
     const h = cur.filter(r => r.high).length, hp = prev.filter(r => r.high).length;
     const rt = cur.length ? h / cur.length * 100 : null, rtp = prev.length ? hp / prev.length * 100 : null;
-    const tc = st.py || '84';
+    const tc = st.pys.length === 1 ? st.pys[0] : st.pys.includes('84') || !st.pys.length ? '84' : st.pys[0];
     const avg = (rs) => { const ps = rs.filter(r => r.pc === tc).flatMap(r => r.trades.map(t => t.price)); return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : null; };
     const a = avg(cur), ap = avg(prev);
     const d = n - np, ach = a && ap ? (a / ap - 1) * 100 : null;
@@ -311,7 +362,7 @@ const Home = (() => {
     $('hmCards').innerHTML = PYC.map(([c, nm]) => {
       const rs = rows.filter(r => r.pc === c), hs = rs.filter(r => r.high);
       const top = hs.slice().sort((a, b) => (b.rep.price / b.peak) - (a.rep.price / a.peak))[0];
-      return `<div class="hmcard${st.py === c ? ' on' : ''}"><div class="k">${nm}</div><div class="v">${hs.length}<small> / ${rs.length}곳</small></div>` +
+      return `<div class="hmcard${st.pys.includes(c) ? ' on' : ''}${st.pys.length && !st.pys.includes(c) ? ' dim' : ''}"><div class="k">${nm}</div><div class="v">${hs.length}<small> / ${rs.length}곳</small></div>` +
         `<div class="s">${top ? `${U.esc(top.name)} <b class="up">+${((top.rep.price / top.peak - 1) * 100).toFixed(1)}%</b>` : '-'}</div>` +
         (hs.length ? `<button class="mini" data-card="${c}">보기</button>` : '') + '</div>';
     }).join('');
@@ -336,7 +387,7 @@ const Home = (() => {
       (rent ? `${th('sale', '최근 매매가')}${th('ratio', '전세가율')}${th('gap', '매-전')}` : '') + `${th('tags', '표시', 'l')}<th></th></tr></thead>`;
     const ncol = 19 + (rent ? 3 : 0) - (all ? 1 : 0);
     const rowsH = list.slice(0, shown).map(r => {
-      const tg = [r.isNew && '<span class="tg new">NEW</span>', r.high && '<span title="신고가">🔴</span>', r.fall && '<span title="급락">🔵</span>', r.mine && '<span title="내 단지">⭐</span>', all && r.thisMonth && '<span title="이달 거래 있음">🟠</span>'].filter(Boolean).join('');
+      const tg = [r.isNew && '<span class="tg new">NEW</span>', r.leader && `<span title="${U.esc(r.gu || r.si)} 대장 · ㎡당 평균 ${Math.round(leaderOf(r.o.code).ppm).toLocaleString()}만 원">👑</span>`, r.high && '<span title="신고가">🔴</span>', r.fall && '<span title="급락">🔵</span>', r.mine && '<span title="내 단지">⭐</span>', all && r.thisMonth && '<span title="이달 거래 있음">🟠</span>'].filter(Boolean).join('');
       const fl = r.rep.floor != null && r.rep.floor <= 3 ? ' <small class="tg low">저층</small>' : '';
       const dr = r.rep.direct ? ' <small class="tg dir">직</small>' : '';
       const cntH = all ? (r.cnt ? `<b>${r.cnt}</b>` : '-') : (r.cnt > 1 ? `<button class="mini hmexp" data-exp="${r.rid}">${r.cnt} ${open.has(r.rid) ? '▴' : '▾'}</button>` : '1');
@@ -354,7 +405,7 @@ const Home = (() => {
     $('hmCardList').hidden = !narrow;
     if (narrow) {
       $('hmCardList').innerHTML = list.slice(0, shown).map(r => {
-        const tg = [r.isNew && '<span class="tg new">NEW</span>', r.high && '🔴', r.fall && '🔵', r.mine && '⭐', all && r.thisMonth && '🟠'].filter(Boolean).join('');
+        const tg = [r.isNew && '<span class="tg new">NEW</span>', r.leader && '👑', r.high && '🔴', r.fall && '🔵', r.mine && '⭐', all && r.thisMonth && '🟠'].filter(Boolean).join('');
         return `<div class="hmrc"><div class="hmrc1"><input type="checkbox" data-sel="${r.rid}" ${sel.has(r.rid) ? 'checked' : ''}> ${tg}<a href="#" data-open="${r.rid}">${U.esc(r.name)}</a> <small>${U.esc([r.gu || r.si, r.dong].join(' '))}</small></div>` +
           `<div class="hmrc2"><span>${r.g}㎡ ${CONFIG.toPyeong(r.area)}평</span><b class="${rent ? 'rent' : 'sale'}">${eok(r.rep.price)}</b><span>${all ? String(r.rep.d).slice(0, 4) + '.' + String(r.rep.d).slice(4, 6) : U.date(r.rep.d).slice(3)} · ${r.rep.floor ?? '-'}층${all ? '' : ' · ' + r.cnt + '건'}</span></div>` +
           `<div class="hmrc2"><span>${rent ? '최고가' : '전고'} ${eok(r.peak)} <b class="${U.cls(r.drop)}">${U.pct(r.drop)}</b></span>${all ? '' : `<span>직전 <b class="${U.cls(r.prevd)}">${r.prevd == null ? '-' : (r.prevd > 0 ? '+' : r.prevd < 0 ? '-' : '') + eok(Math.abs(r.prevd))}</b></span>`}${rent ? `<span>전세가율 ${r.ratio == null ? '-' : r.ratio.toFixed(0) + '%'} · 매-전 ${eok(r.gap)}</span>` : ''}<button class="mini" data-add="${r.rid}">담기</button></div></div>`;
@@ -386,7 +437,17 @@ const Home = (() => {
   /* ── 고르는 줄 ── */
   function syncControls() {
     document.querySelectorAll('#hmKind button').forEach(b => b.classList.toggle('on', b.dataset.k === st.kind));
-    document.querySelectorAll('#hmPy button').forEach(b => b.classList.toggle('on', b.dataset.p === st.py));
+    document.querySelectorAll('#hmPy button').forEach(b => b.classList.toggle('on', b.dataset.p ? st.pys.includes(b.dataset.p) : !st.pys.length));
+    const custom = !!st.hhCustom && (st.hhMin != null || st.hhMax != null);     // 직접 입력한 범위
+    const hhPreset = custom ? null : st.hhMin == null ? '' : String(st.hhMin);
+    document.querySelectorAll('#hmHh button').forEach(b => b.classList.toggle('on', hhPreset !== null && b.dataset.h === hhPreset));
+    $('hmHhMin').value = custom && st.hhMin != null ? st.hhMin : ''; $('hmHhMax').value = custom && st.hhMax != null ? st.hhMax : '';
+    document.querySelectorAll('#hmAge button').forEach(b => b.classList.toggle('on', b.dataset.a === st.age));
+    document.querySelectorAll('.hmth').forEach(sel => {
+      const opts = [['', '세대수 전체'], ['300', '300세대↑'], ['500', '500세대↑'], ['1000', '1,000세대↑'], ['2000', '2,000세대↑']];
+      sel.innerHTML = opts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('') + (custom ? `<option value="custom">${hhText()}</option>` : '');
+      sel.value = custom ? 'custom' : hhPreset || '';
+    });
     document.querySelectorAll('#hmView button').forEach(b => b.classList.toggle('on', b.dataset.v === st.view));
     $('hmYearsWrap').hidden = st.view !== 'all'; $('hmYears').value = String(st.years);
     $('hmLow').checked = st.low; $('hmDirect').checked = st.direct;
@@ -403,7 +464,7 @@ const Home = (() => {
     const fl = Tracking.folderList();
     if (!st.folder || !fl.includes(st.folder)) st.folder = Tracking.curFolder() || fl[0] || '기본';
     $('hmFolder').innerHTML = fl.map(f => `<option${f === st.folder ? ' selected' : ''}>${U.esc(f)}</option>`).join('') + '<option value="__new">+ 새 폴더…</option>';
-    $('hmCondSum').textContent = [st.kind === 'rent' ? '전세' : '매매', ymText(st.ym), st.regs.map(tokLabel).join(', ') || '지역 없음', st.py ? pyName(st.py) : '전체 평형', st.bands.length ? st.bands.map(b => BANDS[b].l).join('·') : '억대 미선택', st.view === 'all' ? `지역 전체(${st.years}년)` : ''].filter(Boolean).join(' · ');
+    $('hmCondSum').textContent = [st.kind === 'rent' ? '전세' : '매매', ymText(st.ym), st.regs.map(tokLabel).join(', ') || '지역 없음', st.pys.length ? st.pys.map(pyName).join('·') : '전체 평형', hhText(), ageText(), st.bands.length ? st.bands.map(b => BANDS[b].l).join('·') : '억대 미선택', st.view === 'all' ? `지역 전체(${st.years}년)` : ''].filter(Boolean).join(' · ');
     const ps = Store.get(PK, {}) || {};
     const cur = $('hmPreset').value;
     $('hmPreset').innerHTML = '<option value="">저장한 조건 ▾</option>' + Object.keys(ps).map(n => `<option${n === cur ? ' selected' : ''}>${U.esc(n)}</option>`).join('');
@@ -462,13 +523,26 @@ const Home = (() => {
     regBy = new Map(regions.map(r => [r[0], r]));
     st = Object.assign(DEF(), Store.get(SK, {}) || {});
     if (!Array.isArray(st.bands)) st.bands = [];
+    const saved0 = Store.get(SK, {}) || {};
+    if (!Array.isArray(saved0.pys)) st.pys = st.py ? [st.py] : [];      // 예전 한 개 선택(py) → 여러 개(pys)
+    delete st.py;
     const months = []; for (let k = 0; k < 36; k++) months.push(ymAdd(nowYm(), -k));
     if (!months.includes(st.ym)) st.ym = ymAdd(nowYm(), -1);
     $('hmMonth').innerHTML = months.map(m => `<option value="${m}">${ymText(m)}${m >= ymAdd(nowYm(), -1) ? ' (집계 중)' : ''}</option>`).join('');
     if (window.innerWidth <= 760) $('hmCond').open = false;
 
     $('hmKind').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.kind = b.dataset.k; sel.clear(); save(); refresh(); };
-    $('hmPy').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.py = b.dataset.p; save(); refresh(); };
+    $('hmPy').onclick = (e) => {                             // 여러 개 선택 ([전체] = 모두 풀기)
+      const b = e.target.closest('button'); if (!b) return;
+      const p = b.dataset.p;
+      st.pys = !p ? [] : st.pys.includes(p) ? st.pys.filter(x => x !== p) : PYC.map(x => x[0]).filter(x => x === p || st.pys.includes(x));
+      save(); refresh();
+    };
+    $('hmHh').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.hhMin = b.dataset.h ? +b.dataset.h : null; st.hhMax = null; st.hhCustom = false; save(); refresh(); };
+    const hhIn = () => { const a = $('hmHhMin').value.trim(), b = $('hmHhMax').value.trim(); st.hhCustom = a !== '' || b !== ''; st.hhMin = a === '' ? null : Math.max(0, +a); st.hhMax = b === '' ? null : Math.max(0, +b); if (st.hhMin != null && st.hhMax != null && st.hhMax < st.hhMin) [st.hhMin, st.hhMax] = [st.hhMax, st.hhMin]; save(); refresh(); };
+    $('hmHhMin').onchange = hhIn; $('hmHhMax').onchange = hhIn;
+    $('hmAge').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.age = b.dataset.a; save(); refresh(); };
+    document.querySelectorAll('.hmth').forEach(sel => { sel.onchange = () => { if (sel.value === 'custom') return; st.hhMin = sel.value ? +sel.value : null; st.hhMax = null; st.hhCustom = false; save(); refresh(); }; });
     $('hmView').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.view = b.dataset.v; sel.clear(); shown = 300; save(); refresh(); };
     $('hmYears').onchange = () => { st.years = +$('hmYears').value; save(); refresh(); };
     $('hmLow').onchange = () => { st.low = $('hmLow').checked; save(); refresh(); };
@@ -493,7 +567,7 @@ const Home = (() => {
       if (g) { const t = 'c:' + g; st.regs = e.target.checked ? [...st.regs.filter(x => x !== 'g:all' && x !== t), t] : st.regs.filter(x => x !== t); regChanged(); }
     };
     document.addEventListener('mousedown', (e) => { const p = $('hmRegPop'); if (!p.hidden && !p.contains(e.target) && e.target.id !== 'hmAddReg') p.hidden = true; });
-    $('hmCards').onclick = (e) => { const b = e.target.closest('[data-card]'); if (!b) return; st.py = b.dataset.card; st.onlyHigh = true; st.view = 'month'; save(); refresh(); };
+    $('hmCards').onclick = (e) => { const b = e.target.closest('[data-card]'); if (!b) return; st.pys = [b.dataset.card]; st.onlyHigh = true; st.view = 'month'; save(); refresh(); };
     $('hmTable').onclick = (e) => {
       const o = e.target.closest('[data-open]');
       if (o) { e.preventDefault(); const r = rowsByRid([o.dataset.open])[0]; if (r) { App.showTab('search'); Search.openComplex({ code: r.o.code, key: r.o.key }); } return; }
@@ -524,14 +598,14 @@ const Home = (() => {
       const n = $('hmPreset').value, ps = Store.get(PK, {}) || {};
       $('hmPresetDel').hidden = !n;
       if (!n || !ps[n]) return;
-      st = Object.assign(st, ps[n]); sel.clear(); save(); refresh();
+      st = Object.assign(st, { pys: [], hhMin: null, hhMax: null, hhCustom: false, age: '' }, ps[n]); if (!Array.isArray(st.pys)) st.pys = st.py ? [st.py] : []; delete st.py; sel.clear(); save(); refresh();
       U.toast(`[${n}] 조건을 불러왔습니다.`);
     };
     $('hmPresetSave').onclick = () => {
       const n = (prompt('이 조건의 이름 (예: 대구 수성 84 5억대)', '') || '').trim();
       if (!n) return;
       const ps = Store.get(PK, {}) || {};
-      ps[n] = { kind: st.kind, regs: st.regs, py: st.py, view: st.view, years: st.years, low: st.low, direct: st.direct, bands: st.bands };
+      ps[n] = { kind: st.kind, regs: st.regs, pys: st.pys, hhMin: st.hhMin, hhMax: st.hhMax, hhCustom: !!st.hhCustom, age: st.age, view: st.view, years: st.years, low: st.low, direct: st.direct, bands: st.bands };
       Store.set(PK, ps); syncControls(); $('hmPreset').value = n; $('hmPresetDel').hidden = false;
       U.toast(`[${n}] 조건을 저장했습니다.`);
     };
