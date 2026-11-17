@@ -1,0 +1,32 @@
+{
+ "lastTry": "2026-11-17",
+ "ok": false,
+ "stop": "인구 자료를 받지 못했습니다. 활용신청이 승인됐는지, 주소가 바뀌지 않았는지 확인하세요.",
+ "tried": [
+  {
+   "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus/selectStdgPpltnHhStus",
+   "ym": "202610",
+   "regions": 0,
+   "fail": 3
+  },
+  {
+   "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus",
+   "ym": "202610",
+   "regions": 0,
+   "fail": 3
+  },
+  {
+   "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus/selectStdgPpltnHhStus",
+   "ym": "202609",
+   "regions": 0,
+   "fail": 3
+  },
+  {
+   "url": "https://apis.data.go.kr/1741000/stdgPpltnHhStus",
+   "ym": "202609",
+   "regions": 0,
+   "fail": 3
+  }
+ ],
+ "response": "HTTPError: HTTP Error 400: Bad Request"
+}
