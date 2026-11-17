@@ -1,15 +1,15 @@
 {
- "updatedAt": "2026-11-17 13:30",
+ "updatedAt": "2026-11-17 14:29",
  "lastUpdate": "2026-11-17",
  "progress": {
   "sale": {
-   "done": 13212,
+   "done": 13649,
    "total": 63001,
    "priorityDone": 11205,
    "priorityTotal": 11205
   },
   "rent": {
-   "done": 11524,
+   "done": 11958,
    "total": 47941,
    "priorityDone": 11205,
    "priorityTotal": 11205
@@ -20,7 +20,7 @@
    "sale": 450,
    "rent": 450
   },
-  "savedMonths": 864,
+  "savedMonths": 871,
   "failed": 0,
   "stop": "",
   "closed": {
@@ -29,14 +29,14 @@
   },
   "months": {
    "sale": 437,
-   "rent": 427
+   "rent": 434
   },
   "cooldowns": 0,
-  "minutes": 25,
+  "minutes": 26,
   "usedToday": {
    "date": "2026-11-17",
-   "sale": 3150,
-   "rent": 3150
+   "sale": 3600,
+   "rent": 3600
   },
   "warnings": []
  },
