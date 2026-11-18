@@ -31,6 +31,7 @@
     <button data-tab="trends">지역 동향</button>
     <button data-tab="supply">공급</button>
     <button data-tab="supplymap">공급지도</button>
+    <button data-tab="migration">인구이동</button>
     <button data-tab="invest">투자금</button>
     <button data-tab="market">시장 신호</button>
     <button data-tab="my">내 분석</button>
@@ -890,6 +891,62 @@
   </aside>
 </main>
 
+<main id="tab-migration" class="tab" hidden>
+  <section class="panel hmcond">
+    <details id="mgCond" open>
+      <summary><span id="mgCondSum">조건</span> <span class="hmchg">바꾸기 ▾</span></summary>
+      <div class="hmrow">
+        <span class="hmk">지역</span>
+        <span id="mgChips" class="hmchips"></span>
+        <span class="hmaddwrap"><button id="mgAddReg" class="mini">+ 지역 추가 ▾</button>
+          <div id="mgRegPop" class="hmregpop" hidden></div></span>
+      </div>
+      <div class="hmrow">
+        <span class="hmk">기간</span>
+        <span class="seg" id="mgPer"><button data-p="1">최근 1개월</button><button data-p="3">3개월 합계</button><button data-p="12">12개월 합계</button></span>
+        <label class="inline">기준 월 <select id="mgMonth"></select></label>
+      </div>
+    </details>
+    <div id="mgInfo" class="hint hmload"></div>
+  </section>
+
+  <section class="panel" id="mgSetup" hidden></section>
+
+  <div id="mgBody" hidden>
+  <section class="panel"><div id="mgSum" class="mgsum"></div></section>
+
+  <section class="panel">
+    <div class="bar"><strong>순이동 지도</strong><span class="grow"></span>
+      <span class="mglg"><i class="pos"></i>들어온 사람이 많음 <i class="neg"></i>나간 사람이 많음</span></div>
+    <div id="mgMap" class="mgmap"></div>
+    <p class="hint" id="mgMapMsg"></p>
+  </section>
+
+  <section class="panel">
+    <div class="bar"><strong id="mgChartTitle">월별 순이동</strong><span class="grow"></span><button id="mgSelClear" class="mini" hidden>고른 지역 풀기 (합계 보기)</button></div>
+    <div class="mgchart"><canvas id="mgChart1" role="img" aria-label="월별 순이동 막대그래프 (주황 유입, 파랑 유출)와 12개월 평균선"></canvas></div>
+    <p class="hint">주황 막대 = 들어온 사람이 더 많은 달, 파랑 막대 = 나간 사람이 더 많은 달, 점선 = 12개월 평균. 지도 원이나 아래 표의 줄을 누르면 그 지역만 봅니다.</p>
+    <div id="mgChart2Wrap">
+      <div class="bar" style="margin-top:10px"><strong>같은 기간 입주 물량</strong><small class="hint" style="margin:0 0 0 8px">청약홈 일반분양 세대 기준 · 공급 탭과 같은 자료</small></div>
+      <div class="mgchart sm"><canvas id="mgChart2" role="img" aria-label="월별 입주 세대수 막대그래프"></canvas></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="bar"><strong>시도 간 이동</strong><span class="grow"></span><label class="inline">기준 시도 <select id="mgOdSido"></select></label></div>
+    <div id="mgOd" class="mgod"></div>
+    <p class="hint">다른 시도와 주고받은 사람 수의 차이(들어옴 − 나감)입니다. 시군구끼리의 이동은 공개 통계에 없어 시도 단위로만 보여 줍니다.</p>
+  </section>
+
+  <section class="panel">
+    <div class="bar"><strong id="mgTitle">지역별 순이동 순위</strong><span class="grow"></span><button id="mgExcel" class="mini">엑셀</button></div>
+    <div id="mgCfBar" class="cfbar"></div>
+    <div class="tablewrap"><table id="mgTable" class="hmtable mgtable"></table></div>
+    <p class="hint">순이동률 = 순이동 ÷ 인구 × 100 (인구는 인구 자료 기준). 줄을 누르면 위 그래프가 그 지역으로 바뀝니다.</p>
+  </section>
+  </div>
+</main>
+
 
 <main id="tab-invest" class="tab" hidden>
   <section class="panel filters">
@@ -1307,7 +1364,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

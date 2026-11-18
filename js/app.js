@@ -133,6 +133,7 @@ const App = (() => {
     if (typeof Supply !== 'undefined') Supply.init();
     if (typeof SupplyMap !== 'undefined') SupplyMap.init();
     if (typeof SupplyCmp !== 'undefined') SupplyCmp.init();
+    if (typeof Migration !== 'undefined') Migration.init();
     Market.init(); Imjang.init(); PriceMap.init(); if (typeof PmArea !== "undefined") PmArea.init(); Eval.init();
     await Search.init();
     await Promise.all([My.init(), Land.init()]);
