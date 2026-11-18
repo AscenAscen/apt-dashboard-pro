@@ -297,7 +297,7 @@ const Compare = (() => {
         const pct = (p / r.st.peak.price - 1) * 100;
         return `<b class="${U.cls(pct)}">${U.pct(pct)}</b><small>${U.diff(p - r.st.peak.price)} · 전고점 ${U.price(r.st.peak.price)} (${U.date(r.st.peak.d)})</small>`;
       }],
-      ['전저점 (2020년~)', r => (r.st.trough ? `${U.price(r.st.trough.price)}<small>${U.date(r.st.trough.d)}</small>` : '-')],
+      ['전저점 (전고점 이후)', r => (r.st.trough ? `${U.price(r.st.trough.price)}<small>${U.date(r.st.trough.d)}</small>` : '-')],
       ['전저 대비', r => `<span class="${U.cls(r.st.rise)}">${U.pct(r.st.rise)}</span>`],
       ['최근 전세 실거래', r => (r.st.rentLast ? `${U.price(r.st.rentLast.price)}<small>${U.date(r.st.rentLast.d)}</small>` : '-')],
       ['전세가율 / 매-전', r => (r.st.ratio == null ? '-' : `${r.st.ratio.toFixed(0)}% / ${U.price(r.st.last.price - r.st.rentLast.price)}`)],

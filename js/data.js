@@ -66,18 +66,21 @@ const Data = (() => {
     }
   }
 
+  /** 전고점·전저점 (대시보드 전체가 이 한 곳의 기준을 씀)
+      · 전고점 = 2020년(CONFIG.PEAK_FROM) 이후 가장 비싼 거래 (같으면 나중 거래)
+      · 전저점 = 전고점 뒤에 나온 가장 싼 거래 = 하락장 바닥 (같으면 먼저 거래). 전고점 뒤 거래가 없으면 null → '신고가 중'
+      거래 순서는 상관없음 */
+  function peakTrough(trades) {
+    let peak = null, trough = null;
+    for (const t of trades) if (t && t.d >= CONFIG.PEAK_FROM && (!peak || t.price > peak.price || (t.price === peak.price && t.d > peak.d))) peak = t;
+    if (peak) for (const t of trades) if (t && t.d > peak.d && (!trough || t.price < trough.price || (t.price === trough.price && t.d < trough.d))) trough = t;
+    return { peak, trough };
+  }
+
   /** 전고점·전저점·등락률 계산. sale/rent = 날짜순 거래 배열 */
   function stats(sale, rent, noDirect) {
     const s = noDirect ? sale.filter(t => !t.direct) : sale;
-    const pick = (arr) => {
-      const since = arr.filter(t => t.d >= CONFIG.PEAK_FROM);
-      let peak = null, trough = null;
-      for (const t of since) {
-        if (!peak || t.price >= peak.price) peak = t;
-        if (!trough || t.price < trough.price) trough = t;
-      }
-      return { last: arr[arr.length - 1] || null, peak, trough };
-    };
+    const pick = (arr) => ({ last: arr[arr.length - 1] || null, ...peakTrough(arr) });
     const a = pick(s), b = pick(rent);
     const rate = (x, base) => (x && base ? (x.price / base.price - 1) * 100 : null);
     return {
@@ -118,7 +121,7 @@ const Data = (() => {
   const cx = (sd) => getJson(`cx/${sd}.json`, null);   // 단지 요약 (비슷한 단지 찾기용, scripts/cx_summary.py)
   const kaptFile = () => getJson('kapt_file_status.json', null);   // K-apt 엑셀 → 세대수 변환 결과 (scripts/kapt_file.py)
 
-  return { json: getJson, regions, status, index, loadYears, parseKey, eachTrade, stats, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
+  return { json: getJson, regions, status, index, loadYears, parseKey, eachTrade, stats, peakTrough, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
 })();
 
 /* ───────────── 공통 도구 ───────────── */

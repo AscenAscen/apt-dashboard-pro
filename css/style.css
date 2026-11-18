@@ -1008,3 +1008,112 @@ kbd { display: inline-block; border: 1px solid var(--line); border-bottom-width:
   .hs { flex-basis: 100%; padding-left: 28px; }
   .hsec { padding-left: 16px; }
 }
+/* ── 단지 지도 (첫 화면) ── */
+#tab-cxmap .hmcond{position:relative;padding-top:8px;padding-bottom:8px}
+#tab-cxmap .hmcond summary{cursor:pointer;font-size:13.5px;list-style:none;display:flex;gap:8px;align-items:center}
+#tab-cxmap .hmcond summary::-webkit-details-marker{display:none}
+#tab-cxmap .hmcond details[open] summary{margin-bottom:6px;opacity:.8}
+#tab-cxmap .hmchg{color:var(--accent);font-size:12.5px}
+#tab-cxmap .hmrow{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:5px 0}
+#tab-cxmap .hmk{font-size:12.5px;color:var(--sub);min-width:40px}
+#tab-cxmap .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;flex-wrap:wrap}
+#tab-cxmap .seg button{border:0;border-radius:0;background:transparent;padding:5px 11px;font-size:13px;color:var(--text);cursor:pointer}
+#tab-cxmap .seg button+button{border-left:1px solid var(--line)}
+#tab-cxmap .seg button.on{background:var(--c-sale);color:#fff}
+#tab-cxmap .hmchips{display:inline-flex;flex-wrap:wrap;gap:5px}
+#tab-cxmap .hmchip,.cxmstyle .hmchip{display:inline-flex;align-items:center;gap:3px;padding:3px 4px 3px 10px;border-radius:14px;background:color-mix(in srgb,var(--c-sale) 16%,transparent);font-size:13px}
+#tab-cxmap .hmchip button,.cxmstyle .hmchip button{border:0;background:transparent;color:var(--sub);cursor:pointer;padding:0 5px;font-size:12px}
+#tab-cxmap .hmaddwrap{position:relative}
+#tab-cxmap .hmregpop{position:absolute;left:0;top:calc(100% + 4px);z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:min(560px,92vw);box-shadow:0 6px 24px rgba(0,0,0,.3)}
+#tab-cxmap .hmpr{display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center;margin:4px 0}
+#tab-cxmap .hmgus{max-height:220px;overflow:auto}
+#tab-cxmap .grow{flex:1}
+.cxmstyle{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px}
+.cxmstyle .cxs-row{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:6px 0;font-size:13px}
+.cxmstyle .cxs-row>b{color:var(--sub);font-weight:600;font-size:12.5px}
+.cxmstyle .seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.cxmstyle .seg button{border:0;background:transparent;padding:5px 11px;color:var(--text);cursor:pointer}
+.cxmstyle .seg button.on{background:var(--c-sale);color:#fff}
+.cxmpanel{padding:8px}
+.cxmmap{height:calc(100vh - 250px);min-height:460px;border-radius:10px;overflow:hidden;background:var(--line);--cxff:inherit}
+.cxmlegend{font-size:12px}
+/* 라벨 */
+.cxl{--cxs:1;--cxf:13px;--bg:#f2b705;--fg:#1d1d1f;--bd:#c89400;position:relative;transform:scale(var(--cxs));transform-origin:50% 100%;margin-bottom:9px;cursor:pointer;font-family:var(--cxff,inherit);
+  background:var(--bg);color:var(--fg);border:1.5px solid var(--bd);border-radius:7px;padding:3px 9px 4px;text-align:center;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.28);line-height:1.25;user-select:none}
+.cxl::after{content:'';position:absolute;left:50%;bottom:-7px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:var(--bd)}
+.cxl .cxl-n{font-size:var(--cxf);font-weight:800;letter-spacing:-.2px}
+.cxl .cxl-n i{font-style:normal;margin-right:2px}
+.cxl .cxl-s{font-size:calc(var(--cxf) - 2px);font-weight:600;opacity:.82}
+.cxl:hover{z-index:999;filter:brightness(1.06);box-shadow:0 3px 12px rgba(0,0,0,.4)}
+.cxl.th-gold{--bg:#f6c544;--fg:#2a2100;--bd:#c99a12}
+.cxl.th-navy{--bg:#1f3a6e;--fg:#fff;--bd:#14284d}
+.cxl.th-green{--bg:#2e9e6a;--fg:#fff;--bd:#1f7a50}
+.cxl.th-coral{--bg:#ef6f5e;--fg:#fff;--bd:#c9503f}
+.cxl.th-mono{--bg:#ffffff;--fg:#1d1d1f;--bd:#8e8e93}
+.cxl.ds-pill{border-radius:999px;padding:3px 12px}
+.cxl.ds-pill::after,.cxl.ds-line::after,.cxl.ds-text::after{display:none}
+.cxl.ds-fill{border-radius:4px;border-width:0}
+.cxl.ds-line{background:rgba(255,255,255,.92);color:#1d1d1f;border-width:2px}
+.cxl.ds-text{background:transparent;border:0;box-shadow:none;color:#111;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 4px #fff}
+/* 강조: 색 / 테두리 */
+.cxl.em-color.lead{--bg:#e8453c;--fg:#fff;--bd:#b52a22}
+.cxl.em-color.new{--bg:#7c4dff;--fg:#fff;--bd:#5b2fd6}
+.cxl.em-color.mine{box-shadow:0 0 0 3px #3987e5,0 2px 6px rgba(0,0,0,.3)}
+.cxl.em-border.lead{border-width:3px;border-color:#e8453c}
+.cxl.em-border.new{border-width:3px;border-color:#7c4dff}
+.cxl.em-border.mine{outline:2px dashed #3987e5;outline-offset:2px}
+/* 배율 · 겹침 */
+.cxl.mini{padding:0;width:12px;height:12px;border-radius:50%;margin-bottom:4px;transform:none}
+.cxl.mini>*{display:none}
+.cxl.mini::after{display:none}
+.cxl.mini:hover{transform:scale(1.4)}
+#cxmMap[data-zoom="name"] .cxl:not(.mini) .cxl-s{display:none}
+.cxme{width:16px;height:16px;border-radius:50%;background:#3987e5;border:3px solid #fff;box-shadow:0 0 0 6px rgba(57,135,229,.25)}
+/* 창 */
+.cxtip{position:fixed;z-index:1200;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:12px 14px;width:310px;font-size:13px;line-height:1.5}
+.cxtip.wide{width:auto;max-width:min(560px,94vw)}
+.cxtip.pin{border-color:var(--accent)}
+.cxt-h{display:flex;align-items:baseline;gap:6px}
+.cxt-h b{font-size:15px}
+.cxt-h small{color:var(--sub);font-size:11.5px}
+.cxt-h .grow{flex:1}
+.cxt-x{border:0;background:transparent;color:var(--sub);font-size:15px;cursor:pointer;padding:0 2px}
+.cxt-s{color:var(--sub);font-size:12px;margin:2px 0 8px;border-bottom:1px solid var(--line);padding-bottom:7px}
+.cxt-t{display:flex;gap:4px;margin:0 0 8px;flex-wrap:wrap}
+.cxt-t button{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:6px;padding:2px 9px;cursor:pointer;font-size:12.5px}
+.cxt-t button.on{background:var(--c-sale);border-color:var(--c-sale);color:#fff}
+.cxt-a>div{display:flex;align-items:baseline;gap:5px;margin:3px 0;flex-wrap:wrap}
+.cxt-a span{color:var(--sub);width:52px;flex:none;font-size:12px}
+.cxt-a b{font-size:13.5px}
+.cxt-a b.rent{color:var(--rent)}
+.cxt-a small{color:var(--sub);font-size:11px}
+.cxt-a em{font-style:normal;margin-left:auto;font-size:12.5px;font-weight:700}
+.cxt-g{color:var(--sub);font-size:12px}
+.cxt-q{border-top:1px dashed var(--line);padding-top:4px}
+.cxtip .hot{color:#ff6b3d}
+.cxt-tb{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+.cxt-tb th{color:var(--sub);font-weight:600;font-size:11.5px;text-align:right;padding:3px 6px;border-bottom:1px solid var(--line)}
+.cxt-tb td{text-align:right;padding:4px 6px;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+.cxt-tb .l{text-align:left}
+.cxt-tb small{display:block;color:var(--sub);font-size:10.5px}
+.cxt-tb tr.main td:first-child b::after{content:' ●';color:var(--accent);font-size:9px}
+.cxt-tb tr.sel td{background:color-mix(in srgb,var(--c-sale) 12%,transparent)}
+.cxt-r{color:var(--sub);font-size:12px;margin-top:6px}
+.cxt-none{color:var(--sub);margin:6px 0}
+.cxt-b{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.cxt-b button{border:1px solid var(--line);background:transparent;color:var(--text);border-radius:7px;padding:5px 9px;font-size:12.5px;cursor:pointer}
+.cxt-b button:hover{border-color:var(--accent)}
+.cxt-hint{color:var(--sub);font-size:11px;margin-top:8px}
+.cxtip.sheet{left:0!important;right:0;top:auto!important;bottom:0;width:auto;max-width:none;border-radius:16px 16px 0 0;max-height:62vh;overflow:auto;padding:14px 16px 20px;box-shadow:0 -8px 30px rgba(0,0,0,.4)}
+.cxtip.sheet::before{content:'';display:block;width:40px;height:4px;border-radius:2px;background:var(--line);margin:-4px auto 10px}
+/* 캡처 모드 */
+body.cxm-cap>header,body.cxm-cap #tab-cxmap .cxmcond,body.cxm-cap #tab-cxmap section:not(.cxmpanel),body.cxm-cap .cxmlegend,body.cxm-cap #cxmMsg{display:none!important}
+body.cxm-cap #tab-cxmap .cxmpanel{padding:0;margin:0}
+body.cxm-cap .cxmmap{height:100vh;border-radius:0}
+@media (max-width:760px){
+  .cxmmap{height:calc(100vh - 190px);min-height:380px}
+  #tab-cxmap .seg button{padding:5px 8px}
+}
+
+.cxl.hid{opacity:.4;filter:grayscale(1)}
+#cxmMap.muted img{opacity:.5}

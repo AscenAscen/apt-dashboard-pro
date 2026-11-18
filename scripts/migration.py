@@ -25,8 +25,8 @@ OD_TABLES = [("101", "DT_1B26003_A01"), ("101", "DT_1B26003")]            # 전�
 FULL_MONTHS, RECENT_MONTHS, CHUNK = 36, 4, 3                              # 한 번에 3개월씩 (요청당 4만 칸 한도)
 TIMEOUT = 60
 DELAY = 0.4
-# 인천 행정구역 개편: 새 구 → 실거래 자료가 쓰는 예전 구 (인구 수집기와 같은 규칙)
-INCHEON_NEW = {"영종구": "28110", "제물포구": "28110", "서해구": "28260", "검단구": "28260"}
+# 인천 행정구역 개편(2026.7.1): KOSIS 가 새 구를 통계청 번호로 줄 때 실거래 지역 코드로 (config/regions.csv 와 같은 새 코드)
+INCHEON_NEW = {"영종구": "28155", "제물포구": "28125", "서해구": "28275", "검단구": "28290"}
 SIDO_SHORT = {"서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구", "인천광역시": "인천", "광주광역시": "광주", "대전광역시": "대전",
               "울산광역시": "울산", "세종특별자치시": "세종", "경기도": "경기", "강원도": "강원", "강원특별자치도": "강원", "충청북도": "충북",
               "충청남도": "충남", "전라북도": "전북", "전북특별자치도": "전북", "전라남도": "전남", "경상북도": "경북", "경상남도": "경남",
@@ -205,6 +205,9 @@ def main():
             old = json.load(open(OUT, encoding="utf-8"))
         except Exception:
             old = {}
+    if old.get("sgg") and reg and any(c not in reg and c not in (old.get("names") or {}) for c in old["sgg"]):
+        st["notes"].append("지역 코드가 바뀌어(행정구역 개편) 3년 치를 새 코드로 다시 받았습니다.")
+        old = {}                                   # 예전 코드로 쌓인 자료는 버리고 새로 받음
     # 공표는 보통 다음 달 말 → 지난달까지 시도, 없으면 그 전 달
     last = ym_add(now.year * 100 + now.month, -1)
     n = RECENT_MONTHS if old.get("months") else FULL_MONTHS

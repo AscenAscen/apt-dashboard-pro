@@ -19,7 +19,8 @@
 <header class="top">
   <h1>아파트 실거래가 대시보드</h1>
   <nav class="tabs" id="tabs">
-    <button data-tab="home" class="on">최근 거래</button>
+    <button data-tab="cxmap" class="on">단지 지도</button>
+    <button data-tab="home">최근 거래</button>
     <button data-tab="search">실거래 조회</button>
     <button data-tab="compare">단지 비교</button>
     <button data-tab="eval">비교 평가</button>
@@ -53,7 +54,59 @@
 
 <!-- ═══════════════ 1. 실거래 조회 ═══════════════ -->
 <!-- ═══════════════ 0. 최근 거래 (첫 화면) ═══════════════ -->
-<main id="tab-home" class="tab">
+<!-- ═══════════════ 0. 단지 지도 (첫 화면) ═══════════════ -->
+<main id="tab-cxmap" class="tab">
+  <section class="panel hmcond cxmcond">
+    <details id="cxmCond" open>
+      <summary><span id="cxmCondSum">전체 단지</span> <span class="hmchg">조건 바꾸기 ▾</span></summary>
+      <div class="hmrow">
+        <span class="hmk">지역</span>
+        <span id="cxmChips" class="hmchips"></span>
+        <span class="hmaddwrap"><button id="cxmAddReg" class="mini">+ 지역 추가 ▾</button><div id="cxmRegPop" class="hmregpop" hidden></div></span>
+        <button id="cxmLoc" class="mini">📍 내 위치</button>
+        <label class="inline" title="지도를 옮기면 화면 가운데 시군구를 저절로 불러옵니다"><input type="checkbox" id="cxmAuto"> 지도 옮기면 옆 지역도</label>
+      </div>
+      <div class="hmrow">
+        <span class="hmk">평형</span>
+        <span class="seg" id="cxmPy"><button data-v="">전체</button><button data-v="s">소형</button><button data-v="59">59</button><button data-v="74">74</button><button data-v="84">84</button><button data-v="L">대형</button></span>
+      </div>
+      <div class="hmrow">
+        <span class="hmk">세대수</span>
+        <span class="seg" id="cxmHh"><button data-v="0">전체</button><button data-v="300">300↑</button><button data-v="500">500↑</button><button data-v="1000">1,000↑</button><button data-v="2000">2,000↑</button><button data-v="-1">직접</button></span>
+        <span id="cxmHhCustom" hidden><input id="cxmHhMin" type="number" min="0" step="50" placeholder="최소" style="width:80px"> ~ <input id="cxmHhMax" type="number" min="0" step="50" placeholder="최대" style="width:80px"> 세대</span>
+      </div>
+      <div class="hmrow">
+        <span class="hmk">연식</span>
+        <span class="seg" id="cxmAge"><button data-v="0">전체</button><button data-v="5">5년↓</button><button data-v="10">10년↓</button><button data-v="20">20년↓</button><button data-v="-1">직접</button></span>
+        <span id="cxmAgeCustom" hidden><input id="cxmAgeMax" type="number" min="0" max="60" placeholder="연차" style="width:70px"> 년 이내</span>
+      </div>
+      <div class="hmrow">
+        <label class="inline"><input type="checkbox" id="cxmMine"> ⭐ 내 단지만 (시세트래킹)</label>
+        <label class="inline"><input type="checkbox" id="cxmAll"> 거래 적은 단지도 모두 보기</label>
+        <span id="cxmHidWrap" hidden><label class="inline"><input type="checkbox" id="cxmShowHid"> 숨긴 단지 <span id="cxmHidN">0</span>곳 흐리게 보기</label> <button id="cxmClearHid" class="mini">모두 다시 보이기</button></span>
+        <span class="grow"></span>
+        <button id="btnCxmStyle" class="mini">🎨 라벨 꾸미기</button>
+      </div>
+    </details>
+    <div id="cxmStyle" class="cxmstyle" hidden></div>
+  </section>
+  <section class="panel cxmpanel">
+    <div id="cxmMap" class="cxmmap"></div>
+    <p class="hint" id="cxmMsg">지도를 준비하는 중…</p>
+    <p class="hint cxmlegend">👑 동마다 대장 단지(200세대↑, 최근 1년 ㎡당 평균가 1위) · 🆕 5년 이내 신축 · ⭐ 시세트래킹에 담은 단지 · 라벨에 마우스를 올리면(휴대폰은 누르면) 실거래·전고점·전저점</p>
+  </section>
+  <section class="panel">
+    <details id="cxmList">
+      <summary><b>지도에 나온 단지 목록 (<span id="cxmListN">0</span>)</b> <span class="hint" style="margin:0">— 펼치면 표 · 필터 ▾ · 엑셀</span></summary>
+      <div class="bar" style="margin-top:8px"><span class="grow"></span><button id="cxmExcel" class="mini">엑셀</button></div>
+      <div id="cxmCfBar" class="cfbar"></div>
+      <div class="tablewrap"><table id="cxmTable" class="hmtable"></table></div>
+      <p class="hint">줄을 누르면 지도에서 그 단지로 갑니다. 평형을 고르면 그 평형 기준, 아니면 거래가 가장 많은 평형 기준입니다. 전저점 = 전고점 이후 최저가.</p>
+    </details>
+  </section>
+</main>
+
+<main id="tab-home" class="tab" hidden>
   <!-- ① 고르는 줄 (위에 고정) -->
   <section class="panel hmcond" id="hmCondPanel">
     <details id="hmCond" open>
@@ -190,7 +243,7 @@
       <button id="btnAddTrackSel">선택 단지 트래킹에 담기</button>
       <button id="btnExcelList">엑셀 다운로드</button>
     </div>
-    <p class="hint">전고점·전저점은 <b>2020년 1월 이후</b> 실거래 기준입니다. 행을 누르면 아래에 상세 내역이 열립니다. 엑셀은 체크한 단지만(체크가 없으면 목록 전체) 내려받습니다.</p>
+    <p class="hint">전고점은 <b>2020년 1월 이후</b> 가장 비싼 실거래, 전저점은 <b>전고점 이후</b> 가장 싼 실거래(하락장 바닥)입니다. 행을 누르면 아래에 상세 내역이 열립니다. 엑셀은 체크한 단지만(체크가 없으면 목록 전체) 내려받습니다.</p>
     <div class="tablewrap"><table id="listTable"></table></div>
     <p class="hint" id="listNote"></p>
   </section>
@@ -430,7 +483,7 @@
     <details class="help"><summary>도움말</summary>
       <p class="hint"><b>시세 추가</b>를 누르면 그 달의 칸 묶음이 맨 앞에 생기고, 예전 기록은 오른쪽으로 밀려 계속 남습니다.
       파란 제목 칸(<b>매매·전세·개수</b>)에는 직접 확인한 가격을 억 단위로 적습니다. 예: 14억 3천만 원 → <b>14.3</b>.
-      <b>전고점·전저점</b>은 2020년 이후 실거래(직거래 제외)로 자동 기입되며, 칸을 눌러 고칠 수 있고 지우면 자동값으로 돌아갑니다.
+      <b>전고점·전저점</b>은 실거래(직거래 제외)로 자동 기입되며(전고점 = 2020년 이후 최고가, 전저점 = 전고점 이후 최저가), 칸을 눌러 고칠 수 있고 지우면 자동값으로 돌아갑니다.
       하락률·상승률은 가장 최근에 적은 매매가 기준이며, 적지 않았으면 최근 실거래가 기준입니다. <b>호가-실거래</b>는 적은 매매 호가에서 최근 매매 실거래가를 뺀 값입니다.
       <b>단지 정보 펼치기</b>를 누르면 생활권·세대수·구조·방·화·링크 칸이 나옵니다. 단지명에 마우스를 올리면 담긴 폴더가 보입니다.
       기록은 이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 오른쪽 <b>🧰 도구</b>의 백업이나 기기 동기화를 쓰세요.</p>
@@ -1254,7 +1307,7 @@
       <li><b>🚇 역 관리</b>: 직선거리를 잴 역을 추가·숨김·삭제합니다. 단지 비교·비교 평가·입지 분석이 같은 목록을 씁니다.</li>
       </ol>
     <details class="help"><summary>용어 풀이</summary>
-      <p class="hint"><b>전고점·전저점</b>: 2020년 1월 이후 가장 비싸게·싸게 팔린 실거래. <b>잠정</b>: 최근 30일 안에 신고된 거래로, 계약이 해제되면 사라질 수 있습니다. <b>직거래</b>: 중개사 없이 한 거래(가족 간 거래가 많아 계산에서 뺍니다).
+      <p class="hint"><b>전고점</b>: 2020년 1월 이후 가장 비싸게 팔린 실거래. <b>전저점</b>: 전고점 <u>이후</u> 가장 싸게 팔린 실거래(하락장 바닥). 전고점 뒤에 더 싼 거래가 없으면 '🔥 신고가 중'. <b>잠정</b>: 최근 30일 안에 신고된 거래로, 계약이 해제되면 사라질 수 있습니다. <b>직거래</b>: 중개사 없이 한 거래(가족 간 거래가 많아 계산에서 뺍니다).
       <b>세대수</b>: 공동주택관리정보(K-apt)에서 자동으로 가져오며, 비어 있으면 직접 적을 수 있습니다. <b>R-ONE</b>: 한국부동산원 통계. <b>호가</b>: 집주인이 부르는 값(직접 적는 값).</p>
     </details>
   </section>
@@ -1366,7 +1419,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

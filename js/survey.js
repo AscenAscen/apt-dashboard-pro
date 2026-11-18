@@ -309,9 +309,9 @@ const Survey = (() => {
         if (t.direct) return;                                   // 직거래 제외
         const r = get(key, t.g);
         if (!r.sale || t.d >= r.sale.d) r.sale = t;
-        if (!r.peak || t.price >= r.peak.price) r.peak = t;
-        if (!r.trough || t.price < r.trough.price) r.trough = t;
+        (r.ts || (r.ts = [])).push(t);                          // 전고점·전저점은 다 모은 뒤 Data.peakTrough 로
       });
+      for (const r of map.values()) { Object.assign(r, Data.peakTrough(r.ts || [])); delete r.ts; }
       Data.eachTrade(data.rent, null, (key, t) => { const r = get(key, t.g); if (!r.rent || t.d >= r.rent.d) r.rent = t; });
       // 실거래에는 없지만 예전에 호가를 적어 둔 단지도 목록에 넣음
       for (const { id } of Tracking.allRecords()) { if (id.startsWith(code + '|') && !map.has(id)) { const p = parseId(id); get(p.key, p.g); } }

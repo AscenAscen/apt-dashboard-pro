@@ -171,7 +171,7 @@ const Real = (() => {
         const x = b.get(`${code}|${key}#${tr.g}`);
         if (!x || tr.direct) return;
         if (!x.sale || tr.d >= x.sale.d) x.sale = tr;
-        if (tr.d >= CONFIG.PEAK_FROM) { if (!x.peak || tr.price >= x.peak.price) x.peak = tr; if (!x.trough || tr.price < x.trough.price) x.trough = tr; }
+        if (tr.d >= CONFIG.PEAK_FROM) (x.ts || (x.ts = [])).push(tr);          // 전고점·전저점은 다 모은 뒤 Data.peakTrough 로
         if (tr.d > d30) x.n30++;
         if (tr.d > d90) x.n90++;
         const i = pos.get(Math.floor(tr.d / 100));
@@ -183,7 +183,7 @@ const Real = (() => {
         if (!x.rent || tr.d >= x.rent.d) x.rent = tr;
         if (tr.d > d90) x.r90++;
       });
-      for (const [id, x] of b) { x.mon = x.sum.map((s, i) => (x.cnt[i] ? s / x.cnt[i] : null)); delete x.sum; delete x.cnt; cache.set(id, x); }
+      for (const [id, x] of b) { x.mon = x.sum.map((s, i) => (x.cnt[i] ? s / x.cnt[i] : null)); delete x.sum; delete x.cnt; Object.assign(x, Data.peakTrough(x.ts || [])); delete x.ts; cache.set(id, x); }
       loaded.add(code);
     }
   }

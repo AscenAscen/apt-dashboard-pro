@@ -131,6 +131,12 @@ const Health = (() => {
       sum: `${String(kbU.last).slice(0, 4)}-${String(kbU.last).slice(4, 6)}-${String(kbU.last).slice(6, 8)} 주 기준 (${ago(kbU.last)})`, fix: byAge(hoursAgo(kbU.last), 24 * 14, 24 * 30) === 'ok' ? [] : ['KB부동산 데이터허브에서 주간 시계열 엑셀을 받아 저장소 kb 폴더에 올리기'] }
       : { id: 'kb', name: 'KB 주간 시계열', every: '엑셀 올릴 때', wf: wf('kb.yml'), lv: 'warn', sum: '아직 없음' });
 
+    /* 8. 행정구역 개편 → 내 기록 코드 바꾸기 (js/regfix.js) */
+    const rf = Store.get('apt.regfix.v1', null), rl = rf && rf.runs && rf.runs[rf.runs.length - 1];
+    if (rl && rl.pending) add({ id: 'regfix', name: '내 기록 지역 코드 (행정구역 개편)', every: '접속할 때', when: rl.t, lv: 'info',
+      sum: `화성시 등 새 구를 아직 정하지 못한 기록 ${rl.pending}건 — 새 구 실거래 자료가 모이면 다음 접속 때 저절로 바뀝니다`,
+      notes: ['광주·전남·인천·화성의 지역 코드가 2026년에 바뀌어, 저장된 기록(시세트래킹·전수조사 등)의 코드를 접속할 때 새 코드로 바꿉니다.'] });
+
     last = items;
     return items;
   }

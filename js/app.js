@@ -20,6 +20,7 @@ const App = (() => {
     if (name === 'guide') Guide.open();
     if (name === 'grouping') My.pivot();
     if (name === 'supplymap' && typeof SupplyMap !== 'undefined') SupplyMap.open();
+    if (name === 'cxmap' && typeof CxMap !== 'undefined') CxMap.open();
   }
 
   /** 지도 창 열기. 단지 정보(code, key, sido, sgg, dong, jibun, name)가 있으면 됩니다.
@@ -116,6 +117,8 @@ const App = (() => {
   async function init() {
     initTheme();
     await gate();
+    if (typeof RegFix !== 'undefined') { try { await RegFix.run(); } catch (e) { console.error(e); } }   // 행정구역 개편으로 바뀐 코드 → 내 기록에 반영
+    if (!Store.get('apt.troughRule.v2', 0)) { Store.set('apt.troughRule.v2', 1); setTimeout(() => U.toast('전저점 기준이 바뀌었습니다: 2020년 이후 최저가 → 전고점 이후 최저가(하락장 바닥). 모든 탭에 적용됩니다.'), 4500); }
     document.querySelectorAll('#tabs button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
     $('mapClose').onclick = closeMap;
     $('mapModal').onclick = (e) => { if (e.target.id === 'mapModal') closeMap(); };
@@ -130,6 +133,7 @@ const App = (() => {
     Compare.init();
     Infra.init();
     Home.init();
+    if (typeof CxMap !== 'undefined') CxMap.init();
     if (typeof Supply !== 'undefined') Supply.init();
     if (typeof SupplyMap !== 'undefined') SupplyMap.init();
     if (typeof SupplyCmp !== 'undefined') SupplyCmp.init();

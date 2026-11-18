@@ -280,7 +280,7 @@ const Search = (() => {
       card('최근 매매 실거래', st.last ? U.price(st.last.price) : '-', when(st.last)),
       card('전고점 (2020년~)', st.peak ? U.price(st.peak.price) : '-', when(st.peak)),
       card('전고대비 하락률', U.pct(st.drop), st.peak && st.last ? U.diff(st.last.price - st.peak.price) : '', U.cls(st.drop)),
-      card('전저점 (2020년~)', st.trough ? U.price(st.trough.price) : '-', when(st.trough)),
+      card('전저점 (전고점 이후)', st.trough ? U.price(st.trough.price) : st.peak ? '🔥 신고가 중' : '-', st.trough ? when(st.trough) : st.peak ? '전고점 뒤 더 싼 거래 없음' : ''),
       card('전저대비 상승률', U.pct(st.rise), st.trough && st.last ? U.diff(st.last.price - st.trough.price) : '', U.cls(st.rise)),
       card('최근 전세 실거래', st.rentLast ? U.price(st.rentLast.price) : '-', when(st.rentLast)),
       card('전세 전고점 / 전저점', st.rentPeak ? `${U.price(st.rentPeak.price)}` : '-', st.rentTrough ? `전저 ${U.price(st.rentTrough.price)}` : ''),

@@ -406,17 +406,14 @@ const Tracking = (() => {
           const b = bucket.get(`${code}|${key}#${t.g}`);
           if (!b || t.direct) return;                        // 직거래 제외
           if (!b.sale || t.d >= b.sale.d) b.sale = t;
-          if (t.d >= CONFIG.PEAK_FROM) {
-            if (!b.peak || t.price >= b.peak.price) b.peak = t;
-            if (!b.trough || t.price < b.trough.price) b.trough = t;
-          }
+          if (t.d >= CONFIG.PEAK_FROM) (b.ts || (b.ts = [])).push(t);     // 전고점·전저점은 다 모은 뒤 Data.peakTrough 로
         });
         Data.eachTrade(data.rent, k => keys.has(k), (key, t) => {
           const b = bucket.get(`${code}|${key}#${t.g}`);
           if (b && (!b.rent || t.d >= b.rent.d)) b.rent = t;
         });
         for (const it of mine) {
-          const b = bucket.get(it.id); real.set(it.id, b);
+          const b = bucket.get(it.id); Object.assign(b, Data.peakTrough(b.ts || [])); delete b.ts; real.set(it.id, b);
           if (b.sale && !it.lastSale) it.lastSale = b.sale.price;
           if (b.sale && !it.seenSale) it.seenSale = b.sale.d;      // 처음 본 거래는 "새 거래"로 치지 않음
           if (b.rent && !it.seenRent) it.seenRent = b.rent.d;

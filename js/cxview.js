@@ -4,7 +4,8 @@
    · 비슷한 단지: data/cx/{시도}.json (scripts/cx_summary.py 가 자동 수집 때 만듦) 에서 가격·평형·연식·세대수가 가까운 단지 */
 const CxView = (() => {
   const $ = (id) => document.getElementById(id);
-  const ZONE_SD = { 서울: ['11'], 수도권: ['41', '28'], 광역시: ['26', '27', '29', '30', '31', '36'] };
+  // 권역별로 불러올 시도 묶음 파일(data/cx/앞2자리.json). 2026.7 광주·전남 통합으로 둘 다 '12' → 불러온 뒤 시도 이름으로 다시 거름
+  const ZONE_SD = { 서울: ['11'], 수도권: ['41', '28'], 광역시: ['26', '27', '12', '29', '30', '31'] };
   const SIM = 'apt.cxSim.v1';                                  // 비슷한 단지 찾기 조건 (기기에 기억)
   const DEF = { scope: 'sido', price: 1, area: 1, year: 1, hh: 1, ratio: 0, pp: 15, ap: 5, yp: 5, rp: 5, unknownHH: 1 };
   let chart = null, cur = null, sumCache = new Map();
@@ -46,8 +47,7 @@ const CxView = (() => {
     const hh = hhMan || (kp.m[q.key] ? kp.m[q.key][0] : null);
     const S = sale.filter(t => t.g === g).sort((a, b) => a.d - b.d), R = rent.filter(t => t.g === g).sort((a, b) => a.d - b.d);
     const real = S.filter(t => !t.direct), last = real[real.length - 1] || null, lastR = R[R.length - 1] || null;
-    let peak = null; real.forEach(t => { if (!peak || t.price > peak.price) peak = t; });
-    let trough = null; if (peak) real.filter(t => t.d > peak.d).forEach(t => { if (!trough || t.price < trough.price) trough = t; });
+    const { peak, trough } = Data.peakTrough(real);
     const d12 = +new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10).replace(/-/g, '');
     const n12 = S.filter(t => t.d >= d12).length;
     const qs = rec ? rec.quotes || {} : {}, ms = Object.keys(qs).map(Number).sort((a, b) => b - a);
@@ -81,7 +81,7 @@ const CxView = (() => {
         ${stat('최근 전세 실거래', eok(c.lastR?.price), c.lastR ? U.date(c.lastR.d) : '')}
         ${stat('내 최신 호가', c.qS ? eok(c.qs[c.qS].s) : '-', c.qS ? Tracking.ymLabel(c.qS) + (c.qR ? ` · 전세 ${eok(c.qs[c.qR].r)}` : '') : c.rec ? '아직 안 적음' : '시세트래킹에 담으면 적을 수 있어요')}
         ${stat('전고점 (2020년~)', eok(c.peak?.price), c.peak ? U.date(c.peak.d) : '')}
-        ${stat('전고점 대비', `<span class="${U.cls(c.drop)}">${pct(c.drop, 1)}</span>`, c.trough ? `전저점 ${eok(c.trough.price)} (${U.date(c.trough.d)})` : '')}
+        ${stat('전고점 대비', `<span class="${U.cls(c.drop)}">${pct(c.drop, 1)}</span>`, c.trough ? `전저점 ${eok(c.trough.price)} (${U.date(c.trough.d)})` : c.peak ? '🔥 신고가 중 (전고점 뒤 더 싼 거래 없음)' : '')}
         ${stat('전세가율', c.ratio == null ? '-' : c.ratio.toFixed(0) + '%', c.gap == null ? '' : `투자금 ${eok(c.gap)}`)}
         ${stat('1년 매매 거래', `${c.n12}건`, turn == null ? (c.hh ? '' : '세대수를 알면 회전율 계산') : `회전율 ${turn.toFixed(1)}% (세대수 대비)`, spN)}
       </div>
@@ -125,10 +125,13 @@ const CxView = (() => {
   async function sums(scope, c) {
     const regs = await Kit.regions(), all = [...new Set([...regs.keys()].map(k => k.slice(0, 2)))], sd = c.code.slice(0, 2);
     const zone = CONFIG.zoneOf(c.sido);
-    const list = scope === 'sgg' || scope === 'sido' ? [sd] : scope === 'zone' ? (ZONE_SD[zone] || all.filter(s => !Object.values(ZONE_SD).flat().includes(s))) : all;
+    const list = scope === 'sgg' || scope === 'sido' ? [sd] : scope === 'zone' ? (ZONE_SD[zone] || all.filter(s => !['11', '41', '28', '26', '27', '29', '30', '31'].includes(s))) : all;
     const out = [];
     for (const s of list) { if (!sumCache.has(s)) sumCache.set(s, Data.cx(s)); const j = await sumCache.get(s); if (j && j.rows) out.push(...j.rows); }
-    return { rows: scope === 'sgg' ? out.filter(r => r[0] === c.code) : out, ok: list.some(s => sumCache.has(s)), any: out.length > 0 };
+    const sidoOf = (code) => (regs.get(code) || [])[1] || '';
+    const rows = scope === 'sgg' ? out.filter(r => r[0] === c.code) : scope === 'sido' ? out.filter(r => sidoOf(r[0]) === c.sido)
+      : scope === 'zone' ? out.filter(r => CONFIG.zoneOf(sidoOf(r[0])) === zone) : out;
+    return { rows, ok: list.some(s => sumCache.has(s)), any: rows.length > 0 };
   }
   async function similar(c, n) {
     const o = simOpts(), ctl = $('cxSimCtl'), outEl = $('cxSimOut');
