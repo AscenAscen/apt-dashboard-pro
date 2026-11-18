@@ -23,9 +23,15 @@ const CONFIG = {
   zoneOf: (sido) => { const s = sido || ''; return s.startsWith('서울') ? '서울' : /^(경기|인천)/.test(s) ? '수도권' : /^(부산|대구|광주|대전|울산)/.test(s) ? '광역시' : '중소도시'; },
   priceBand: (manwon) => manwon < 10000 ? '1억 미만' : Math.floor(manwon / 10000) + '억대',
 
-  // 단지 링크(자동). 네이버 검색 결과 맨 위에 네이버페이 부동산 단지 카드가 나옵니다.
-  // 다른 주소로 바꾸고 싶으면 이 한 줄만 고치면 됩니다.
-  landLink: (sgg, dong, name) => 'https://search.naver.com/search.naver?query=' + encodeURIComponent(`${sgg} ${dong} ${name}`),
+  // 단지 링크(자동) → 네이버페이 부동산 (fin.land.naver.com)
+  // LAND_SEARCH: 네이버페이 부동산의 "검색 결과 주소". {q} 자리에 단지 이름이 들어갑니다.
+  //   비어 있으면: 네이버페이 부동산 첫 화면이 열리고, 단지 이름이 복사돼 있습니다 → 위쪽 검색칸에 붙여넣기(Ctrl+V) → Enter
+  //   (주소 뒤의 #q=단지이름 은 네이버가 무시하는 부분이라 화면에는 영향이 없고, 이 사이트가 복사할 이름을 읽는 데만 씁니다)
+  LAND_SEARCH: '',
+  landLink: (sgg, dong, name) => {
+    const q = String(name || '').trim();
+    return CONFIG.LAND_SEARCH ? CONFIG.LAND_SEARCH.replace('{q}', encodeURIComponent(q)) + '#q=' + encodeURIComponent(q) : 'https://fin.land.naver.com/#q=' + encodeURIComponent(q);
+  },
 
   // ── 카카오맵 ──────────────────────────────────────────
   // 카카오디벨로퍼스에서 받은 "JavaScript 키"를 따옴표 안에 붙여 넣으세요. (REST API 키·어드민 키는 넣지 마세요)

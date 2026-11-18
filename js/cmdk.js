@@ -84,7 +84,7 @@ const CmdK = (() => {
       if (h.t === 'apt') {
         const x = h.x, al = Alias.of(x.code, x.key);
         return top + `<div class="ckrow" data-i="${i}" role="option"><span class="ckic">🏢</span><span class="ckm"><b>${hl(x.name, q)}</b><small>${hl(`${x.sido} ${x.sgg} ${x.dong}`, q)}${al ? ` · 별칭 <i>${hl(al, q)}</i>` : ''}</small></span>
-          <span class="ckact"><button data-a="cx" title="단지 한 장 요약 (Enter)">요약</button><button data-a="search" title="실거래 조회 탭에서 열기 (Shift+Enter)">실거래</button><button data-a="map" title="지도">지도</button><button data-a="naver" title="네이버에서 찾기">네이버</button></span></div>`;
+          <span class="ckact"><button data-a="cx" title="단지 한 장 요약 (Enter)">요약</button><button data-a="search" title="실거래 조회 탭에서 열기 (Shift+Enter)">실거래</button><button data-a="map" title="지도">지도</button><button data-a="naver" title="네이버페이 부동산에서 찾기 (단지 이름 복사)">네이버</button></span></div>`;
       }
       if (h.t === 'reg') return top + `<div class="ckrow" data-i="${i}" role="option"><span class="ckic">📍</span><span class="ckm"><b>${hl(h.name, q)}</b><small>${U.esc(h.sido)} · 실거래 조회에서 이 지역 보기</small></span></div>`;
       return top + `<div class="ckrow" data-i="${i}" role="option"><span class="ckic">↪</span><span class="ckm"><b>${hl(h.name, q)}</b><small>탭으로 가기</small></span></div>`;
@@ -106,7 +106,7 @@ const CmdK = (() => {
     const x = h.x; remember(x);
     if (how === 'search') { App.showTab('search'); await Search.openComplex(x); window.scrollTo({ top: 0 }); return; }
     if (how === 'map') { App.showMap(x); return; }
-    if (how === 'naver') { window.open(CONFIG.landLink(x.sgg, x.dong, x.name), '_blank', 'noopener'); return; }
+    if (how === 'naver') { LandLink.open(x.sgg, x.dong, x.name); return; }
     CxView.open(`${x.code}|${x.key}#0`);                      // 평형 0 → 요약 창이 거래가 가장 많은 평형을 고름
   }
   function key(e) {

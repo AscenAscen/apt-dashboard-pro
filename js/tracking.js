@@ -598,7 +598,7 @@ const Tracking = (() => {
         <div class="tsub">${U.esc(it.sgg)} ${U.esc(it.dong)}${it.buildYear ? ` · ${it.buildYear}년` : ''}${p0 ? ` · 지난 기록 매매 ${p.s != null ? eok(p.s) + '억' : '-'} / 전세 ${p.r != null ? eok(p.r) + '억' : '-'}` : ''}</div>
         <div class="tgrid"><label>매매(억) ${qin('s', '예: 14.3', true)}</label><label>매물 수 ${qin('sn', '개')}</label><label>전세(억) ${qin('r', '예: 7.5', true)}</label><label>매물 수 ${qin('rn', '개')}</label></div>
         <div class="tcalc" data-calc>${cardCalc(c, g)}</div>
-        <div class="tfoot"><input data-f="memo" class="memo" value="${U.esc(it.memo || '')}" placeholder="메모"><a class="btn mini" href="${U.esc(link(it))}" target="_blank" rel="noopener">네이버에서 보기</a><button class="mini" data-map="${i}">위치</button></div>
+        <div class="tfoot"><input data-f="memo" class="memo" value="${U.esc(it.memo || '')}" placeholder="메모"><a class="btn mini" href="${U.esc(link(it))}" target="_blank" rel="noopener">네이버 부동산</a><button class="mini" data-map="${i}">위치</button></div>
       </div>`;
     }).join('') || '<p class="empty">조건에 맞는 단지가 없습니다.</p>';
     box.onclick = (e) => {
