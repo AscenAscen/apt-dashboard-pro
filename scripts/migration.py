@@ -43,9 +43,11 @@ class KosisError(Exception):
     pass
 
 
-def call(key, org, tbl, start, end, objs):
-    q = {"method": "getList", "apiKey": key, "orgId": org, "tblId": tbl, "itmId": "ALL", "format": "json", "jsonVD": "Y",
-         "prdSe": "M", "startPrdDe": str(start), "endPrdDe": str(end)}
+def call(key, org, tbl, start, end, objs, extra=None):
+    q = {"method": "getList", "apiKey": key, "orgId": org, "tblId": tbl, "itmId": "ALL", "format": "json", "jsonVD": "Y", "prdSe": "M"}
+    if start:
+        q.update({"startPrdDe": str(start), "endPrdDe": str(end)})
+    q.update(extra or {})
     for i, v in enumerate(objs, 1):
         q["objL%d" % i] = v
     url = BASE + "?" + urllib.parse.urlencode(q)
@@ -108,26 +110,78 @@ def kind_of(item_name):
     return None
 
 
-def fetch_table(key, cands, months, objs, st, tag):
-    """후보 통계표를 차례로 시도해 months 기간 줄을 모두 받음"""
+TOTAL_NM = ("계", "합계", "전체", "총계", "소계", "계(전체)")
+
+
+def keep_totals(rows, base, depth):
+    """기본 분류(base개) 밖의 분류(성별·연령 등)가 있으면 '계' 줄만 남김"""
+    for k in range(base + 1, depth + 1):
+        col = "C%d_NM" % k
+        tot = [r for r in rows if re.sub(r"\s", "", str(r.get(col, ""))) in TOTAL_NM]
+        if tot:
+            rows = tot
+    return rows
+
+
+def fetch_table(key, cands, months, base, st, tag):
+    """후보 통계표를 차례로 시도.
+       ① 시험 요청: 최근 1개월(newEstPrdCnt) — 분류 개수가 모자라면(오류 20) objL2, objL3… 를 늘려 다시
+       ② 기간 요청: 3개월씩. 그 기간 자료가 없으면(오류 30) 그 묶음만 건너뜀 (예전엔 표 전체를 포기했음)"""
     errs = []
     for org, tbl in cands:
-        rows, ok = [], True
-        for i in range(0, len(months), CHUNK):
-            ms = months[i:i + CHUNK]
+        depth, probe = base, None
+        for d in range(base, 6):
             try:
-                rows += call(key, org, tbl, ms[0], ms[-1], objs)
+                probe = call(key, org, tbl, None, None, ["ALL"] * d, {"newEstPrdCnt": "1"})
+                depth = d
+                break
             except KosisError as e:
                 if "인증키" in str(e):
                     raise
-                errs.append("%s: %s" % (tbl, e)); ok = False; break
+                if str(e).startswith("20") or "objL" in str(e):
+                    continue                                   # 분류 하나 더
+                errs.append("%s 시험 요청: %s" % (tbl, e)); break
             except Exception as e:  # noqa: BLE001
-                errs.append("%s %s~%s: %s" % (tbl, ms[0], ms[-1], str(e)[:160])); ok = False; break
-        if ok and rows:
-            st["tables"][tag] = {"orgId": org, "tblId": tbl, "name": rows[0].get("TBL_NM", ""),
-                                 "items": sorted({r.get("ITM_NM", "") for r in rows}),
-                                 "sample": rows[:3], "rows": len(rows)}
-            return rows
+                errs.append("%s 시험 요청: %s" % (tbl, str(e)[:160])); break
+        if not probe:
+            if not errs or not errs[-1].startswith(tbl):
+                errs.append("%s: 분류를 5단계까지 늘려도 응답 없음" % tbl)
+            continue
+        latest = max((num(r.get("PRD_DE")) or 0) for r in probe)
+        use = [m for m in months if m <= latest] or [latest]
+        rows, skipped = [], []
+        for i in range(0, len(use), CHUNK):
+            ms = use[i:i + CHUNK]
+            try:
+                rows += call(key, org, tbl, ms[0], ms[-1], ["ALL"] * depth)
+            except KosisError as e:
+                if "인증키" in str(e):
+                    raise
+                if str(e).startswith(("30", "31")) and len(ms) > 1:   # 칸이 너무 많거나 한 달이 비면 → 한 달씩 다시
+                    for m in ms:
+                        try:
+                            rows += call(key, org, tbl, m, m, ["ALL"] * depth)
+                        except KosisError as e2:
+                            if "인증키" in str(e2):
+                                raise
+                            skipped.append("%s: %s" % (m, e2))
+                        except Exception as e2:  # noqa: BLE001
+                            skipped.append("%s: %s" % (m, str(e2)[:120]))
+                    continue
+                skipped.append("%s~%s: %s" % (ms[0], ms[-1], e))
+            except Exception as e:  # noqa: BLE001
+                skipped.append("%s~%s: %s" % (ms[0], ms[-1], str(e)[:120]))
+        if not rows:
+            rows = probe
+            st["notes"].append("%s: 기간 요청이 모두 실패해 최근 1개월만 받음 (%s)" % (tbl, "; ".join(skipped[:2])))
+        elif skipped:
+            st["notes"].append("%s: 건너뛴 기간 %d묶음 (%s)" % (tbl, len(skipped), "; ".join(skipped[:3])))
+        rows = keep_totals(rows, base, depth)
+        st["tables"][tag] = {"orgId": org, "tblId": tbl, "name": rows[0].get("TBL_NM", "") if rows else "",
+                             "objL": depth, "latest": latest, "items": sorted({r.get("ITM_NM", "") for r in rows}),
+                             "dims": {("C%d" % k): sorted({str(r.get("C%d_NM" % k, "")) for r in probe})[:12] for k in range(2, depth + 1)},
+                             "sample": rows[:3], "rows": len(rows)}
+        return rows
     st["errors"] += errs
     return []
 
@@ -157,8 +211,8 @@ def main():
     months = month_list(last, n + 1)          # 한 달 더 앞까지 (아직 공표 안 된 달은 비어서 옴)
     try:
         # ① 시군구별
-        rows = fetch_table(key, SGG_TABLES, months, ["ALL"], st, "sgg")
-        sgg, unmatched = {}, {}
+        rows = fetch_table(key, SGG_TABLES, months, 1, st, "sgg")
+        sgg, unmatched, city, city_sgg = {}, {}, {}, {}
         # KOSIS 지역 번호는 통계청 행정구역분류(경기 31 등)라 실거래 법정동 코드(경기 41)와 다를 수 있음
         #  → 시도 줄(2자리)에서 시도 이름을 알아내고, '시도 이름 + 구 이름' 으로 실거래 지역과 맞춤
         sido_nm = {}
@@ -207,15 +261,32 @@ def main():
                 cand = [x for x in regions if short2(x[1]) == "광주" and ns(x[2]) == nm1]
                 code = cand[0][0] if cand else None
             if not code:
+                sd, nmc = sido_nm.get(c[:2], ""), ns(nm)
+                gus = [x for x in regions if x[2].startswith(nmc + " ") and short2(x[1]) == short2(sd)] if nmc.endswith("시") else []
+                if gus:                                         # KOSIS 는 수원·성남·고양 등을 일반구 없이 '시'로만 줌
+                    cc = gus[0][0][:4] + "0"
+                    while cc in reg:
+                        cc = str(int(cc) + 9)[:5]
+                    city[cc] = (gus, [gus[0][1], nmc])
+                    d = city_sgg.setdefault(cc, {}).setdefault(ym, {"in": 0, "out": 0, "net": 0})
+                    d[k] += v
+                    continue
                 unmatched[c[:5]] = nm
                 continue
             d = sgg.setdefault(code, {}).setdefault(ym, {"in": 0, "out": 0, "net": 0})
             d[k] += v                                  # 새 구 여러 개 → 예전 구 하나로 합침
+        alias, names = dict(old.get("alias") or {}), dict(old.get("names") or {})
+        for cc, (gus, nmv) in city.items():
+            if any(g[0] in sgg for g in gus):                  # 구 자료가 따로 있으면 시 합계는 버림 (중복 방지)
+                continue
+            sgg[cc] = city_sgg[cc]; names[cc] = nmv
+            for g in gus:
+                alias[g[0]] = cc
         got = sorted({ym for d in sgg.values() for ym in d})
         if not got:
             raise RuntimeError("시군구 자료를 하나도 읽지 못했습니다 (통계표·항목 이름 확인 필요)")
         # ② 시도 간
-        od_rows = fetch_table(key, OD_TABLES, months, ["ALL", "ALL"], st, "od")
+        od_rows = fetch_table(key, OD_TABLES, months, 2, st, "od")
         od = {}
         for r in od_rows:
             ym = num(r.get("PRD_DE")); v = num(r.get("DT"))
@@ -245,14 +316,14 @@ def main():
         for ym, flows in od.items():
             od_all[str(ym)] = [[a, b, n] for (a, b), n in sorted(flows.items(), key=lambda x: -x[1])]
         od_all = {k: od_all[k] for k in sorted(od_all)[-36:]}
-        out = {"asOf": st["asOf"], "months": all_m, "sgg": out_sgg, "od": od_all,
+        out = {"asOf": st["asOf"], "months": all_m, "sgg": out_sgg, "od": od_all, "alias": alias, "names": names,
                "source": "통계청 KOSIS 국내인구이동통계 (주민등록 전입신고 기준)"}
         save(OUT, out)
         st.update({"ok": True, "months": [all_m[0], all_m[-1]] if all_m else [], "regions": len(out_sgg),
                    "newMonths": got, "odMonths": len(od_all)})
         if unmatched:
             st["notes"].append("지역을 못 맞춘 KOSIS 코드 %d개: %s" % (len(unmatched), ", ".join("%s %s" % kv for kv in list(unmatched.items())[:30])))
-        missing = [c for c in reg if c not in out_sgg]
+        missing = [c for c in reg if c not in out_sgg and alias.get(c) not in out_sgg]
         if missing:
             st["notes"].append("자료가 없는 실거래 지역 %d개: %s" % (len(missing), ", ".join(missing[:30])))
     except KosisError as e:

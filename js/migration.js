@@ -16,7 +16,11 @@ const Migration = (() => {
   const visible = () => !$('tab-migration').hidden;
 
   /* ── 자료 꺼내기 ── */
-  const codes = () => [...new Set(st.regs.flatMap(t => K.codesOf(t)))].filter(c => mg.sgg[c]);
+  // KOSIS 는 수원·성남·고양·용인·안양·안산·부천을 일반구 없이 '시'로만 줌 → 구 코드를 시 코드로 바꿔서 봄 (mg.alias)
+  const al = (c) => (mg.alias && mg.alias[c]) || c;
+  const codes = () => [...new Set(st.regs.flatMap(t => K.codesOf(t)).map(al))].filter(c => mg.sgg[c]);
+  const regOf = (c) => K.reg(c) || (mg.names && mg.names[c] ? [c, mg.names[c][0], mg.names[c][1]] : null);
+  const gusOf = (c) => (mg.alias ? Object.keys(mg.alias).filter(g => mg.alias[g] === c) : []).concat(c);
   const lastYm = () => st.ym && mg.months.includes(st.ym) ? st.ym : (() => {   // 값이 있는 가장 최근 달
     for (let i = mg.months.length - 1; i >= 0; i--) if (Object.values(mg.sgg).some(s => s.net[i] != null)) return mg.months[i];
     return mg.months[mg.months.length - 1];
@@ -28,8 +32,8 @@ const Migration = (() => {
     for (let i = Math.max(0, j - n + 1); i <= j; i++) if (s[kind][i] != null) { t += s[kind][i]; got++; }
     return got ? t : null;
   }
-  const popOf = (c) => (pop[c] && pop[c].pop) || null;
-  function label(c) { const r = K.reg(c); if (!r) return c; const [si, gu] = U.siGu(r[1], r[2]); return [si, gu].filter(Boolean).join(' '); }
+  const popOf = (c) => { const t = gusOf(c).reduce((s, g) => s + ((pop[g] && pop[g].pop) || 0), 0); return t || null; };
+  function label(c) { const r = regOf(c); if (!r) return c; const [si, gu] = U.siGu(r[1], r[2]); return [si, gu].filter(Boolean).join(' '); }
 
   /* ── 요약 ── */
   function drawSummary(cs, end) {
@@ -60,7 +64,7 @@ const Migration = (() => {
     const vals = list.map(c => sumOf(c, 'net', end, st.per) || 0), mx = Math.max(1, ...vals.map(Math.abs));
     const find = (c) => new Promise(res => {
       if (geo.has(c)) return res(geo.get(c));
-      const r = K.reg(c); if (!r) return res(null);
+      const r = regOf(c); if (!r) return res(null);
       gc.addressSearch(`${r[1]} ${r[2]}`, (rs, s) => { const p = s === S.Status.OK && rs.length ? { lat: +rs[0].y, lng: +rs[0].x } : null; geo.set(c, p); res(p); });
     });
     const pts = [];
@@ -73,7 +77,7 @@ const Migration = (() => {
       const el = document.createElement('div');
       el.className = 'mgdot ' + (v >= 0 ? 'pos' : 'neg') + (st.sel === c ? ' on' : '');
       el.style.width = el.style.height = sz + 'px';
-      el.innerHTML = `<span>${U.esc((K.reg(c) || [, , ''])[2].split(' ').pop())}<br><b>${fmt(v)}</b></span>`;
+      el.innerHTML = `<span>${U.esc((regOf(c) || [, , ''])[2].split(' ').pop())}<br><b>${fmt(v)}</b></span>`;
       el.title = `${label(c)} 순이동 ${fmt(v)}명`;
       el.onclick = () => { st.sel = st.sel === c ? null : c; save(); refresh(true); };
       const ov = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(p.lat, p.lng), content: el, yAnchor: 0.5, xAnchor: 0.5, zIndex: Math.round(Math.abs(v)) });
@@ -100,7 +104,7 @@ const Migration = (() => {
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.dataset.label} ${c.raw == null ? '-' : fmt(c.raw)}${yt}` } } } });
     if (chart1) { chart1.data.labels = labels; chart1.data.datasets = ds; chart1.update('none'); } else chart1 = new Chart($('mgChart1'), { data: { labels, datasets: ds }, options: opt('명') });
     // 입주 물량 (청약홈 · 일반분양 기준) — 같은 달 축
-    const tset = new Set(target);
+    const tset = new Set(target.flatMap(gusOf));
     const hh = ms.map(m => sup.filter(it => it.c && tset.has(it.c) && it.mv === m).reduce((t, it) => t + (it.hh || 0), 0));
     const ds2 = [{ type: 'bar', label: '입주', data: hh, backgroundColor: CK.alpha(CK.C.sub(), 0.55), borderRadius: 3, maxBarThickness: 18 }];
     $('mgChart2Wrap').hidden = !sup.length;
@@ -111,7 +115,7 @@ const Migration = (() => {
   const short2 = (s) => (K.shortSido(s) || s).slice(0, 2);
   function drawOd(cs, end) {
     const box = $('mgOd'), od = mg.od || {};
-    const sidos = [...new Set(cs.map(c => (K.reg(c) || [])[1]).filter(Boolean))];
+    const sidos = [...new Set(cs.map(c => (regOf(c) || [])[1]).filter(Boolean))];
     if (!Object.keys(od).length || !sidos.length) { box.innerHTML = '<p class="hint">시도 간 이동 자료가 없습니다.</p>'; return; }
     const want = $('mgOdSido').value && sidos.includes($('mgOdSido').value) ? $('mgOdSido').value : sidos[0];
     $('mgOdSido').innerHTML = sidos.map(s => `<option value="${U.esc(s)}"${s === want ? ' selected' : ''}>${U.esc(K.shortSido(s))}</option>`).join('');
@@ -144,7 +148,7 @@ const Migration = (() => {
   function buildRows(cs, end) {
     const n = st.per, prevEnd = mg.months[mg.months.indexOf(end) - n];
     rows = cs.map(c => {
-      const r = K.reg(c) || [c, '', ''], [si, gu] = U.siGu(r[1], r[2]);
+      const r = regOf(c) || [c, '', ''], [si, gu] = U.siGu(r[1], r[2]);
       const net = sumOf(c, 'net', end, n), p = popOf(c);
       const j = mg.months.indexOf(end), sp = mg.sgg[c].net.slice(Math.max(0, j - 11), j + 1);
       return { c, si, gu, net, inn: sumOf(c, 'in', end, n), out: sumOf(c, 'out', end, n), prev: prevEnd ? sumOf(c, 'net', prevEnd, n) : null, y12: sumOf(c, 'net', end, 12), pop: p, rate: p && net != null ? net / p * 100 : null, sp };
