@@ -954,3 +954,57 @@ button.colf.on.so{background:#2563eb;color:#fff}
   #tab-migration .mgod{grid-template-columns:1fr}
   #tab-migration .mgmap{height:380px}
 }
+/* ── 단지 찾기 (Ctrl+K) · 수집 상태판 ── */
+.ckbtn, .hbtn { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 6px 11px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.ckbtn kbd { font-size: 10.5px; margin-left: 4px; }
+.ckbtn:hover, .hbtn:hover { border-color: var(--accent); }
+.hbtn.warn { border-color: #c9a227; }
+.hbtn.bad { border-color: #d64545; color: #ff8a8a; }
+kbd { display: inline-block; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 11px; font-family: inherit; color: var(--sub); background: color-mix(in srgb, var(--line) 25%, transparent); line-height: 1.5; }
+.ckmodal { align-items: flex-start; }
+.ckbox { width: min(680px, 94vw); margin-top: 9vh; padding: 0; overflow: hidden; display: flex; flex-direction: column; max-height: 76vh; }
+.ckin { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.ckin input { flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 17px; padding: 4px 0; }
+.ckin input::-webkit-search-cancel-button { display: none; }
+.cklist { overflow-y: auto; padding: 6px; flex: 1; }
+.cksec { font-size: 11.5px; color: var(--sub); padding: 8px 10px 4px; }
+.ckrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.ckrow.on { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.ckic { width: 20px; text-align: center; }
+.ckm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ckm b { font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ckm small { color: var(--sub); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ckm mark { background: transparent; color: var(--accent); font-weight: 700; }
+.ckact { display: flex; gap: 4px; opacity: .45; }
+.ckrow.on .ckact, .ckrow:hover .ckact { opacity: 1; }
+.ckact button { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 6px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+.ckact button:hover { border-color: var(--accent); }
+.ckmsg { color: var(--sub); padding: 18px 12px; margin: 0; font-size: 13.5px; }
+.ckfoot { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--sub); }
+.ckfoot .grow { flex: 1; }
+.hbox { width: min(820px, 95vw); max-height: 86vh; overflow-y: auto; }
+.hhead { display: flex; align-items: center; gap: 8px; }
+.hhead b { font-size: 16px; }
+.hcard { border: 1px solid var(--line); border-left-width: 4px; border-radius: 9px; margin: 7px 0; background: var(--panel); }
+.hcard.ok { border-left-color: #3fa66b; } .hcard.info { border-left-color: #3987e5; } .hcard.warn { border-left-color: #c9a227; } .hcard.bad { border-left-color: #d64545; }
+.hcard summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.hcard summary::-webkit-details-marker { display: none; }
+.hi { font-size: 15px; }
+.hn { display: flex; flex-direction: column; min-width: 190px; }
+.hn small { color: var(--sub); font-size: 11.5px; }
+.hs { flex: 1; font-size: 13px; color: var(--text); }
+.hm { color: var(--sub); }
+.hcard[open] .hm { transform: rotate(180deg); }
+.hsec { padding: 2px 14px 10px 42px; font-size: 13px; }
+.hsec ul { margin: 3px 0 0; padding-left: 18px; line-height: 1.65; word-break: keep-all; overflow-wrap: anywhere; }
+.hsec.sub { color: var(--sub); }
+.hsec a { color: var(--accent); }
+@media (max-width: 760px) {
+  .ckbtn kbd, .ckfoot { display: none; }
+  .ckbox { margin-top: 3vh; max-height: 88vh; }
+  .ckact button[data-a="naver"], .ckact button[data-a="map"] { display: none; }
+  .hn { min-width: 0; }
+  .hcard summary { flex-wrap: wrap; }
+  .hs { flex-basis: 100%; padding-left: 28px; }
+  .hsec { padding-left: 16px; }
+}

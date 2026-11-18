@@ -46,6 +46,8 @@
       <option value="white">흰색</option><option value="cream">아이보리</option><option value="mint">연한 민트</option>
     </select>
   </label>
+  <button id="btnCmdK" class="ckbtn" title="어디서든 단지 찾기 (Ctrl+K 또는 / 키)">🔍 단지 찾기 <kbd>Ctrl K</kbd></button>
+  <button id="btnHealth" class="hbtn" title="자동 수집 상태">수집 상태 확인 중…</button>
   <div class="status" id="status">데이터 상태 확인 중…</div>
 </header>
 
@@ -1364,7 +1366,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

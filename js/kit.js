@@ -198,10 +198,10 @@ const Real = (() => {
    · Finder.areas(code, key) → 그 단지의 평형 목록 [{ g, n }] 과 가장 거래가 많은 평형
    ───────────────────────────────────────────────────────── */
 const Finder = (() => {
-  let list = null, state = '';            // state: '' | 'loading' | 'none' | 'ok'
+  let list = null, state = '', loading = null;   // state: '' | 'loading' | 'none' | 'ok'
   const norm = (t) => String(t || '').replace(/\s+/g, '').toLowerCase();
-  async function load() {
-    if (state) return;
+  function load() { return loading || (loading = load0()); }    // 여러 곳에서 동시에 불러도 한 번만, 모두 끝날 때까지 기다림
+  async function load0() {
     state = 'loading';
     const [names, regs] = await Promise.all([Data.names(), Kit.regions()]);
     if (!names || !names.r) { state = 'none'; return; }

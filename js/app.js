@@ -143,6 +143,8 @@ const App = (() => {
     Saves.register('grouping', { name: '시세그룹핑', keys: ['apt.grouping.v1'], hint: '그룹핑 판(생활권·가격대·배치) 전체를 저장합니다.' });
     const xa = $('btnXlAll'); if (xa) xa.onclick = () => Xl.all();
     showStatus();
+    if (typeof CmdK !== 'undefined') CmdK.init();
+    if (typeof Health !== 'undefined') Health.init();
     const back = sessionStorage.getItem('apt.openTab');       // 저장함에서 불러온 뒤 다시 열린 경우 그 탭으로
     if (back) { sessionStorage.removeItem('apt.openTab'); if (document.querySelector(`#tabs button[data-tab="${back}"]`)) showTab(back); }
     else { const cur = document.querySelector('#tabs button.on')?.dataset.tab; if (cur) TabTools.open(cur); }

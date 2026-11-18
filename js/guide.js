@@ -51,6 +51,7 @@ const Guide = (() => {
     add(!use.big && bytes > 4e6 ? 'warn' : 'ok', '내 기록', `시세트래킹 ${Tracking.all().length}개 · 전수조사 기록 ${recs.filter(x => !x.tracked).length}개 · 기록한 달 ${Tracking.getMonths().length}개 · 저장 공간 ${(bytes / 1048576).toFixed(2)}MB 사용 · ${use.big ? '큰 저장소(IndexedDB) 사용 중 — 용량 걱정 없이 쓸 수 있습니다' : '예전 저장소 사용 중 (한도 약 5MB)'}`);
     add(bd == null || bd > 14 ? 'warn' : 'ok', '마지막 백업', bd == null ? '아직 백업한 적이 없습니다. 시세트래킹 → 관리에서 백업 파일을 받아 두세요.' : `${bd}일 전`);
     add('ok', '지역 목록', `${regs.length}개 시군구`);
+    if (typeof Health !== 'undefined') { try { (await Health.guideRows()).forEach(r => rows.push(r)); } catch (e) { console.error(e); } }
     const icon = { ok: '✅', warn: '⚠️', bad: '❌' };
     $('hcTable').innerHTML = '<thead><tr><th class="c">상태</th><th class="l">항목</th><th class="l">내용</th></tr></thead><tbody>' + rows.map(([ok, n, t]) => `<tr><td class="c">${icon[ok]}</td><td class="l"><b>${n}</b></td><td class="l" style="white-space:normal">${t}</td></tr>`).join('') + '</tbody>';
   }
