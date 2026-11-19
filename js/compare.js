@@ -282,7 +282,7 @@ const Compare = (() => {
   /* ── 기본 비교표 ── */
   function basicTable(res, kind, a, b) {
     $('cmpTable').innerHTML = th(res) + rowsHtml(res, [
-      ['위치', r => `${U.esc(r.sgg)} ${U.esc(r.dong)} <button class="mini" data-map="${r.i}">지도</button>`],
+      ['위치', r => `${U.esc(r.sgg)} ${U.esc(r.dong)} <button class="mini" data-map="${r.i}">지도</button>${typeof View3D !== 'undefined' ? ` <button class="mini" data-v3d="${r.i}">3D</button>` : ''}`],
       ['연식', r => (r.buildYear ? `${r.buildYear}년 (${CONFIG.toAge(r.buildYear)}년차)` : '-')],
       ['평형', r => `전용 ${r.g}㎡ (${CONFIG.toPyeong(r.g)}평)`],
       [`기간 내 ${kind === 'sale' ? '매매' : '전세'} 건수`, r => r.main.length + '건'],
@@ -302,7 +302,8 @@ const Compare = (() => {
       ['최근 전세 실거래', r => (r.st.rentLast ? `${U.price(r.st.rentLast.price)}<small>${U.date(r.st.rentLast.d)}</small>` : '-')],
       ['전세가율 / 매-전', r => (r.st.ratio == null ? '-' : `${r.st.ratio.toFixed(0)}% / ${U.price(r.st.last.price - r.st.rentLast.price)}`)],
     ]);
-    $('cmpTable').onclick = (e) => { const i = e.target.dataset.map; if (i != null) App.showMap(res.find(r => r.i === +i)); };
+    $('cmpTable').onclick = (e) => { const i = e.target.dataset.map; if (i != null) App.showMap(res.find(r => r.i === +i));
+      const j = e.target.dataset.v3d; if (j != null && typeof View3D !== 'undefined') { const r = res.find(x => x.i === +j); if (r) { App.showTab('v3d'); View3D.show(r); } } };
     $('cmpTable').onchange = (e) => {              // 현재 가격을 적으면 저장하고 하락률을 다시 계산
       const id = e.target.dataset.cur; if (!id) return;
       const all = Store.get(CPKEY, {}), v = parseFloat(String(e.target.value).replace(/,/g, ''));

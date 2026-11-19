@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D 지도</title>
+<!--
+  3d.html — [3D] 탭 안에 끼워 넣는 브이월드 3D 지도 화면 (iframe)
+  · 대시보드(index.html)와 완전히 떨어진 별도 화면이라, 여기서 문제가 생겨도 다른 탭은 그대로 동작합니다.
+  · 대시보드가 주소 뒤에 ?k=브이월드키 를 붙여서 엽니다. 이 파일을 직접 열 필요는 없습니다.
+  · 대시보드와는 postMessage(창끼리 쪽지 주고받기)로만 대화합니다.
+      대시보드 → 여기: goto(단지로 이동) · view(시점) · turn(회전) · spin(자동 회전) · build(건물 보이기) · fix(위치 고치기) · capture(화면 저장)
+      여기 → 대시보드: ready · error · picked(누른 위치) · captured(화면 이미지) · spin(회전 상태)
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0c0e; color: #e8eaed; font: 14px/1.5 -apple-system, "Malgun Gothic", sans-serif; overflow: hidden; }
+  #vmap { position: absolute; inset: 0; }
+  #msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; background: #0b0c0e; z-index: 10; }
+  #msg[hidden] { display: none; }
+  #fixTip { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: rgba(255, 149, 0, .95); color: #000; padding: 6px 14px; border-radius: 16px; font-weight: 700; z-index: 5; pointer-events: none; }
+  #fixTip[hidden] { display: none; }
+</style>
+<script>
+  /* 브이월드 3D 라이브러리는 화면을 읽는 도중에 불러와야 해서(document.write) 여기서 바로 넣습니다 */
+  window.V3 = { key: new URLSearchParams(location.search).get('k') || '', top: window.parent !== window };
+  if (V3.key && V3.top && /^[A-Za-z0-9-]{10,60}$/.test(V3.key)) {
+    document.write('<script src="https://map.vworld.kr/js/webglMapInit.js.do?version=3.0&apiKey=' + V3.key + '"><\/script>');
+  }
+</script>
+</head>
+<body>
+<div id="vmap"></div>
+<div id="fixTip" hidden>📍 단지 가운데를 누르세요</div>
+<div id="msg">3D 지도를 준비하는 중…</div>
+
+<script>
+(function () {
+  var msgEl = document.getElementById('msg');
+  var ORIGIN = location.origin;
+  function send(o) { try { parent.postMessage(Object.assign({ from: 'v3d' }, o), ORIGIN); } catch (e) { /* 무시 */ } }
+  function fail(code, text) { msgEl.hidden = false; msgEl.textContent = text; send({ type: 'error', code: code, text: text }); }
+
+  if (!V3.top) { msgEl.textContent = '이 화면은 대시보드의 [3D] 탭 안에서 열립니다.'; return; }
+  if (!V3.key) return fail('nokey', '브이월드 인증키가 없습니다.');
+  (function () {             // 3D(WebGL)를 지원하는 브라우저인지
+    try { var c = document.createElement('canvas'); if (!(c.getContext('webgl') || c.getContext('experimental-webgl'))) throw 0; }
+    catch (e) { fail('webgl', '이 기기(브라우저)는 3D 지도(WebGL)를 지원하지 않습니다. PC 크롬이나 최신 태블릿에서 열어 주세요.'); V3.noGL = true; }
+  })();
+  if (V3.noGL) return;
+  if (typeof vw === 'undefined') return fail('load', '브이월드 3D를 불러오지 못했습니다. 인증키, 키에 등록한 사이트 주소, 인터넷 연결을 확인하세요.');
+
+  /* ── 지도 만들기 (브이월드 공식 샘플과 같은 방식) ── */
+  var map = new vw.Map();
+  map.setOption({
+    mapId: 'vmap',
+    initPosition: new vw.CameraPosition(new vw.CoordZ(126.978, 37.5665, 12000), new vw.Direction(0, -90, 0)),
+    logo: true,             // 브이월드 로고(출처 표시)는 꼭 보이게 둡니다
+    navigation: true
+  });
+  map.start();
+
+  var viewer = null, ready = false, pending = null;
+  var cur = null;                     // { lat, lng, name, h }
+  var cam = { view: 'tilt', heading: 0 };
+  var ents = [];
+  var spinTimer = null, fixMode = false;
+  var VIEWS = {                       // 시점: pitch(내려다보는 각도) · range(단지까지 거리 m)
+    top:  { pitch: -89.5, range: 950 },
+    tilt: { pitch: -32,   range: 780 },
+    eye:  { pitch: -7,    range: 430 }
+  };
+  var C = function () { return window.Cesium; };
+  var rad = function (d) { return d * Math.PI / 180; };
+
+  var readyTimer = setTimeout(function () { if (!ready) fail('timeout', '3D 지도가 20초 안에 뜨지 않았습니다. 인증키와 등록한 사이트 주소(https://아이디.github.io)를 확인하거나 새로고침해 보세요.'); }, 20000);
+
+  vw.ws3dInitCallBack = function () {
+    clearTimeout(readyTimer);
+    viewer = window.ws3d && ws3d.viewer;
+    if (!viewer || !C()) return fail('load', '3D 지도 엔진을 찾지 못했습니다. 새로고침해 보세요.');
+    ready = true; msgEl.hidden = true;
+    var canvas = viewer.scene.canvas;
+    canvas.addEventListener('pointerdown', function () { if (spinTimer) spin(false); });
+    var handler = new (C().ScreenSpaceEventHandler)(canvas);
+    handler.setInputAction(function (ev) { if (fixMode) pick(ev.position); }, C().ScreenSpaceEventType.LEFT_CLICK);
+    send({ type: 'ready' });
+    if (pending) { var p = pending; pending = null; goto(p); }
+  };
+
+  /* ── 땅 높이 구하기: 지형이 다 그려지기 전이면 잠깐 기다렸다가 다시 시도. 끝내 모르면 30m ── */
+  function groundHeight(lat, lng) {
+    var carto = C().Cartographic.fromDegrees(lng, lat);
+    return new Promise(function (res) {
+      var tries = 0;
+      (function again() {
+        var h; try { h = viewer.scene.globe.getHeight(carto); } catch (e) { h = undefined; }
+        if (typeof h === 'number' && isFinite(h)) return res(h);
+        if (++tries > 12) return res(30);
+        setTimeout(again, 250);
+      })();
+    });
+  }
+
+  function clearMarks() { ents.forEach(function (e) { try { viewer.entities.remove(e); } catch (x) { /* 무시 */ } }); ents = []; }
+  function mark() {
+    clearMarks();
+    var Cs = C(), col = Cs.Color.fromCssColorString('#ff9500');
+    var base = Cs.Cartesian3.fromDegrees(cur.lng, cur.lat, cur.h);
+    var top = Cs.Cartesian3.fromDegrees(cur.lng, cur.lat, cur.h + 170);
+    ents.push(viewer.entities.add({            // 땅에 깔리는 주황색 원 (반경 120m)
+      position: base,
+      ellipse: { semiMajorAxis: 120, semiMinorAxis: 120, height: cur.h + 1, material: col.withAlpha(0.18), outline: true, outlineColor: col, outlineWidth: 2 }
+    }));
+    ents.push(viewer.entities.add({            // 단지 위 기둥 (건물에 가려지면 점선으로 비쳐 보임)
+      polyline: { positions: [base, top], width: 4, material: col, depthFailMaterial: new Cs.PolylineDashMaterialProperty({ color: col.withAlpha(0.8) }) }
+    }));
+    ents.push(viewer.entities.add({            // 이름표 + 점 (항상 맨 앞에 보이게)
+      position: top,
+      point: { pixelSize: 12, color: col, outlineColor: Cs.Color.WHITE, outlineWidth: 2, disableDepthTestDistance: Number.POSITIVE_INFINITY },
+      label: { text: cur.name || '', font: 'bold 16px "Malgun Gothic", sans-serif', fillColor: Cs.Color.WHITE, outlineColor: Cs.Color.BLACK, outlineWidth: 4,
+        style: Cs.LabelStyle.FILL_AND_OUTLINE, verticalOrigin: Cs.VerticalOrigin.BOTTOM, pixelOffset: new Cs.Cartesian2(0, -12), disableDepthTestDistance: Number.POSITIVE_INFINITY }
+    }));
+  }
+
+  function center() { return C().Cartesian3.fromDegrees(cur.lng, cur.lat, cur.h + 25); }
+  function fly(duration) {
+    if (!cur) return;
+    var v = VIEWS[cam.view] || VIEWS.tilt, Cs = C();
+    viewer.camera.flyToBoundingSphere(new Cs.BoundingSphere(center(), 1), {
+      offset: new Cs.HeadingPitchRange(rad(cam.heading), rad(v.pitch), v.range),
+      duration: duration == null ? 1.6 : duration
+    });
+  }
+
+  async function goto(o) {
+    if (!ready) { pending = o; return; }
+    spin(false);
+    cur = { lat: +o.lat, lng: +o.lng, name: o.name || '', h: 30 };
+    if (o.view && VIEWS[o.view]) cam.view = o.view;
+    cam.heading = +o.heading || 0;
+    try {   // 먼저 그 위치를 위에서 보게 옮겨 지형을 불러온 뒤, 땅 높이를 재고 원하는 시점으로 이동
+      map.moveTo(new vw.CameraPosition(new vw.CoordZ(cur.lng, cur.lat, 1800), new vw.Direction(0, -90, 0)));
+    } catch (e) { /* 무시 */ }
+    var token = cur;
+    var h = await groundHeight(cur.lat, cur.lng);
+    if (token !== cur) return;          // 그 사이 다른 단지를 고른 경우
+    cur.h = h;
+    mark();
+    fly();
+  }
+
+  /* ── 자동 회전: 단지를 가운데 두고 천천히 한 바퀴 ── */
+  function spin(on) {
+    var Cs = C();
+    if (spinTimer) { clearInterval(spinTimer); spinTimer = null; try { viewer.camera.lookAtTransform(Cs.Matrix4.IDENTITY); } catch (e) { /* 무시 */ } }
+    if (on && cur) {
+      var v = VIEWS[cam.view] || VIEWS.tilt, c = center();
+      spinTimer = setInterval(function () {
+        cam.heading = (cam.heading + 0.35) % 360;
+        viewer.camera.lookAt(c, new Cs.HeadingPitchRange(rad(cam.heading), rad(v.pitch), v.range));
+      }, 30);
+    }
+    send({ type: 'spin', on: !!spinTimer });
+  }
+
+  /* ── 위치 고치기: 지도를 누른 곳의 좌표를 대시보드로 보냄 ── */
+  function pick(pos) {
+    var Cs = C(), cart;
+    try { var ray = viewer.camera.getPickRay(pos); cart = viewer.scene.globe.pick(ray, viewer.scene); } catch (e) { cart = null; }
+    if (!cart) { try { cart = viewer.scene.pickPosition(pos); } catch (e) { cart = null; } }
+    if (!cart) return;
+    var g = Cs.Cartographic.fromCartesian(cart);
+    setFix(false);
+    send({ type: 'picked', lat: Cs.Math.toDegrees(g.latitude), lng: Cs.Math.toDegrees(g.longitude) });
+  }
+  function setFix(on) { fixMode = !!on; document.getElementById('fixTip').hidden = !fixMode; if (fixMode) spin(false); }
+
+  /* ── 지금 화면을 그림으로 ── */
+  function capture() {
+    try {
+      viewer.render();
+      send({ type: 'captured', dataUrl: viewer.scene.canvas.toDataURL('image/png') });
+    } catch (e) { send({ type: 'captured', error: '이 브라우저에서는 3D 화면을 그림으로 저장할 수 없습니다. 윈도우 캡처(Win+Shift+S)를 써 주세요.' }); }
+  }
+
+  function buildings(show) {
+    try { var l = map.getLayerElement('facility_build'); if (l) { if (show) l.show(); else l.hide(); } } catch (e) { /* 무시 */ }
+  }
+
+  /* ── 대시보드에서 온 쪽지 처리 ── */
+  window.addEventListener('message', function (e) {
+    if (e.origin !== ORIGIN || !e.data || e.data.to !== 'v3d') return;
+    var d = e.data;
+    try {
+      if (d.type === 'goto') return goto(d);
+      if (!ready) return;
+      if (d.type === 'view' && VIEWS[d.view]) { spin(false); cam.view = d.view; return fly(); }
+      if (d.type === 'turn') { spin(false); cam.heading = ((cam.heading + (+d.deg || 0)) % 360 + 360) % 360; return fly(1.0); }
+      if (d.type === 'north') { spin(false); cam.heading = 0; return fly(1.0); }
+      if (d.type === 'spin') return spin(d.on);
+      if (d.type === 'build') return buildings(d.on);
+      if (d.type === 'fix') return setFix(d.on);
+      if (d.type === 'capture') return capture();
+    } catch (err) { console.error(err); send({ type: 'error', code: 'run', text: '3D 지도 동작 중 문제가 생겼습니다: ' + (err && err.message || err) }); }
+  });
+})();
+</script>
+</body>
+</html>

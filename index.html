@@ -25,6 +25,7 @@
     <button data-tab="compare">단지 비교</button>
     <button data-tab="eval">비교 평가</button>
     <button data-tab="infra">입지 분석</button>
+    <button data-tab="v3d">3D</button>
     <button data-tab="survey">전수조사</button>
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
     <button data-tab="map">시세지도</button>
@@ -771,6 +772,41 @@
   </div>
 </main>
 
+<!-- ═══════════════ 3D (브이월드 3D 지도 + 카카오 로드뷰) — js/view3d.js, 3d.html ═══════════════ -->
+<main id="tab-v3d" class="tab" hidden>
+  <section class="panel filters findbar">
+    <label class="findlab">🔎 전국 단지 검색 <input type="search" id="v3Find" placeholder="단지 이름이나 별칭" autocomplete="off"></label>
+    <span class="hint" style="margin:0">고르면 그 단지로 3D 지도가 이동합니다. 단지 지도·단지 비교의 [3D] 버튼으로도 열 수 있습니다.</span>
+  </section>
+  <div class="chips v3-recent" id="v3Recent"></div>
+  <section class="panel" id="v3Body">
+    <div class="bar">
+      <strong id="v3Title">단지를 검색해 고르세요</strong><span class="grow"></span>
+      <div class="presets" id="v3Views"><button data-v="top">위에서</button><button data-v="tilt">비스듬히</button><button data-v="eye">눈높이</button></div>
+      <button id="v3Left" title="왼쪽으로 45° 돌기">⟲</button><button id="v3Right" title="오른쪽으로 45° 돌기">⟳</button><button id="v3North" title="북쪽이 위로 오게">N</button>
+      <button id="v3Spin">🔄 자동 회전</button>
+      <button id="v3Build" title="건물을 숨기면 언덕·경사가 잘 보입니다">🏢 건물 숨기기</button>
+    </div>
+    <div class="bar">
+      <button id="v3Shot" class="primary">📷 화면 저장</button>
+      <button id="v3Fix" title="단지 위치가 틀렸을 때 3D 지도에서 직접 찍어 고칩니다">📍 위치 고치기</button>
+      <button id="v3Unfix" hidden title="직접 고친 위치를 지우고 원래 위치로">원래 위치로</button>
+      <button id="v3Naver">네이버 부동산</button>
+      <button id="v3Vworld" title="일조·조망 분석은 브이월드 사이트에서 할 수 있습니다">브이월드에서 열기</button>
+      <span class="grow"></span>
+      <span class="hint" style="margin:0">로드뷰</span>
+      <div class="presets" id="v3Split"><button data-s="0">숨기기</button><button data-s="7">좁게</button><button data-s="5">반반</button></div>
+      <button id="v3Reload" class="mini" title="3D 지도가 멈췄을 때 다시 불러오기">↻ 3D 다시 불러오기</button>
+    </div>
+    <p class="hint v3-note" id="v3Note"></p>
+    <div class="v3-split" id="v3Split2" data-split="7">
+      <div class="v3-map" id="v3Map"><div class="v3-cover" id="v3Cover" hidden></div></div>
+      <div class="kmap v3-road" id="v3Road"><p class="empty" id="v3RoadMsg">단지를 고르면 로드뷰가 나옵니다.</p></div>
+    </div>
+    <p class="hint">마우스: 왼쪽 끌기 = 이동 · 오른쪽 끌기(또는 휠) = 확대·축소 · Ctrl+왼쪽 끌기(또는 휠 누르고 끌기) = 기울이기·돌리기. 3D 건물 높이와 신축 여부는 실제와 다를 수 있으니 <b>참고용</b>으로만 보세요. 지방·외곽은 건물이 흰 상자로 보입니다.</p>
+  </section>
+</main>
+
 <!-- ═══════════════ 4. 지역 동향 ═══════════════ -->
 <main id="tab-trends" class="tab" hidden>
   <section class="panel filters">
@@ -1420,7 +1456,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/view3d.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;

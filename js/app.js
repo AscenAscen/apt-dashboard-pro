@@ -21,6 +21,7 @@ const App = (() => {
     if (name === 'grouping') My.pivot();
     if (name === 'supplymap' && typeof SupplyMap !== 'undefined') SupplyMap.open();
     if (name === 'cxmap' && typeof CxMap !== 'undefined') CxMap.open();
+    if (typeof View3D !== 'undefined') { if (name === 'v3d') View3D.open(); else View3D.leave(); }     // 3D 탭 (js/view3d.js)
   }
 
   /** 지도 창 열기. 단지 정보(code, key, sido, sgg, dong, jibun, name)가 있으면 됩니다.

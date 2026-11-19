@@ -1147,3 +1147,28 @@ body.cxm-cap .cxmmap{height:100vh;border-radius:0}
 .cxmloc:hover{background:#f3f6fb}
 body.cxm-cap .cxmloc{display:none}
 @media (max-width:760px){.cxmloc{bottom:22px;padding:9px 12px}.cxmloc b{display:none}.cxmloc span{font-size:20px}}
+
+/* ═════════ 3D 탭 (js/view3d.js, 3d.html) — 이름이 모두 v3- 로 시작해 다른 탭과 섞이지 않습니다 ═════════ */
+.v3-recent { margin: -4px 0 12px; align-items: center; }
+.v3-recent:empty { display: none; }
+.v3-recent button small { color: var(--sub); }
+.v3-note { min-height: 18px; }
+.v3-note.warn { color: var(--rent); }
+.v3-split { display: grid; grid-template-columns: 7fr 3fr; gap: 10px; }
+.v3-split[data-split="5"] { grid-template-columns: 1fr 1fr; }
+.v3-split[data-split="0"] { grid-template-columns: 1fr; }
+.v3-split[data-split="0"] .v3-road { display: none; }
+.v3-map { position: relative; height: min(72vh, 700px); min-height: 360px; border-radius: 8px; overflow: hidden; background: #0b0c0e; border: 1px solid var(--line); }
+.v3-road { height: min(72vh, 700px); min-height: 360px; }
+.v3-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.v3-cover { position: absolute; inset: 0; z-index: 2; background: var(--panel); overflow: auto; padding: 24px; }
+.v3-key { max-width: 640px; margin: 0 auto; }
+.v3-key b { font-size: 16px; }
+.v3-key ol { padding-left: 20px; line-height: 1.9; }
+.v3-key code { background: var(--panel2); padding: 1px 6px; border-radius: 4px; }
+#v3Spin.on, #v3Fix.on, #v3Build.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+@media (max-width: 900px) {
+  .v3-split, .v3-split[data-split="5"] { grid-template-columns: 1fr; }
+  .v3-map { height: 58vh; }
+  .v3-road { height: 320px; min-height: 0; }
+}

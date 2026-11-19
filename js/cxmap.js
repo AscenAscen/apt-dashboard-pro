@@ -250,7 +250,7 @@ const CxMap = (() => {
     if (!cx.pcs.length) body = '<p class="cxt-none">2020년 이후 거래가 없습니다.</p>';
     else if (ls.tip === 'B') body = tableB(cx);
     else body = viewA(cx, tip.pc);
-    const btns = `<div class="cxt-b"><button data-a="cx">단지 요약</button><button data-a="search">실거래</button><button data-a="trk">${tracked.has(cx.id) ? '⭐ 담김' : '☆ 시세트래킹'}</button><button data-a="naver">네이버 부동산</button><button data-a="hide" title="이 단지를 지도에서 숨김 (조건 줄에서 다시 보기)">${st.hide.includes(cx.id) ? '다시 보이기' : '숨기기'}</button></div>`;
+    const btns = `<div class="cxt-b"><button data-a="cx">단지 요약</button><button data-a="search">실거래</button><button data-a="trk">${tracked.has(cx.id) ? '⭐ 담김' : '☆ 시세트래킹'}</button><button data-a="naver">네이버 부동산</button>${typeof View3D !== 'undefined' ? '<button data-a="v3d" title="이 단지를 3D 탭에서 보기">3D</button>' : ''}<button data-a="hide" title="이 단지를 지도에서 숨김 (조건 줄에서 다시 보기)">${st.hide.includes(cx.id) ? '다시 보이기' : '숨기기'}</button></div>`;
     t.innerHTML = head + body + (tipPin || sheet ? btns : '<div class="cxt-hint">누르면 고정 · ' + (ls.tip === 'A' ? '← → 평형 바꾸기' : 'A/B 모양은 🎨 에서') + '</div>');
     t.className = 'cxtip' + (sheet ? ' sheet' : '') + (tipPin ? ' pin' : '') + (ls.tip === 'B' ? ' wide' : '');
     t.hidden = false;
@@ -301,6 +301,7 @@ const CxMap = (() => {
     if (a === 'next') return stepPc(1);
     if (a === 'cx') { hideTip(); return CxView.open(`${cx.id}#${g}`); }
     if (a === 'naver') return LandLink.open(cx.sgg, cx.dong, cx.name);
+    if (a === 'v3d' && typeof View3D !== 'undefined') { hideTip(); App.showTab('v3d'); return View3D.show({ code: cx.code, key: cx.key, sido: cx.sido, sgg: cx.sgg, dong: cx.dong, jibun: cx.jibun, name: cx.name }); }
     if (a === 'hide') { st.hide = st.hide.includes(cx.id) ? st.hide.filter(x => x !== cx.id) : [...st.hide, cx.id]; save(); hideTip(); syncCtl(); return redraw(); }
     if (a === 'search') { hideTip(); App.showTab('search'); return Search.openComplex({ code: cx.code, key: cx.key, sido: cx.sido, sgg: cx.sgg, dong: cx.dong, jibun: cx.jibun, name: cx.name }); }
     if (a === 'trk') {
