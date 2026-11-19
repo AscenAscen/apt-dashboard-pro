@@ -76,6 +76,18 @@
     </div>
 
     <div class="card">
+      <h2>6. 지도 위 표시</h2>
+      <div class="row" style="flex-direction:column;align-items:flex-start;gap:4px">
+        <label><input type="checkbox" id="ovHybrid"> ① 지명·도로명</label>
+        <label><input type="checkbox" id="ovCad"> ④ 지적도 (필지 경계선, 크게 확대해야 보여요)</label>
+        <label><input type="checkbox" id="ovZone"> ④ 용도지역 (도시지역, 반투명)</label>
+        <label><input type="checkbox" id="ovLabel"> ② 샘플 단지 라벨 (지도 가운데)</label>
+      </div>
+      <div class="row" style="margin-top:8px"><button id="t6">시험 6 실행 (저장 가능 여부 확인)</button></div>
+      <div class="res" id="r6">체크하면 지도에 바로 겹쳐 보여요. 체크한 것은 5번 고화질 저장 사진에도 같이 들어가요.</div>
+    </div>
+
+    <div class="card">
       <h2>5. 고화질 저장</h2>
       <div class="row">
         <label>범위
@@ -303,6 +315,101 @@
     record('4_최대크기', max + 'px (안 됨: ' + (bad.join(', ') || '없음') + ')');
   };
 
+  // 6. 지도 위 표시
+  var HALF = 20037508.342789244;
+  var OV = {
+    hybrid: { name: '지명·도로명', type: 'wmts', layer: 'Hybrid', ext: 'png' },
+    zone:   { name: '용도지역', type: 'wms', layer: 'lt_c_uq111', alpha: 0.5 },
+    cad:    { name: '지적도', type: 'wms', layer: 'lp_pa_cbnd_bubun' }
+  };
+  var ORDER = ['zone', 'cad', 'hybrid'];
+  function tileBox3857(z, x, y) {
+    var span = 2 * HALF / Math.pow(2, z);
+    var minx = -HALF + x * span, maxy = HALF - y * span;
+    return [minx, maxy - span, minx + span, maxy];
+  }
+  function ovUrl(o, key, z, y, x) {
+    if (o.type === 'wmts') {
+      return 'https://api.vworld.kr/req/wmts/1.0.0/' + encodeURIComponent(key) + '/' + o.layer + '/' + z + '/' + y + '/' + x + '.' + o.ext;
+    }
+    return 'https://api.vworld.kr/req/wms?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0' +
+      '&LAYERS=' + o.layer + '&STYLES=' + o.layer + '&CRS=EPSG:3857&BBOX=' + tileBox3857(z, x, y).join(',') +
+      '&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true' +
+      '&KEY=' + encodeURIComponent(key) + '&DOMAIN=' + encodeURIComponent(location.origin);
+  }
+  var ovLayers = {};
+  function makeOvLayer(id) {
+    var o = OV[id], key = getKey();
+    var Lyr = L.TileLayer.extend({
+      getTileUrl: function (c) { return ovUrl(o, key, c.z, c.y, c.x); }
+    });
+    return new Lyr('', { maxNativeZoom: 19, maxZoom: 21, opacity: o.alpha || 1, zIndex: 10 + ORDER.indexOf(id) });
+  }
+  var cb = { hybrid: 'ovHybrid', cad: 'ovCad', zone: 'ovZone' };
+  function activeOv() { return ORDER.filter(function (id) { return $(cb[id]).checked; }); }
+  Object.keys(cb).forEach(function (id) {
+    $(cb[id]).onchange = function () {
+      if (ovLayers[id]) { map.removeLayer(ovLayers[id]); ovLayers[id] = null; }
+      if (this.checked) {
+        if (needKey()) { this.checked = false; return; }
+        ovLayers[id] = makeOvLayer(id).addTo(map);
+      }
+    };
+  });
+
+  var LABEL = { title: '샘플단지', sub: '2005년 · 1,200세대' };
+  var labelMarker = null, labelPos = null;
+  $('ovLabel').onchange = function () {
+    if (labelMarker) { map.removeLayer(labelMarker); labelMarker = null; labelPos = null; }
+    if (this.checked) {
+      labelPos = map.getCenter();
+      labelMarker = L.marker(labelPos, { icon: L.divIcon({
+        className: '', iconSize: null,
+        html: '<div style="transform:translate(-50%,-100%);background:#2d6cdf;color:#fff;padding:4px 8px;border-radius:6px;font-size:12px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.6)"><b>' +
+              LABEL.title + '</b><br>' + LABEL.sub + '</div>'
+      }) }).addTo(map);
+    }
+  };
+  function drawLabel(ctx, x, y, scale) {
+    var f1 = Math.round(14 * scale), f2 = Math.round(12 * scale), pad = Math.round(8 * scale);
+    ctx.font = 'bold ' + f1 + 'px sans-serif';
+    var w1 = ctx.measureText(LABEL.title).width;
+    ctx.font = f2 + 'px sans-serif';
+    var w2 = ctx.measureText(LABEL.sub).width;
+    var w = Math.max(w1, w2) + pad * 2, h = f1 + f2 + pad * 2.5;
+    var bx = x - w / 2, by = y - h - 6 * scale;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(bx + 2 * scale, by + 2 * scale, w, h);
+    ctx.fillStyle = '#2d6cdf'; ctx.fillRect(bx, by, w, h);
+    ctx.beginPath(); ctx.moveTo(x - 6 * scale, by + h); ctx.lineTo(x + 6 * scale, by + h); ctx.lineTo(x, y); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold ' + f1 + 'px sans-serif'; ctx.fillText(LABEL.title, bx + pad, by + pad + f1 * 0.85);
+    ctx.font = f2 + 'px sans-serif'; ctx.fillText(LABEL.sub, bx + pad, by + pad * 1.5 + f1 + f2 * 0.85);
+  }
+
+  $('t6').onclick = function () {
+    if (needKey()) return;
+    set('r6', '확인 중...');
+    var key = getKey();
+    var c = map.getCenter();
+    var z = Math.max(16, Math.min(map.getZoom(), 19));
+    var t = lonLatToTile(c.lng, c.lat, z);
+    Promise.all(ORDER.map(function (id) {
+      var o = OV[id];
+      return loadImg(ovUrl(o, key, z, t.y, t.x), true).then(function (img) {
+        var cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
+        var ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
+        cv.toDataURL('image/png');
+        return '✅ ' + o.name + ': 저장에 넣을 수 있어요';
+      }).catch(function (e) {
+        return '❌ ' + o.name + ': 안 돼요 (' + e.message + ')';
+      });
+    })).then(function (r) {
+      r.push('✅ 단지 라벨: 직접 그리는 방식이라 항상 저장돼요');
+      set('r6', r.join('\n') + '\n\n(레벨 ' + z + ', 지도 가운데 기준으로 확인했어요)');
+      record('6_표시', r.join(' / '));
+    });
+  };
+
   // 5. 고화질 저장
   function lonLatToPx(lon, lat, z) {
     var size = 256 * Math.pow(2, z);
@@ -393,16 +500,28 @@
 
     var queue = [];
     for (var ty = p.ty0; ty <= p.ty1; ty++) for (var tx = p.tx0; tx <= p.tx1; tx++) queue.push({ x: tx, y: ty });
-    var done = 0, failed = 0, t0 = Date.now();
+    var done = 0, failed = 0, ovFailed = 0, t0 = Date.now();
+    var ovs = activeOv();
     function progress() {
       set('hqRes', '받는 중... ' + done + ' / ' + p.count + (failed ? ' (실패 ' + failed + ')' : ''));
+    }
+    function loadOv(id, t) {
+      return loadImg(ovUrl(OV[id], key, p.z, t.y, t.x), true).catch(function () { ovFailed++; return null; });
     }
     function worker() {
       if (stopFlag || !queue.length) return Promise.resolve();
       var t = queue.shift();
-      return loadTileRetry(key, p.z, t.y, t.x, 2).then(function (img) {
-        ctx.drawImage(img, t.x * 256 - p.x0, t.y * 256 - p.y0);
-      }).catch(function () { failed++; }).then(function () {
+      var dx = t.x * 256 - p.x0, dy = t.y * 256 - p.y0;
+      var base = loadTileRetry(key, p.z, t.y, t.x, 2).catch(function () { failed++; return null; });
+      return Promise.all([base].concat(ovs.map(function (id) { return loadOv(id, t); }))).then(function (imgs) {
+        if (imgs[0]) ctx.drawImage(imgs[0], dx, dy);
+        ovs.forEach(function (id, i) {
+          var im = imgs[i + 1]; if (!im) return;
+          ctx.globalAlpha = OV[id].alpha || 1;
+          ctx.drawImage(im, dx, dy);
+          ctx.globalAlpha = 1;
+        });
+      }).then(function () {
         done++; progress();
         return new Promise(function (r) { setTimeout(r, 30); });
       }).then(worker);
@@ -412,6 +531,11 @@
 
     Promise.all(workers).then(function () {
       if (stopFlag) { set('hqRes', '<span class="warn">멈췄어요.</span>'); return; }
+      if (labelPos) {
+        var lp = lonLatToPx(labelPos.lng, labelPos.lat, p.z);
+        var lx = lp.x - p.x0, ly = lp.y - p.y0;
+        if (lx >= 0 && ly >= 0 && lx <= p.w && ly <= p.h) drawLabel(ctx, lx, ly, Math.max(1, p.w / 900));
+      }
       var fs = Math.max(14, Math.round(p.w / 90));
       ctx.font = fs + 'px sans-serif';
       var label = '출처: 브이월드';
@@ -431,8 +555,11 @@
           var secs = Math.round((Date.now() - t0) / 1000);
           var mb = (b.size / 1048576).toFixed(1);
           set('hqRes', '<span class="ok">✅ 저장했어요: ' + name + '</span>\n' + p.w + '×' + p.h + '픽셀, ' + mb + 'MB, ' + secs + '초' +
-            (failed ? '\n<span class="warn">빠진 조각 ' + failed + '개는 회색으로 남았어요.</span>' : ''));
-          record('5_고화질', '성공 L' + p.z + ' ' + p.w + 'x' + p.h + ' ' + mb + 'MB ' + secs + '초 실패조각 ' + failed);
+            (ovs.length || labelPos ? '\n포함된 표시: ' + ovs.map(function (id) { return OV[id].name; }).concat(labelPos ? ['단지 라벨'] : []).join(', ') : '') +
+            (failed ? '\n<span class="warn">빠진 조각 ' + failed + '개는 회색으로 남았어요.</span>' : '') +
+            (ovFailed ? '\n<span class="warn">표시 조각 ' + ovFailed + '개를 못 받았어요.</span>' : ''));
+          record('5_고화질', '성공 L' + p.z + ' ' + p.w + 'x' + p.h + ' ' + mb + 'MB ' + secs + '초 실패조각 ' + failed +
+            ' 표시[' + ovs.join(',') + (labelPos ? ',label' : '') + '] 표시실패 ' + ovFailed);
           resolve();
         }, 'image/jpeg', 0.92);
       });
