@@ -1234,3 +1234,19 @@ button.yd-x:hover { color: var(--danger, #e5484d); opacity: 1; }
 .yd-saved { font-size: 12px; color: var(--sub); white-space: nowrap; }
 .yd-saved.bad { color: var(--up); font-weight: 700; }
 .yd-remind { margin: 6px 0 0; color: var(--rent); }
+/* 앞마당: 평형 고르기 · 직접 추가 */
+.yd-gspick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.yd-quick { display: inline-flex; gap: 4px; align-items: center; color: var(--sub); font-size: 12px; }
+.yd-gsl { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+label.yd-gs { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; font-size: 13px; background: var(--panel); }
+label.yd-gs:has(input:checked) { border-color: var(--accent); background: rgba(79, 156, 255, .15); font-weight: 700; }
+label.yd-gs.old { opacity: .7; }
+label.yd-gs small { color: var(--sub); margin-left: 2px; font-weight: 400; }
+.yd-found .yd-inmk { color: var(--accent); }
+.yd-rgrp { gap: 8px; padding: 6px 0; }
+.yd-remind { font-size: 12px; color: var(--rent); white-space: nowrap; cursor: help; }
+.tag.yd-manual { font-size: 10px; padding: 0 5px; border-radius: 6px; background: var(--panel2); border: 1px solid var(--rent); color: var(--rent); margin-left: 4px; }
+.tag.yd-mg { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 8px; border: 1px solid var(--line); border-radius: 999px; }
+.tag.yd-mg button { border: 0; background: none; color: var(--sub); cursor: pointer; padding: 0 4px; }
+.fdrop .yd-man { display: block; width: 100%; text-align: left; color: var(--accent); font-weight: 700; }
+.filters .yd-rgrp label { flex-direction: row; align-items: center; color: var(--text); font-size: 14px; gap: 3px; }
