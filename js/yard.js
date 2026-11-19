@@ -15,7 +15,6 @@ const Yard = (() => {
   const $ = (id) => document.getElementById(id);
   const KEY = 'apt.yard.v1', SKEY = 'apt.yardSurveys.v1', PKEY = 'apt.yardPicks.v1', OKEY = 'apt.yardOpts.v1', UKEY = 'apt.yardUi.v1';
   const DEF_GROUPS = [{ k: '59', min: 55, max: 65 }, { k: '74', min: 66, max: 79 }, { k: '84', min: 80, max: 89 }];
-  const AGE = { all: '전체', a5: '5년 이내', a10: '10년 이내', a1020: '10~20년', a20: '20년 이상', a30: '30년 이상' };
   const THIS_Y = new Date().getFullYear();
   const esc = (s) => U.esc(s);
 
@@ -28,8 +27,7 @@ const Yard = (() => {
     const o = Store.get(OKEY, {});
     opts = { groups: Array.isArray(o.groups) && o.groups.length ? o.groups : DEF_GROUPS.map(g => ({ ...g })), step: +o.step > 0 ? +o.step : 1 };
     const u = Store.get(UKEY, {});
-    ui = Object.assign({ sub: 'pick', grp: '84', base: '', ym: thisYm(), step: null, sort: 's', esid: '', egrp: '', esgg: '', onlyEmpty: false, ca: '', cb: '', csort: 'up', rgrp: '84', rfrom: '', rto: '' }, u);
-    ui.f = Object.assign({ sido: '', sgg: '', dong: '', hh: 0, age: 'all', trk: 'all' }, u.f || {});
+    ui = Object.assign({ sub: 'pick', grp: '84', ym: thisYm(), step: null, sort: 's', onlyPick: false, esid: '', egrp: '', esgg: '', onlyEmpty: false, ca: '', cb: '', csort: 'up', rgrp: '84', rfrom: '', rto: '' }, u);
     if (!opts.groups.some(g => g.k === ui.grp)) ui.grp = opts.groups[opts.groups.length - 1].k;
     if (!opts.groups.some(g => g.k === ui.rgrp)) ui.rgrp = ui.grp;
   }
@@ -67,7 +65,7 @@ const Yard = (() => {
     const out = [];
     for (const cid of Object.keys(cx)) {
       const c = cx[cid];
-      for (const g of c.gs || []) { const gr = groupOf(g); if (gr) out.push({ id: `${cid}#${g}`, cid, code: c.code, key: c.key, sido: c.sido, sgg: c.sgg, dong: c.dong, jibun: c.jibun, name: c.name, g, grp: gr.k }); }
+      for (const g of c.gs || []) { if (c.hide && c.hide.includes(g)) continue; const gr = groupOf(g); if (gr) out.push({ id: `${cid}#${g}`, cid, code: c.code, key: c.key, sido: c.sido, sgg: c.sgg, dong: c.dong, jibun: c.jibun, name: c.name, g, grp: gr.k }); }
     }
     return out;
   }
@@ -84,16 +82,6 @@ const Yard = (() => {
   }
   /** 그 값보다 앞에 적은 매매 호가 (지난 대비 계산용) */
   function prevOf(rowId, v) { return v ? valueAt(rowId, v.sid, true) : null; }
-  const latestSid = () => surveysDesc()[0]?.id || '';
-  const baseSid = () => (ui.base && sv[ui.base] ? ui.base : latestSid());
-
-  const tracked = (id) => typeof Tracking !== 'undefined' && Tracking.has(id);
-  function ageOk(by) {
-    if (ui.f.age === 'all') return true;
-    if (!by) return false;
-    const a = THIS_Y - by;
-    return { a5: a <= 5, a10: a <= 10, a1020: a >= 10 && a <= 20, a20: a >= 20, a30: a >= 30 }[ui.f.age];
-  }
 
   /* ═════════ 화면 틀 ═════════ */
   function frame() {
@@ -122,13 +110,12 @@ const Yard = (() => {
   }
 
   function status() {
-    const n = Object.keys(cx).length, last = surveysDesc()[0];
-    const rows = allRows().filter(r => r.grp === ui.grp), bands = new Set(), sid = baseSid();
-    rows.forEach(r => { const v = valueAt(r.id, sid); if (v?.s != null) bands.add(bandLo(v.s)); });
+    const n = Object.keys(cx).length, last = surveysDesc()[0], all = allRows();
+    const rows = all.filter(r => r.grp === ui.grp), bands = new Set();
+    rows.forEach(r => { const v = valueAt(r.id, ''); if (v?.s != null) bands.add(bandLo(v.s)); });
     const pk = picks[ui.ym]?.[ui.grp] || {}, done = [...bands].filter(lo => pk[lo]).length;
-    $('ydStatus').textContent = `단지 ${n}개 · 최근 조사 ${last ? last.date : '없음'} · ${ymLabel(ui.ym)} ${grpName(ui.grp)}㎡ 1등 ${bands.size}칸 중 ${done}칸 지정`;
+    $('ydStatus').textContent = `단지 ${n}개 · 픽 ${all.filter(r => picked(r.id)).length}개 · 최근 입력 ${last ? last.date : '없음'} · ${ymLabel(ui.ym)} ${grpName(ui.grp)}㎡ 1등 ${bands.size}칸 중 ${done}칸`;
   }
-
   function show() {
     document.querySelectorAll('#ydSubs button').forEach(b => b.classList.toggle('on', b.dataset.s === ui.sub));
     const empty = !Object.keys(cx).length;
@@ -140,11 +127,14 @@ const Yard = (() => {
     status();
   }
 
-  /* ═════════ 단지 추가 ═════════ */
+  /* ═════════ 단지 추가·빼기 ═════════ */
   async function addOne(x) {
     if (locked()) return;
-    const cid = cidOf(x);
-    if (cx[cid]) return U.toast(`${x.name} 은(는) 이미 앞마당에 있습니다.`);
+    const cid = cidOf(x), old = cx[cid];
+    if (old) {
+      if (old.hide?.length) { delete old.hide; saveCx(); show(); return U.toast(`${x.name} 의 빼 두었던 평형을 다시 보이게 했습니다.`); }
+      return U.toast(`${x.name} 은(는) 이미 앞마당에 있습니다.`);
+    }
     U.toast(`${x.name} 평형을 확인하는 중…`);
     let gs = [];
     try { const a = await Finder.areas(x.code, x.key); gs = a.list.map(v => v.g); } catch (e) { console.error(e); }
@@ -152,7 +142,9 @@ const Yard = (() => {
     cx[cid] = { code: x.code, key: x.key, sido: x.sido, sgg: x.sgg, dong: x.dong, jibun: x.jibun, name: x.name, gs, t: Date.now(), memo: '' };
     saveCx();
     const inGrp = gs.filter(g => groupOf(g));
-    U.toast(`${x.name} 을(를) 앞마당에 추가했습니다. (평형 ${gs.join('·')}㎡${inGrp.length ? '' : ' — 지금 평형 그룹에 맞는 평형이 없어 표에는 안 보입니다. ⚙ 설정에서 그룹을 늘려 보세요'})`);
+    const back = surveysAsc().some(s => Object.keys(s.q || {}).some(id => id.startsWith(cid + '#')));
+    U.toast(`${x.name} 을(를) 앞마당에 추가했습니다.${back ? ' 예전에 적은 호가 기록도 그대로 살아났습니다.' : ''}${inGrp.length ? '' : ' (지금 평형 그룹에 맞는 평형이 없어 표에는 안 보입니다 — ⚙ 설정에서 그룹을 늘려 보세요)'}`);
+    if (!inGrp.some(g => groupOf(g).k === ui.grp) && inGrp.length) { ui.grp = groupOf(inGrp[inGrp.length - 1]).k; saveUi(); }
     show();
   }
 
@@ -200,185 +192,261 @@ const Yard = (() => {
     } finally { btn.disabled = false; btn.textContent = '📍 지역 단지 한꺼번에 추가'; }
   }
 
-  function removeCx(cids) {
+  /** 단지 통째로 빼기 (조사 기록·1등 기록은 남음 → 다시 추가하면 살아남) */
+  function removeCx(cids, ask = true) {
     if (locked() || !cids.length) return;
     const names = cids.map(c => cx[c]?.name).filter(Boolean);
-    if (!Vault.sure(`앞마당에서 ${names.length}개 단지를 뺍니다: ${names.slice(0, 5).join(', ')}${names.length > 5 ? ' …' : ''}\n(조사 기록·1등 기록과 시세트래킹은 그대로 남습니다)`, names.length >= 3)) return;
+    if (ask && !Vault.sure(`앞마당에서 ${names.length}개 단지를 뺍니다: ${names.slice(0, 5).join(', ')}${names.length > 5 ? ' …' : ''}\n(적어 둔 호가 기록은 남아서, 다시 추가하면 그대로 살아납니다)`, names.length >= 5)) return;
     cids.forEach(c => delete cx[c]);
     checked.forEach(id => { if (cids.includes(id.split('#')[0])) checked.delete(id); });
     saveCx(); show();
+    U.toast(`${names.length}개 단지를 앞마당에서 뺐습니다.`);
+  }
+  /** [✕ 빼기] — 이 평형만 / 단지 통째로 */
+  function askRemove(id) {
+    if (locked()) return;
+    const p = Kit.parseId(id), cid = `${p.code}|${p.key}`, c = cx[cid]; if (!c) return;
+    const shownGs = (c.gs || []).filter(g => !(c.hide || []).includes(g) && groupOf(g));
+    const box = modal(`<div class="bar"><strong>${esc(c.name)} 빼기</strong><span class="grow"></span><button data-close>✕</button></div>
+      <label class="row" style="gap:8px"><input type="radio" name="ydRm" value="g" checked> ${p.g}㎡ 평형만 빼기</label>
+      <label class="row" style="gap:8px"><input type="radio" name="ydRm" value="all"> 단지 통째로 빼기 <small class="hint" style="margin:0">(모든 평형 ${(c.gs || []).join('·')}㎡)</small></label>
+      <p class="hint" style="margin:0">적어 둔 호가 기록은 남습니다. 다시 추가하면 그대로 살아납니다.</p>
+      <div class="bar"><span class="grow"></span><button data-close>취소</button><button class="primary danger-fill" id="ydRmOk">빼기</button></div>`);
+    box.querySelector('#ydRmOk').onclick = () => {
+      const all = box.querySelector('input[name="ydRm"]:checked').value === 'all' || shownGs.length <= 1;
+      closeModal();
+      if (all) return removeCx([cid], false);
+      c.hide = [...new Set([...(c.hide || []), p.g])]; checked.delete(id); saveCx(); show();
+      U.toast(`${c.name} ${p.g}㎡ 를 뺐습니다. 단지를 다시 검색해 고르면 다시 보입니다.`);
+    };
   }
 
-  /* ═════════ 시세트래킹으로 보내기 ═════════ */
+  /* ═════════ 픽 (후보 표시) — 평형별, 1등과 별개 ═════════ */
+  const picked = (id) => { const p = id.split('#'); return !!cx[p[0]]?.pick?.[p[1]]; };
+  function setPick(ids, on) {
+    if (locked()) return false;
+    ids.forEach(id => { const [cid, g] = id.split('#'), c = cx[cid]; if (!c) return; c.pick = c.pick || {}; if (on) c.pick[g] = 1; else delete c.pick[g]; if (!Object.keys(c.pick).length) delete c.pick; });
+    saveCx(); return true;
+  }
+
+  /* ═════════ 시세트래킹으로 보내기 (버튼을 누를 때만) ═════════ */
+  const sent = (id) => { const p = id.split('#'); return cx[p[0]]?.sent?.[p[1]] || null; };
   async function toTracking(ids) {
-    ids = [...new Set(ids)].filter(id => !tracked(id));
-    if (!ids.length) return U.toast('이미 모두 시세트래킹에 담겨 있습니다.');
+    ids = [...new Set(ids)];
+    if (!ids.length) return;
     const rows = ids.map(id => { const p = Kit.parseId(id), c = cx[`${p.code}|${p.key}`] || {}; return { ...p, sido: c.sido, sgg: c.sgg, dong: c.dong ?? p.dong, jibun: c.jibun ?? p.jibun, name: c.name ?? p.name }; });
     await Real.load(rows);
     Tracking.add(rows.map(r => { const rl = Real.get(r.id) || {}; return { ...r, buildYear: rl.buildYear, st: { last: rl.sale } }; }));
-    show();
+    const d = today();
+    ids.forEach(id => { const [cid, g] = id.split('#'), c = cx[cid]; if (c) { c.sent = c.sent || {}; c.sent[g] = d; } });   // 앞마당에만 남기는 "보냄" 표시
+    saveCx(); show();
+  }
+
+  /* ═════════ 호가 입력 → 오늘 조사 회차에 자동 기록 ═════════ */
+  function todaySid(create) {
+    const d = today(), s = surveysDesc().find(x => x.date === d);
+    if (s || !create) return s?.id || '';
+    const id = 's' + Date.now().toString(36);
+    sv[id] = { date: d, memo: '', auto: true, t: Date.now(), q: {} };
+    saveSv();
+    return id;
   }
 
   /* ═════════ ① 1등 뽑기 ═════════ */
-  function filtered(rows) {
-    const f = ui.f;
-    return rows.filter(r => (!f.sido || r.sido === f.sido) && (!f.sgg || r.sgg === f.sgg) && (!f.dong || r.dong === f.dong) &&
-      (f.trk === 'all' || (f.trk === 'y' ? tracked(r.id) : !tracked(r.id))) &&
-      (!f.hh || (Real.get(r.id)?.hh || 0) >= f.hh) && ageOk(Real.get(r.id)?.buildYear));
-  }
-  function regionOpts(list, key, cur, label) {
-    const vals = [...new Set(list.map(x => x[key]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
-    return `<option value="">${label}</option>` + vals.map(v => `<option ${v === cur ? 'selected' : ''}>${esc(v)}</option>`).join('');
-  }
+  const NEW_DAYS = 7;
+  let F = null;
+  const T = (label, f) => ColFilter.txtCol(label, f), N = (label, f, k) => ColFilter.numCol(label, f, k);
+  const PCOLS = () => ({
+    pick: T('픽', r => (picked(r.id) ? '✔ 픽' : '미픽')), first: T('1등', r => (r.isFirst ? '🥇 1등' : '')),
+    name: T('단지명', r => r.name), sgg: T('시군구', r => r.sgg), dong: T('동', r => r.dong),
+    area: { label: '평형', get: r => `${r.g}㎡ (${CONFIG.toPyeong(r.g)}평)`, num: r => r.g },
+    s: N('매매 호가', r => r.s), r: N('전세 호가', r => r.rr), gap: N('투자금', r => r.gap), chg: N('지난 대비', r => r.chg, 'diff'),
+    by: N('연식', r => r.by || null, 'n'), hh: N('세대수', r => r.hh || null, 'n'), sale: N('최근 실거래', r => r.rl.sale?.price ?? null),
+    drop: N('전고 대비', r => r.drop, 'pct'), rise: N('전저 대비', r => r.rise, 'pct'), memo: T('메모', r => cx[r.cid]?.memo || ''),
+    sent: T('트래킹', r => (sent(r.id) ? '트래킹에 보냄' : '')),
+  });
+  const PF = () => F || (F = ColFilter.create({ key: 'yard', cols: PCOLS, bar: 'ydCfBar', sortSel: 'ydSort', onChange: () => renderPick() }));
 
   async function renderPick() {
-    const my = ++seq, el = $('ydPick'), sid = baseSid(), st = stepMan();
-    const all = allRows();
-    const inGrp = all.filter(r => r.grp === ui.grp);
-    el.innerHTML = '<p class="hint">불러오는 중…</p>';
+    const my = ++seq, el = $('ydPick'), st = stepMan();
+    const inGrp = allRows().filter(r => r.grp === ui.grp);
+    if (!el.innerHTML) el.innerHTML = '<p class="hint">불러오는 중…</p>';
     await Real.load(inGrp);
     if (my !== seq) return;
-    const rows = filtered(inGrp).map(r => {
-      const v = valueAt(r.id, sid), p = prevOf(r.id, v), rl = Real.get(r.id) || {};
+    const now = Date.now(), pk = (picks[ui.ym] || {})[ui.grp] || {};
+    let rows = inGrp.map(r => {
+      const v = valueAt(r.id, ''), p = prevOf(r.id, v), rl = Real.get(r.id) || {};
       const s = v?.s ?? null, rr = v?.r ?? null;
       const peak = rl.peak?.price ?? null, trough = rl.trough?.price ?? null, base = s ?? rl.sale?.price ?? null;
+      const lo = s != null ? bandLo(s, st) : null;
       return { ...r, v, p, rl, s, rr, gap: s != null && rr != null ? s - rr : null, chg: s != null && p?.s != null ? s - p.s : null,
-        lo: s != null ? bandLo(s, st) : null, plo: p?.s != null ? bandLo(p.s, st) : null,
+        lo, plo: p?.s != null ? bandLo(p.s, st) : null, isFirst: lo != null && pk[lo]?.id === r.id, fresh: !v && now - (cx[r.cid]?.t || 0) < NEW_DAYS * 864e5,
         drop: base && peak ? (base / peak - 1) * 100 : null, rise: base && trough ? (base / trough - 1) * 100 : null, by: rl.buildYear, hh: rl.hh };
     });
-    const sorter = { s: (a, b) => a.s - b.s, by: (a, b) => (b.by || 0) - (a.by || 0), hh: (a, b) => (b.hh || 0) - (a.hh || 0), gap: (a, b) => (a.gap ?? 1e12) - (b.gap ?? 1e12), chg: (a, b) => (b.chg ?? -1e12) - (a.chg ?? -1e12), name: (a, b) => a.name.localeCompare(b.name, 'ko') }[ui.sort] || ((a, b) => a.s - b.s);
-    const bands = new Map(); const none = [];
-    rows.forEach(r => { if (r.lo == null) none.push(r); else { if (!bands.has(r.lo)) bands.set(r.lo, []); bands.get(r.lo).push(r); } });
+    const total = rows.length;
+    if (ui.onlyPick) rows = rows.filter(r => picked(r.id));
+    const sorter = { s: (a, b) => (a.s ?? 1e12) - (b.s ?? 1e12) || a.name.localeCompare(b.name, 'ko'), by: (a, b) => (b.by || 0) - (a.by || 0), hh: (a, b) => (b.hh || 0) - (a.hh || 0), gap: (a, b) => (a.gap ?? 1e12) - (b.gap ?? 1e12), chg: (a, b) => (b.chg ?? -1e12) - (a.chg ?? -1e12), name: (a, b) => a.name.localeCompare(b.name, 'ko'), pick: (a, b) => picked(b.id) - picked(a.id) || (a.s ?? 1e12) - (b.s ?? 1e12) }[ui.sort] || null;
+    const preF = rows, sortFn = (list) => (sorter ? [...list].sort(sorter) : list);
+    rows = PF().apply(rows, sortFn);          // 엑셀식 열 필터 + 정렬 (정렬은 가격대 칸 안에서만 의미가 있음)
+    const bands = new Map(), none = [], fresh = [];
+    rows.forEach(r => { if (r.lo != null) { if (!bands.has(r.lo)) bands.set(r.lo, []); bands.get(r.lo).push(r); } else (r.fresh ? fresh : none).push(r); });
     const los = [...bands.keys()].sort((a, b) => a - b);
-    const pk = (picks[ui.ym] || {})[ui.grp] || {};
-    const sList = surveysDesc();
     const stepNow = ui.step || opts.step;
 
     const head = `<div class="filters yd-ctl">
         <div><span class="hint" style="margin:0">평형</span><div class="presets" id="ydGrp">${opts.groups.map(g => `<button data-g="${esc(g.k)}" class="${g.k === ui.grp ? 'on' : ''}" title="전용 ${g.min}~${g.max}㎡">${esc(g.k)}</button>`).join('')}</div></div>
         <div><span class="hint" style="margin:0">가격대 폭</span><div class="presets" id="ydStep">${[0.5, 1, 2].map(v => `<button data-v="${v}" class="${v === stepNow ? 'on' : ''}">${v}억</button>`).join('')}<input id="ydStepIn" class="num" inputmode="decimal" style="width:56px" placeholder="직접" value="${[0.5, 1, 2].includes(stepNow) ? '' : stepNow}"></div></div>
-        <label>기준 조사 <select id="ydBase">${sList.length ? sList.map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.date)}${s.memo ? ' · ' + esc(s.memo) : ''}</option>`).join('') : '<option value="">조사 기록 없음</option>'}</select></label>
         <label>1등 저장 달 <input type="month" id="ydYm" value="${ymShort(ui.ym)}"></label>
-      </div>
-      <div class="filters yd-ctl">
-        <label>시/도 <select id="ydFSido">${regionOpts(inGrp, 'sido', ui.f.sido, '전체')}</select></label>
-        <label>시/군/구 <select id="ydFSgg">${regionOpts(inGrp.filter(r => !ui.f.sido || r.sido === ui.f.sido), 'sgg', ui.f.sgg, '전체')}</select></label>
-        <label>동 <select id="ydFDong">${regionOpts(inGrp.filter(r => (!ui.f.sido || r.sido === ui.f.sido) && (!ui.f.sgg || r.sgg === ui.f.sgg)), 'dong', ui.f.dong, '전체')}</select></label>
-        <label>세대수 <select id="ydFHh">${[[0, '전체'], [200, '200 이상'], [300, '300 이상'], [500, '500 이상'], [1000, '1000 이상']].map(([v, t]) => `<option value="${v}" ${+ui.f.hh === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-        <label>연식 <select id="ydFAge">${Object.entries(AGE).map(([k, t]) => `<option value="${k}" ${ui.f.age === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
-        <label>트래킹 <select id="ydFTrk"><option value="all">전체</option><option value="y" ${ui.f.trk === 'y' ? 'selected' : ''}>트래킹 중</option><option value="n" ${ui.f.trk === 'n' ? 'selected' : ''}>미포함</option></select></label>
-        <label>칸 안 정렬 <select id="ydSort">${[['s', '호가 낮은 순'], ['by', '신축순'], ['hh', '세대수 많은 순'], ['gap', '투자금 적은 순'], ['chg', '지난 대비 오른 순'], ['name', '단지명순']].map(([k, t]) => `<option value="${k}" ${ui.sort === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label class="row" style="flex-direction:row;align-items:center;padding-bottom:7px;gap:6px"><input type="checkbox" id="ydOnlyPick" ${ui.onlyPick ? 'checked' : ''}> 픽한 단지만 보기</label>
+        <label>칸 안 정렬 <select id="ydSort">${[['s', '호가 낮은 순'], ['pick', '픽 먼저'], ['by', '신축순'], ['hh', '세대수 많은 순'], ['gap', '투자금 적은 순'], ['chg', '지난 대비 오른 순'], ['name', '단지명순']].map(([k, t]) => `<option value="${k}" ${ui.sort === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <span class="grow"></span>
         <button id="ydPickAllTrk" title="이 달에 지정한 1등(모든 평형)을 시세트래킹에 담기">🥇 ${ymLabel(ui.ym)} 1등 전체 트래킹 담기</button>
         <button id="ydPickXl">📥 엑셀</button>
       </div>
-      ${sList.length ? '' : '<p class="hint warn-hint">아직 조사 기록이 없어서 모든 단지가 "미입력"에 있습니다. <b>② 조사 기록</b>에서 [+ 새 조사]를 만들고 매매 호가를 적으면 가격대로 나뉩니다.</p>'}`;
+      <div class="cfbar" id="ydCfBar"></div>`;
 
-    const COLS = 16;
+    const H = (k, label, cls = '') => `<th class="${cls}">${label}${PF().btn(k)}</th>`;
+    const COLS = 18;
     const rowHtml = (r) => {
-      const isPick = r.lo != null && pk[r.lo]?.id === r.id, c = cx[r.cid] || {};
-      const moved = r.plo != null && r.lo != null && r.plo !== r.lo ? `<span class="tag yd-move" title="지난 조사(${esc(r.p.date)})에는 ${bandLabel(r.plo, r.plo + st)}">${bandLabel(r.plo, r.plo + st)}→${bandLabel(r.lo, r.lo + st)} ${r.lo > r.plo ? '⤴' : '⤵'}</span>` : '';
-      const carried = r.v && r.v.sid !== sid ? `<small title="기준 조사에는 안 적어서 ${esc(r.v.date)} 값을 씀">${esc(dShort(r.v.date))}</small>` : '';
-      return `<tr data-id="${esc(r.id)}" class="${isPick ? 'yd-picked' : ''}"><td class="c"><input type="checkbox" data-chk ${checked.has(r.id) ? 'checked' : ''}></td>` +
-        `<td class="c">${r.lo == null ? '' : `<button class="yd-medal ${isPick ? 'on' : ''}" data-pick title="${isPick ? '1등 지정 풀기' : '이 가격대 1등으로 지정'}">${isPick ? '🥇' : '○'}</button>`}</td>` +
-        `<td class="l"><a href="#" data-hist>${esc(r.name)}</a> <small>${esc(r.sgg)} ${esc(r.dong)}</small>${moved}</td>` +
+      const isPk = picked(r.id), c = cx[r.cid] || {}, sd = sent(r.id);
+      const moved = r.plo != null && r.lo != null && r.plo !== r.lo ? `<span class="tag yd-move" title="지난 입력(${esc(r.p.date)})에는 ${bandLabel(r.plo, r.plo + st)}">${bandLabel(r.plo, r.plo + st)}→${bandLabel(r.lo, r.lo + st)} ${r.lo > r.plo ? '⤴' : '⤵'}</span>` : '';
+      const old = r.v && r.v.date !== today() ? `<small class="yd-when" title="${esc(r.v.date)}에 적은 값">${esc(dShort(r.v.date))}</small>` : '';
+      return `<tr data-id="${esc(r.id)}" class="${isPk ? 'yd-pk' : 'yd-grey'}${r.isFirst ? ' yd-picked' : ''}"><td class="c"><input type="checkbox" data-chk ${checked.has(r.id) ? 'checked' : ''}></td>` +
+        `<td class="c"><button class="yd-tick ${isPk ? 'on' : ''}" data-pk title="${isPk ? '픽 끄기' : '후보로 픽'}">${isPk ? '✔' : '○'}</button></td>` +
+        `<td class="c">${r.lo == null ? '' : `<button class="yd-medal ${r.isFirst ? 'on' : ''}" data-first title="${r.isFirst ? '1등 지정 풀기' : '이 가격대 1등으로 지정'}">${r.isFirst ? '🥇' : '○'}</button>`}</td>` +
+        `<td class="l yd-nm">${isPk ? '<b class="yd-ck">✔</b>' : ''}<a href="#" data-hist>${esc(r.name)}</a> <small>${esc(r.sgg)} ${esc(r.dong)}</small>${moved}</td>` +
         `<td>${r.g}㎡<small>${CONFIG.toPyeong(r.g)}평</small></td>` +
-        `<td class="sale"><b>${eok(r.s)}</b>${carried}</td><td>${eok(r.rr)}</td><td>${eok(r.gap)}</td>` +
+        `<td class="yd-in"><input class="num" inputmode="decimal" data-f="s" value="${eokIn(r.s)}" placeholder="억">${old}</td><td class="yd-in"><input class="num" inputmode="decimal" data-f="r" value="${eokIn(r.rr)}" placeholder="억"></td>` +
+        `<td data-gap>${eok(r.gap)}</td>` +
         `<td class="${U.cls(r.chg)}">${r.chg == null ? '-' : (r.chg > 0 ? '▲' : r.chg < 0 ? '▼' : '') + (r.chg ? eok(Math.abs(r.chg)) : '0')}</td>` +
         `<td>${r.by || '-'}${r.by ? `<small>${CONFIG.toAge(r.by)}년차</small>` : ''}</td><td>${r.hh ? r.hh.toLocaleString() : '-'}</td>` +
         `<td>${r.rl.sale ? `${eok(r.rl.sale.price)}<small>${U.date(r.rl.sale.d)}</small>` : '-'}</td>` +
         `<td class="${U.cls(r.drop)}">${U.pct(r.drop, 0)}</td><td class="${U.cls(r.rise)}">${U.pct(r.rise, 0)}</td>` +
-        `<td class="c">${tracked(r.id) ? '<span class="yd-trk" title="시세트래킹에 담긴 평형">★ 트래킹 중</span>' : '<button class="mini" data-trk>담기</button>'}</td>` +
         `<td class="l"><input class="wide yd-memo" data-memo value="${esc(c.memo || '')}" placeholder="메모"></td>` +
-        `<td class="c"><button class="mini" data-menu title="더 보기">⋯</button></td></tr>`;
+        `<td class="c">${sd ? `<span class="yd-sent" title="${esc(sd)}에 시세트래킹으로 보냄">트래킹에 보냄</span>` : '<button class="mini" data-trk>담기</button>'}</td>` +
+        `<td class="c"><button class="mini danger" data-rm title="앞마당에서 빼기">✕ 빼기</button></td>` +
+        `<td class="c"><button class="mini" data-menu title="가격 이력·네이버·3D·위성지도">⋯</button></td></tr>`;
     };
-    const bandHtml = (lo, list) => {
-      list.sort(sorter);
-      const hi = lo + st, p = pk[lo], pn = p ? (cx[p.id.split('#')[0]]?.name || p.name || '') : '';
-      const isClosed = closed.has(`${ui.grp}|${lo}`);
-      return `<tbody data-lo="${lo}" class="${isClosed ? 'yd-closed' : ''}"><tr class="yd-band"><td colspan="${COLS}"><span class="yd-tw">${isClosed ? '▶' : '▼'}</span> <b>${bandLabel(lo, hi)}</b> <small>(${bandRange(lo, hi)})</small> · ${list.length}개` +
-        `<span class="yd-pickname">${p ? `🥇 1등: <b>${esc(pn)}</b> ${p.id.split('#')[1]}㎡` : '<span class="hint" style="margin:0">🥇 1등: 아직 안 고름</span>'}</span></td></tr>` + list.map(rowHtml).join('') + '</tbody>';
+    const section = (k, title, list, extraCls = '') => {
+      const isClosed = closed.has(`${ui.grp}|${k}`);
+      return `<tbody data-lo="${k}" class="${isClosed ? 'yd-closed' : ''}"><tr class="yd-band ${extraCls}"><td colspan="${COLS}"><span class="yd-tw">${isClosed ? '▶' : '▼'}</span> ${title}</td></tr>` + list.map(rowHtml).join('') + '</tbody>';
     };
-    const noneHtml = none.length ? `<tbody data-lo="none" class="${closed.has(ui.grp + '|none') ? '' : 'yd-closed'}"><tr class="yd-band yd-none"><td colspan="${COLS}"><span class="yd-tw">${closed.has(ui.grp + '|none') ? '▼' : '▶'}</span> <b>미입력</b> · 호가를 아직 안 적은 ${none.length}개 (눌러서 펼치기)</td></tr>` +
-      none.sort((a, b) => a.name.localeCompare(b.name, 'ko')).map(rowHtml).join('') + '</tbody>' : '';
-
-    el.innerHTML = head + (rows.length ? `<div class="tablewrap yd-table"><table id="ydTable"><thead><tr><th class="c"><input type="checkbox" id="ydChkAll" title="보이는 단지 모두 체크"></th><th class="c">1등</th><th class="l">단지</th><th>평형</th><th>매매 호가(억)</th><th>전세(억)</th><th>투자금</th><th>지난 대비</th><th>연식</th><th>세대수</th><th>최근 실거래</th><th>전고 대비</th><th>전저 대비</th><th class="c">트래킹</th><th class="l">메모</th><th></th></tr></thead>` +
-      los.map(lo => bandHtml(lo, bands.get(lo))).join('') + noneHtml + '</table></div>'
-      : `<p class="empty">${inGrp.length ? '필터에 맞는 단지가 없습니다. 필터를 넓혀 보세요.' : `앞마당 단지 중 ${esc(ui.grp)}㎡ 그룹(전용 ${groupOf0(ui.grp)})에 맞는 평형이 없습니다.`}</p>`) +
-      `<div class="bar yd-bulk" id="ydBulk" ${checked.size ? '' : 'hidden'}><b id="ydBulkN">체크한 ${checked.size}개</b><button id="ydBulkTrk" class="primary">트래킹 담기</button><button id="ydBulkDel" class="danger">앞마당에서 빼기</button><button id="ydBulkClr">✕ 선택 해제</button></div>` +
-      `<p class="hint">○ 를 누르면 그 가격대의 🥇 1등이 됩니다(한 칸에 하나). 매매 호가 옆 작은 날짜는 기준 조사에 안 적어서 그 전 조사 값을 쓴 것입니다. 전고·전저 대비는 내가 적은 호가 기준(없으면 최근 실거래)입니다. 단지 이름을 누르면 가격 이력이 열립니다.</p>`;
+    const bandHtml = (lo) => {
+      const list = bands.get(lo), hi = lo + st, p = pk[lo], pn = p ? (cx[p.id.split('#')[0]]?.name || p.name || '') : '';
+      return section(lo, `<b>${bandLabel(lo, hi)}</b> <small>(${bandRange(lo, hi)})</small> · ${list.length}개 · 픽 ${list.filter(r => picked(r.id)).length}개` +
+        `<span class="yd-pickname">${p ? `🥇 1등: <b>${esc(pn)}</b> ${p.id.split('#')[1]}㎡` : '<span class="hint" style="margin:0">🥇 1등: 아직 안 고름</span>'}</span>`, list);
+    };
+    const table = rows.length ? `<div class="tablewrap yd-table"><table id="ydTable"><thead><tr><th class="c"><input type="checkbox" id="ydChkAll" title="보이는 단지 모두 체크"></th>` +
+      H('pick', '픽', 'c') + H('first', '1등', 'c') + H('name', '단지명', 'l') + H('area', '평형') + H('s', '매매(억)') + H('r', '전세(억)') + H('gap', '투자금') + H('chg', '지난 대비') +
+      H('by', '연식') + H('hh', '세대수') + H('sale', '최근 실거래') + H('drop', '전고 대비') + H('rise', '전저 대비') + H('memo', '메모', 'l') + H('sent', '트래킹', 'c') + '<th></th><th></th></tr></thead>' +
+      (fresh.length ? section('fresh', `<b>🆕 새로 추가한 단지 · 호가 입력 필요</b> (${fresh.length}개)`, fresh.sort((a, b) => a.name.localeCompare(b.name, 'ko')), 'yd-new') : '') +
+      los.map(bandHtml).join('') +
+      (none.length ? section('none', `<b>미입력</b> · 호가를 아직 안 적은 ${none.length}개`, none.sort((a, b) => a.name.localeCompare(b.name, 'ko')), 'yd-none') : '') +
+      '</table></div>'
+      : `<p class="empty">${total ? (ui.onlyPick ? '픽한 단지가 없습니다. ○ 를 눌러 후보를 픽하거나 "픽한 단지만 보기"를 끄세요.' : '필터에 맞는 단지가 없습니다. 위의 [모두 풀기]를 눌러 보세요.') : `앞마당 단지 중 ${esc(ui.grp)}㎡ 그룹(전용 ${groupOf0(ui.grp)})에 맞는 평형이 없습니다. 다른 평형 버튼을 눌러 보세요.`}</p>`;
+    el.innerHTML = head + table +
+      `<div class="bar yd-bulk" id="ydBulk" ${checked.size ? '' : 'hidden'}><b id="ydBulkN">체크한 ${checked.size}개</b><button id="ydBulkPk">✔ 픽 켜기</button><button id="ydBulkUnpk">픽 끄기</button><button id="ydBulkTrk">트래킹 담기</button><button id="ydBulkDel" class="danger">✕ 앞마당에서 빼기</button><button id="ydBulkClr">선택 해제</button></div>` +
+      `<p class="hint">매매·전세 칸에 억 단위로 적으면 <b>오늘 날짜로 자동 기록</b>되고, 칸을 벗어나면 가격대 칸으로 옮겨집니다. 옆의 작은 날짜는 그날 적은 값이라는 뜻입니다.<br>픽(○/✔) = 후보 표시, 픽 안 한 줄은 회색입니다. 🥇 1등은 가격대마다 하나이고, 1등을 고르면 픽도 켜집니다. 머리글 ▾ 로 엑셀처럼 거르고 정렬할 수 있습니다.</p>`;
+    PF().apply(preF, sortFn);                 // 필터 안내 줄(ydCfBar)을 그린 뒤 한 번 더 채움
     pickEvents(rows);
     status();
   }
   const groupOf0 = (k) => { const g = opts.groups.find(x => x.k === k); return g ? `${g.min}~${g.max}㎡` : ''; };
 
+  let dirty = false;
   function pickEvents(rows) {
     const set = (fn) => { fn(); saveUi(); renderPick(); };
     $('ydGrp').onclick = (e) => { const g = e.target.closest('button')?.dataset.g; if (g) set(() => { ui.grp = g; checked.clear(); }); };
     $('ydStep').onclick = (e) => { const v = e.target.closest('button')?.dataset.v; if (v) set(() => { ui.step = +v; }); };
     $('ydStepIn').onchange = (e) => { const v = Number(e.target.value); if (!(v > 0 && v <= 20)) return U.toast('0.1~20 사이 억 단위로 적어 주세요. (예: 1.5)'); set(() => { ui.step = Math.round(v * 100) / 100; }); };
-    $('ydBase').onchange = (e) => set(() => { ui.base = e.target.value; });
     $('ydYm').onchange = (e) => { const ym = +String(e.target.value).replace('-', ''); if (ym) set(() => { ui.ym = ym; }); };
-    $('ydFSido').onchange = (e) => set(() => { ui.f.sido = e.target.value; ui.f.sgg = ''; ui.f.dong = ''; });
-    $('ydFSgg').onchange = (e) => set(() => { ui.f.sgg = e.target.value; ui.f.dong = ''; });
-    $('ydFDong').onchange = (e) => set(() => { ui.f.dong = e.target.value; });
-    $('ydFHh').onchange = (e) => set(() => { ui.f.hh = +e.target.value; });
-    $('ydFAge').onchange = (e) => set(() => { ui.f.age = e.target.value; });
-    $('ydFTrk').onchange = (e) => set(() => { ui.f.trk = e.target.value; });
-    $('ydSort').onchange = (e) => set(() => { ui.sort = e.target.value; });
+    $('ydOnlyPick').onchange = (e) => set(() => { ui.onlyPick = e.target.checked; });
+    $('ydSort').onchange = (e) => { if (e.target.value === '__hdr') return; set(() => { ui.sort = e.target.value; }); };
     $('ydPickXl').onclick = () => pickExcel(rows);
     $('ydPickAllTrk').onclick = () => {
       const ids = Object.values(picks[ui.ym] || {}).flatMap(g => Object.values(g).map(p => p.id));
       if (!ids.length) return U.toast(`${ymLabel(ui.ym)}에 지정한 1등이 없습니다.`);
       toTracking(ids);
     };
+    const bulk = (fn) => () => { if (!checked.size) return; fn([...checked]); };
+    $('ydBulkPk').onclick = bulk(ids => { if (setPick(ids, true)) { checked.clear(); renderPick(); } });
+    $('ydBulkUnpk').onclick = bulk(ids => { if (setPick(ids, false)) { checked.clear(); renderPick(); } });
+    $('ydBulkTrk').onclick = bulk(ids => { checked.clear(); toTracking(ids); });
+    $('ydBulkDel').onclick = bulk(ids => removeCx([...new Set(ids.map(id => id.split('#')[0]))]));
+    $('ydBulkClr').onclick = () => { checked.clear(); renderPick(); };
     const tb = $('ydTable');
     if (!tb) return;
     $('ydChkAll').onchange = (e) => { tb.querySelectorAll('tbody:not(.yd-closed) tr[data-id]').forEach(tr => { if (e.target.checked) checked.add(tr.dataset.id); else checked.delete(tr.dataset.id); }); renderPick(); };
     tb.onclick = (e) => {
+      if (e.target.closest('button.colf')) return;
       const band = e.target.closest('tr.yd-band');
-      if (band) { const lo = band.parentElement.dataset.lo, k = `${ui.grp}|${lo}`; if (closed.has(k)) closed.delete(k); else closed.add(k); band.parentElement.classList.toggle('yd-closed'); band.querySelector('.yd-tw').textContent = band.parentElement.classList.contains('yd-closed') ? '▶' : '▼'; return; }
+      if (band) { const k = `${ui.grp}|${band.parentElement.dataset.lo}`; if (closed.has(k)) closed.delete(k); else closed.add(k); band.parentElement.classList.toggle('yd-closed'); band.querySelector('.yd-tw').textContent = band.parentElement.classList.contains('yd-closed') ? '▶' : '▼'; return; }
       const tr = e.target.closest('tr[data-id]'); if (!tr) return;
       const id = tr.dataset.id, r = rows.find(x => x.id === id); if (!r) return;
       if (e.target.closest('[data-hist]')) { e.preventDefault(); return openHist(id); }
-      if (e.target.closest('[data-pick]')) {
+      if (e.target.closest('[data-pk]')) { if (setPick([id], !picked(id))) renderPick(); return; }
+      if (e.target.closest('[data-first]')) {
         if (locked()) return;
         const g = ((picks[ui.ym] = picks[ui.ym] || {})[ui.grp] = picks[ui.ym][ui.grp] || {});
-        if (g[r.lo]?.id === id) delete g[r.lo]; else g[r.lo] = { id, hi: r.lo + stepMan(), name: r.name };
+        if (g[r.lo]?.id === id) delete g[r.lo]; else { g[r.lo] = { id, hi: r.lo + stepMan(), name: r.name }; if (!picked(id)) setPick([id], true); }
         if (!Object.keys(g).length) delete picks[ui.ym][ui.grp];
         if (!Object.keys(picks[ui.ym]).length) delete picks[ui.ym];
         savePk(); return renderPick();
       }
       if (e.target.closest('[data-trk]')) return toTracking([id]);
+      if (e.target.closest('[data-rm]')) return askRemove(id);
       if (e.target.closest('[data-menu]')) return showMenu(e.target.closest('[data-menu]'), id);
     };
     tb.onchange = (e) => {
       const tr = e.target.closest('tr[data-id]'); if (!tr) return;
       const id = tr.dataset.id;
       if (e.target.dataset.chk != null) { if (e.target.checked) checked.add(id); else checked.delete(id); return bulkBar(); }
-      if (e.target.dataset.memo != null) { if (locked()) return; const c = cx[id.split('#')[0]]; if (c) { c.memo = e.target.value.trim(); saveCx(); tb.querySelectorAll(`tr[data-id^="${CSS.escape(id.split('#')[0])}#"] input[data-memo]`).forEach(i => { i.value = c.memo; }); } }
+      if (e.target.dataset.memo != null) { if (locked()) return; const c = cx[id.split('#')[0]]; if (c) { c.memo = e.target.value.trim(); saveCx(); tb.querySelectorAll(`tr[data-id^="${CSS.escape(id.split('#')[0])}#"] input[data-memo]`).forEach(i => { i.value = c.memo; }); } return; }
+      const f = e.target.dataset.f; if (!f) return;
+      const r = rows.find(x => x.id === id);
+      if (locked()) { e.target.value = eokIn(f === 's' ? r?.s : r?.rr); return; }
+      const v = toMan(e.target.value);
+      if (Number.isNaN(v)) { U.toast('숫자만 억 단위로 적어 주세요. (예: 6.3)'); e.target.value = eokIn(f === 's' ? r?.s : r?.rr); return; }
+      if (v != null && v > 0 && v < 1000) U.toast('억 단위로 적었는지 확인하세요. (예: 6억 3천 → 6.3)');
+      const cur = sv[todaySid(true)]; cur.q = cur.q || {};
+      const q = cur.q[id] || {};
+      if (v == null) delete q[f]; else q[f] = v;
+      if (Object.keys(q).length) cur.q[id] = q; else delete cur.q[id];
+      saveSv();
+      const nv = valueAt(id, ''), gap = nv?.s != null && nv?.r != null ? nv.s - nv.r : null;
+      tr.querySelector('[data-gap]').textContent = eok(gap);
+      dirty = true;                                   // 칸을 벗어나면 가격대 칸으로 다시 정리
     };
-    $('ydBulkTrk').onclick = () => toTracking([...checked]);
-    $('ydBulkDel').onclick = () => removeCx([...new Set([...checked].map(id => id.split('#')[0]))]);
-    $('ydBulkClr').onclick = () => { checked.clear(); renderPick(); };
+    tb.addEventListener('keydown', (e) => {         // 매매 → (Tab/Enter) 전세 → (Tab/Enter) 다음 줄 매매 로 이어서 입력
+      const f = e.target.dataset?.f; if (!f || e.shiftKey || (e.key !== 'Tab' && e.key !== 'Enter')) return;
+      const trs = [...tb.querySelectorAll('tbody:not(.yd-closed) tr[data-id]')], i = trs.indexOf(e.target.closest('tr'));
+      const next = f === 's' ? trs[i]?.querySelector('input[data-f="r"]') : trs[i + 1]?.querySelector('input[data-f="s"]');
+      if (!next) return;
+      e.preventDefault(); e.target.dispatchEvent(new Event('change', { bubbles: true })); next.focus(); next.select();
+    });
+    tb.addEventListener('focusout', (e) => {
+      if (!dirty) return;
+      const next = e.relatedTarget;
+      if (next && tb.contains(next) && next.matches('input[data-f]')) return;   // 매매 → 전세처럼 입력칸끼리 옮길 때는 기다림
+      dirty = false; setTimeout(renderPick, 0);
+    });
   }
   function bulkBar() { const b = $('ydBulk'); if (!b) return; b.hidden = !checked.size; $('ydBulkN').textContent = `체크한 ${checked.size}개`; }
 
   function pickExcel(rows) {
-    const st = stepMan(), sid = baseSid(), sd = sv[sid]?.date || '';
-    const sheet1 = [['가격대', '1등', '시도', '시군구', '동', '단지', '전용㎡', '평형 그룹', '매매 호가(만원)', '호가 적은 날', '전세 호가(만원)', '투자금(만원)', '지난 대비(만원)', '연식', '세대수', '최근 실거래(만원)', '실거래일', '전고 대비(%)', '전저 대비(%)', '트래킹', '메모']];
-    const pk = (picks[ui.ym] || {})[ui.grp] || {};
-    [...rows].sort((a, b) => (a.lo ?? 1e12) - (b.lo ?? 1e12) || (a.s ?? 0) - (b.s ?? 0)).forEach(r => sheet1.push([r.lo == null ? '미입력' : bandLabel(r.lo, r.lo + st), r.lo != null && pk[r.lo]?.id === r.id ? '1등' : '', r.sido, r.sgg, r.dong, r.name, r.g, r.grp,
-      r.s ?? '', r.v?.date || '', r.rr ?? '', r.gap ?? '', r.chg ?? '', r.by || '', r.hh || '', r.rl.sale?.price ?? '', r.rl.sale ? U.date(r.rl.sale.d) : '', r.drop == null ? '' : +r.drop.toFixed(1), r.rise == null ? '' : +r.rise.toFixed(1), tracked(r.id) ? '트래킹 중' : '', cx[r.cid]?.memo || '']));
+    const st = stepMan();
+    const sheet1 = [['가격대', '픽', '1등', '시도', '시군구', '동', '단지', '전용㎡', '평형 그룹', '매매 호가(만원)', '호가 적은 날', '전세 호가(만원)', '투자금(만원)', '지난 대비(만원)', '연식', '세대수', '최근 실거래(만원)', '실거래일', '전고 대비(%)', '전저 대비(%)', '트래킹', '메모']];
+    [...rows].sort((a, b) => (a.lo ?? 1e12) - (b.lo ?? 1e12) || (a.s ?? 0) - (b.s ?? 0)).forEach(r => sheet1.push([r.lo == null ? '미입력' : bandLabel(r.lo, r.lo + st), picked(r.id) ? '픽' : '', r.isFirst ? '1등' : '', r.sido, r.sgg, r.dong, r.name, r.g, r.grp,
+      r.s ?? '', r.v?.date || '', r.rr ?? '', r.gap ?? '', r.chg ?? '', r.by || '', r.hh || '', r.rl.sale?.price ?? '', r.rl.sale ? U.date(r.rl.sale.d) : '', r.drop == null ? '' : +r.drop.toFixed(1), r.rise == null ? '' : +r.rise.toFixed(1), sent(r.id) ? '트래킹에 보냄' : '', cx[r.cid]?.memo || '']));
     const sheet2 = [['달', '평형 그룹', '가격대', '1등 단지', '전용㎡', '지역']];
     Object.entries(picks[ui.ym] || {}).forEach(([gk, g]) => Object.keys(g).map(Number).sort((a, b) => a - b).forEach(lo => { const p = g[lo], c = cx[p.id.split('#')[0]] || {}; sheet2.push([ymLabel(ui.ym), gk, bandLabel(lo, p.hi), c.name || p.name || '', +p.id.split('#')[1], `${c.sgg || ''} ${c.dong || ''}`.trim()]); }));
-    U.download(`앞마당_${ui.grp}_1등뽑기_${U.stamp()}`, [{ name: `${ui.grp} 가격대별 (${sd || '조사없음'})`, rows: sheet1 }, { name: `${ymLabel(ui.ym)} 1등`, rows: sheet2 }]);
+    U.download(`앞마당_${ui.grp}_1등뽑기_${U.stamp()}`, [{ name: `${ui.grp} 가격대별`, rows: sheet1 }, { name: `${ymLabel(ui.ym)} 1등`, rows: sheet2 }]);
   }
 
   /* ── ⋯ 메뉴 ── */
   function showMenu(btn, id) {
     const m = $('ydMenu'), r = btn.getBoundingClientRect(), c = cx[id.split('#')[0]] || {};
-    m.innerHTML = `<button data-m="hist">📈 가격 이력</button><button data-m="naver">네이버 부동산</button>${typeof View3D !== 'undefined' ? '<button data-m="v3d">3D로 보기</button>' : ''}${$('tab-sat') ? '<button data-m="sat">위성지도</button>' : ''}<button data-m="del" class="danger">앞마당에서 빼기</button>`;
+    m.innerHTML = `<button data-m="hist">📈 가격 이력</button><button data-m="naver">네이버 부동산</button>${typeof View3D !== 'undefined' ? '<button data-m="v3d">3D로 보기</button>' : ''}${$('tab-sat') ? '<button data-m="sat">위성지도</button>' : ''}`;
     m.hidden = false;
     m.style.top = (window.scrollY + r.bottom + 4) + 'px'; m.style.left = Math.max(8, window.scrollX + r.right - 170) + 'px';
     m.onclick = (e) => {
@@ -387,7 +455,6 @@ const Yard = (() => {
       if (k === 'naver') LandLink.open(c.sgg, c.dong, c.name);
       if (k === 'v3d') { App.showTab('v3d'); View3D.show({ code: c.code, key: c.key, sido: c.sido, sgg: c.sgg, dong: c.dong, jibun: c.jibun, name: c.name }); }
       if (k === 'sat') openSat(c);
-      if (k === 'del') removeCx([id.split('#')[0]]);
     };
   }
   function hideMenu() { const m = $('ydMenu'); if (m) m.hidden = true; }
@@ -403,7 +470,7 @@ const Yard = (() => {
     if (ui.esid && !sv[ui.esid]) ui.esid = '';
     if (!ui.esid) ui.esid = list[0]?.id || '';
     const cur = sv[ui.esid];
-    const chips = list.map(s => `<button data-sid="${s.id}" class="${s.id === ui.esid ? 'on' : ''}" title="${esc(s.date)}${s.memo ? ' · ' + esc(s.memo) : ''}">${esc(dShort(s.date))}${s.memo ? ` <small>${esc(s.memo)}</small>` : ''}</button>`).join('');
+    const chips = list.map(s => `<button data-sid="${s.id}" class="${s.id === ui.esid ? 'on' : ''}" title="${esc(s.date)}${s.memo ? ' · ' + esc(s.memo) : ''}">${esc(dShort(s.date))}${s.memo ? ` <small>${esc(s.memo)}</small>` : s.auto ? ' <small>(1등 뽑기에서 입력)</small>' : ''}</button>`).join('');
     let html = `<div class="bar"><strong>조사 회차</strong><span class="grow"></span><button id="ydSNew" class="primary">+ 새 조사</button><button id="ydSEdit" ${cur ? '' : 'disabled'}>회차 수정</button><button id="ydSDel" class="danger" ${cur ? '' : 'disabled'}>회차 삭제</button><button id="ydSXl" ${list.length ? '' : 'disabled'}>📥 전체 조사 엑셀</button></div>` +
       `<div class="chips yd-chips">${chips || '<span class="hint" style="margin:0">아직 조사 회차가 없습니다. [+ 새 조사]를 눌러 오늘 조사를 시작하세요.</span>'}</div>`;
     if (cur) html += entryHtml(cur) + compareHtml();
@@ -426,7 +493,6 @@ const Yard = (() => {
         <label class="row" style="flex-direction:row;align-items:center;padding-bottom:7px"><input type="checkbox" id="ydEOnly" ${ui.onlyEmpty ? 'checked' : ''}> 아직 안 적은 평형만</label>
         <span class="grow"></span>
         <button id="ydESame" title="체크한 평형에 바로 앞 조사 값을 그대로 넣습니다 (빈칸만)">지난 조사와 같음 (체크)</button>
-        <button id="ydETrk" title="이 회차에서 빈칸인 평형에 시세트래킹에 적어 둔 최근 호가를 넣습니다">시세트래킹 호가 불러오기</button>
       </div>
       <div class="tablewrap yd-table"><table id="ydETable"></table></div>
       <p class="hint">가격은 억 단위(예: 6.3), 매물은 개수입니다. 칸을 고치면 바로 저장됩니다. Tab 키로 다음 칸으로 넘어가며 적을 수 있습니다.</p></div>`;
@@ -437,8 +503,8 @@ const Yard = (() => {
     const rowState = rows.map(r => ({ r, q: cur.q?.[r.id] || {}, pv: valueAt(r.id, ui.esid, true) }));
     const vis = ui.onlyEmpty ? rowState.filter(x => x.q.s == null && x.q.r == null) : rowState;
     $('ydETable').innerHTML = `<thead><tr><th class="c"><input type="checkbox" id="ydEChkAll"></th><th class="l">단지</th><th>평형</th><th>매매(억)</th><th>전세(억)</th><th>매물</th><th>지난 조사 매매 / 전세</th><th>변동</th></tr></thead><tbody>` +
-      (vis.length ? vis.map(({ r, q, pv }) => `<tr data-id="${esc(r.id)}"><td class="c"><input type="checkbox" data-chk ${echecked.has(r.id) ? 'checked' : ''}></td>` +
-        `<td class="l"><a href="#" data-hist>${esc(r.name)}</a> <small>${esc(r.sgg)} ${esc(r.dong)}</small></td><td>${r.g}㎡<small>${esc(r.grp)}</small></td>` +
+      (vis.length ? vis.map(({ r, q, pv }) => `<tr data-id="${esc(r.id)}" class="${picked(r.id) ? 'yd-pk' : 'yd-grey'}"><td class="c"><input type="checkbox" data-chk ${echecked.has(r.id) ? 'checked' : ''}></td>` +
+        `<td class="l">${picked(r.id) ? '<b class="yd-ck">✔</b>' : ''}<a href="#" data-hist>${esc(r.name)}</a> <small>${esc(r.sgg)} ${esc(r.dong)}</small></td><td>${r.g}㎡<small>${esc(r.grp)}</small></td>` +
         `<td><input class="num" inputmode="decimal" data-f="s" value="${eokIn(q.s)}" placeholder="억"></td><td><input class="num" inputmode="decimal" data-f="r" value="${eokIn(q.r)}" placeholder="억"></td><td><input class="num" inputmode="numeric" data-f="n" value="${q.n ?? ''}" placeholder="개" style="width:50px"></td>` +
         `<td>${pv ? `${eok(pv.s)} / ${eok(pv.r)}<small>${esc(dShort(pv.date))}</small>` : '<small>없음</small>'}</td><td data-chg class="${U.cls(chgOf(q, pv))}">${chgText(q, pv)}</td></tr>`).join('')
         : `<tr><td colspan="8" class="empty" style="padding:20px">${ui.onlyEmpty ? '모든 평형을 적었습니다. 👍' : '보여 줄 평형이 없습니다.'}</td></tr>`) + '</tbody>';
@@ -511,14 +577,6 @@ const Yard = (() => {
         let ch = false; ['s', 'r', 'n'].forEach(f => { if (q[f] == null && pv[f] != null) { q[f] = pv[f]; ch = true; } }); if (ch) { cur.q[id] = q; n++; } });
       saveSv(); echecked.clear(); fillEntry(); entryCount(); fillCompare();
       U.toast(n ? `${n}개 평형에 지난 조사 값을 넣었습니다.` : '넣을 값이 없습니다. (이미 적었거나 지난 조사 값이 없음)');
-    };
-    $('ydETrk').onclick = () => {
-      if (locked()) return;
-      const cur = sv[ui.esid]; cur.q = cur.q || {}; let n = 0;
-      entryRows().forEach(r => { const q = cur.q[r.id] || {}; if (q.s != null || q.r != null) return; const t = Kit.quote(Tracking.rec(r.id)); if (!t || (t.s == null && t.r == null)) return;
-        cur.q[r.id] = { ...q, ...(t.s != null ? { s: t.s } : {}), ...(t.r != null ? { r: t.r } : {}), ...(t.sn != null ? { n: t.sn } : {}) }; n++; });
-      saveSv(); fillEntry(); entryCount(); fillCompare();
-      U.toast(n ? `${n}개 평형의 빈칸을 시세트래킹 호가로 채웠습니다.` : '채울 값이 없습니다. (시세트래킹에 호가를 적은 앞마당 평형이 없거나 이미 다 적음)');
     };
     const tb = $('ydETable');
     $('ydETable').onclick = (e) => { if (e.target.closest('[data-hist]')) { e.preventDefault(); openHist(e.target.closest('tr').dataset.id); } };
@@ -659,8 +717,9 @@ const Yard = (() => {
     async function draw() {
       const id = `${cid}#${g}`, my = hist;
       box.querySelectorAll('#ydHG button').forEach(b => b.classList.toggle('on', +b.dataset.g === g));
-      $('ydHTrk').innerHTML = tracked(id) ? '<span class="yd-trk">★ 트래킹 중</span>' : '<button id="ydHTrkB">트래킹 담기</button>';
+      $('ydHTrk').innerHTML = (cx[cid] ? `<button id="ydHPk" class="${picked(id) ? 'on' : ''}">${picked(id) ? '✔ 픽 켜짐' : '○ 픽 하기'}</button> ` : '') + (sent(id) ? `<span class="yd-sent">트래킹에 보냄 (${esc(sent(id))})</span>` : '<button id="ydHTrkB">트래킹 담기</button>');
       if ($('ydHTrkB')) $('ydHTrkB').onclick = async () => { await toTracking([id]); draw(); };
+      if ($('ydHPk')) $('ydHPk').onclick = () => { if (setPick([id], !picked(id))) { draw(); if (ui.sub === 'pick') renderPick(); } };
       await Real.load([{ id, code: c.code, key: c.key }]);
       const rl = Real.get(id) || {};
       $('ydHInfo').textContent = `${c.sgg || ''} ${c.dong || ''}${rl.buildYear ? ` · ${rl.buildYear}년` : ''}${rl.hh ? ` · ${rl.hh.toLocaleString()}세대` : ''}`;
