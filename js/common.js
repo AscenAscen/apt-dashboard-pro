@@ -385,11 +385,11 @@ const LandLink = (() => {
       document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); return ok;
     } catch (e) { return false; }
   }
-  const nameOf = (href) => { const m = /fin\.land\.naver\.com[^#]*#q=([^&]*)/.exec(href || ''); return m ? decodeURIComponent(m[1]) : null; };
+  const nameOf = (href) => { const m = /fin\.land\.naver\.com[^#]*[#?&]q=([^&#]*)/.exec(href || ''); return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : null; };
   async function note(name) {
     if (!name) return;
     const ok = await copy(name);
-    U.toast(CONFIG.LAND_SEARCH ? `네이버페이 부동산에서 「${name}」 검색 결과를 엽니다.`
+    U.toast(CONFIG.LAND_SEARCH ? `네이버페이 부동산에서 「${name}」 검색 결과를 엽니다. (이름도 복사해 두었습니다)`
       : ok ? `「${name}」 이름을 복사했습니다 → 네이버페이 부동산 위쪽 검색칸에 붙여넣기(Ctrl+V) 후 Enter` : `네이버페이 부동산 검색칸에 「${name}」 을(를) 입력하세요.`);
   }
   /** 버튼에서 직접 열 때 (window.open 대신) */

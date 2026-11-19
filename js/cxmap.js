@@ -12,20 +12,29 @@ const CxMap = (() => {
   const SK = 'apt.cxmap.v1', LK = 'apt.cxmapStyle.v1', PK = 'apt.cxmapPresets.v1';
   const PYC = [['s', '소형'], ['59', '59'], ['74', '74'], ['84', '84'], ['L', '대형']];
   const PYN = Object.fromEntries(PYC);
-  const DEF = { codes: [], hide: [], py: '', hh: 0, hhMin: '', hhMax: '', age: 0, ageMax: '', showAll: 0, mine: 0, auto: 1, view: null };
-  const LDEF = { mu: 0, tip: 'A', ds: 'card', s: 1, f: 13, ff: '', th: 'gold', em: 'icon', bDate: 1, bAmt: 1, bPct: 1, bRent: 1, cap: 0 };
-  const THEMES = { gold: '노랑 (기본)', navy: '남색', green: '초록', coral: '산호', mono: '흰색' };
-  const DESIGNS = { card: '말풍선 카드', pill: '둥근 알약', fill: '색 채움', line: '테두리만', text: '글자만' };
+  const DEF = { codes: [], hide: [], pys: [], pr: 0, pyMin: '', pyMax: '', hh: 0, hhMin: '', hhMax: '', age: 0, ageMax: '', showAll: 0, mine: 0, auto: 1, view: null };
+  const LDEF = { v: 2, mu: 0, tip: 'A', ds: 'white', s: 1, f: 15, ff: 'pretendard', th: 'navy', em: 'badge', bDate: 1, bAmt: 1, bPct: 1, bRent: 1, cap: 0 };
+  const THEMES = { navy: '남색 (기본)', gold: '골드', green: '초록', coral: '산호', mono: '그레이' };
+  const DESIGNS = { white: '화이트 카드 (기본)', dark: '다크 골드', bar: '컬러 바', card: '말풍선 카드', pill: '둥근 알약', fill: '색 채움', line: '테두리만', text: '글자만' };
+  const NJ = 'https://cdn.jsdelivr.net/gh/projectnoonnu/';
+  // 모두 상업용 무료 글꼴 (눈누 · 제작사 배포 주소 그대로). 고른 글꼴만 그때 불러옴
   const FONTS = [
     { k: '', name: '기본 글씨' },
     { k: 'pretendard', name: '프리텐다드', fam: "'Pretendard', system-ui, sans-serif", css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
-    { k: 'noto', name: '노토산스', fam: "'Noto Sans KR', sans-serif", css: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700&display=swap' },
+    { k: 'isamanru', name: '이사만루체', fam: "'Isamanru', sans-serif", faces: [[500, 'https://cdn.jsdelivr.net/npm/@noonnu/gong-gothic-medium@0.1.0/fonts/gonggothicmedium-normal.woff', 'woff'], [800, 'https://cdn.jsdelivr.net/npm/@noonnu/gonggothicbold@0.0.1/GongGothicBold.woff', 'woff']] },
+    { k: 'jamsil', name: '더잠실체', fam: "'TheJamsil', sans-serif", faces: [[400, NJ + 'noonfonts_2302_01@1.0/TheJamsil3Regular.woff2', 'woff2'], [500, NJ + 'noonfonts_2302_01@1.0/TheJamsil4Medium.woff2', 'woff2'], [700, NJ + 'noonfonts_2302_01@1.0/TheJamsil5Bold.woff2', 'woff2'], [800, NJ + 'noonfonts_2302_01@1.0/TheJamsil6ExtraBold.woff2', 'woff2']] },
+    { k: 'gmarket', name: 'G마켓 산스', fam: "'GmarketSans', sans-serif", faces: [[500, NJ + 'noonfonts_2001@1.1/GmarketSansMedium.woff', 'woff'], [800, NJ + 'noonfonts_2001@1.1/GmarketSansBold.woff', 'woff']] },
+    { k: 'scdream', name: '에스코어드림', fam: "'SCoreDream', sans-serif", faces: [[500, NJ + 'noonfonts_six@1.2/S-CoreDream-4Regular.woff', 'woff'], [800, NJ + 'noonfonts_six@1.2/S-CoreDream-6Bold.woff', 'woff']] },
+    { k: 'suit', name: 'SUIT', fam: "'SUIT', sans-serif", css: 'https://cdn.jsdelivr.net/npm/@sun-typeface/suit@2.0.5/fonts/static/woff2/SUIT.css' },
+    { k: 'noto', name: '노토산스', fam: "'Noto Sans KR', sans-serif", css: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700;800&display=swap' },
     { k: 'nanum', name: '나눔고딕', fam: "'Nanum Gothic', sans-serif", css: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@700;800&display=swap' },
   ];
   const BUILTIN = {
-    field: { name: '임장용 (크게)', v: { ds: 'card', s: 1.25, f: 15, th: 'gold' } },
-    report: { name: '보고서용 (깔끔)', v: { ds: 'line', s: 1, f: 13, th: 'mono', ff: 'pretendard' } },
-    simple: { name: '간단히 (작게)', v: { ds: 'pill', s: 0.85, f: 11, th: 'navy' } },
+    luxe: { name: '고급 (화이트)', v: { ds: 'white', th: 'navy', s: 1, f: 15, ff: 'pretendard', em: 'badge' } },
+    dark: { name: '다크 골드', v: { ds: 'dark', th: 'gold', s: 1, f: 15, ff: 'pretendard', em: 'badge' } },
+    field: { name: '임장용 (크게)', v: { ds: 'white', th: 'coral', s: 1.2, f: 17, ff: 'gmarket', em: 'badge' } },
+    report: { name: '보고서용', v: { ds: 'bar', th: 'navy', s: 1, f: 14, ff: 'suit', em: 'badge' } },
+    simple: { name: '간단히 (작게)', v: { ds: 'pill', th: 'navy', s: 0.9, f: 12, ff: '', em: 'badge' } },
   };
   const NOW_Y = new Date().getFullYear();
   const D5 = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); return U.ymd(d); })();
@@ -85,6 +94,7 @@ const CxMap = (() => {
         cx.ppa12 = cx.ppa[1] ? cx.ppa[0] / cx.ppa[1] : null;
         cx.isNew = !!cx.year && NOW_Y - cx.year <= 5;
         cx.alias = Alias.of(code, cx.key) || '';
+        cx.gList = [...cx.gs.values()].map(x => x.g);
         delete cx.gs; delete cx.ppa;
       }
       // 👑 동마다 대장: 200세대 이상 중 최근 1년 ㎡당 평균가 1위
@@ -101,12 +111,25 @@ const CxMap = (() => {
   }
 
   /* ── 거르기 ── */
+  const pyOf = (g) => CONFIG.toPyeong(g);
+  const rangeOn = () => !!st.pr && (st.pyMin !== '' || st.pyMax !== '');
+  const inRange = (py) => (st.pyMin === '' || py >= +st.pyMin) && (st.pyMax === '' || py <= +st.pyMax);
+  const pyFilterOn = () => st.pys.length > 0 || rangeOn();
+  /** 평형 조건(여러 개 · ○평~○평)에 맞는 평형 구분들 — 조건이 없으면 전부 */
+  function matchPcs(cx) {
+    return cx.pcs.filter(pc => (!st.pys.length || st.pys.includes(pc)) && (!rangeOn() || inRange(pyOf(cx.cls[pc].g))));
+  }
+  /** 창·표에서 먼저 보여 줄 평형: 조건에 맞는 것 중 거래가 가장 많은 것 */
+  function focusPc(cx) {
+    const m = pyFilterOn() ? matchPcs(cx) : [];
+    return m.length ? m.slice().sort((a, b) => cx.cls[b].n - cx.cls[a].n)[0] : cx.main;
+  }
   function passes(cx) {
     if (st.hide.includes(cx.id) && !st.showHidden) return false;
     const mine = tracked.has(cx.id);
     if (st.mine && !mine) return false;
     if (!st.showAll && !mine && cx.n5 < MIN_N5) return false;
-    if (st.py && !cx.cls[st.py]) return false;
+    if (pyFilterOn() && !matchPcs(cx).length) return false;
     const hmin = st.hh === -1 ? +st.hhMin || 0 : st.hh, hmax = st.hh === -1 ? +st.hhMax || 0 : 0;
     if (hmin && (cx.hh || 0) < hmin) return false;
     if (hmax && (cx.hh || 0) > hmax) return false;
@@ -119,12 +142,13 @@ const CxMap = (() => {
 
   /* ── 라벨 ── */
   function labelHtml(cx) {
-    const ic = [cx.leader ? '👑' : '', cx.isNew ? '🆕' : '', tracked.has(cx.id) ? '⭐' : ''].filter(Boolean).join('');
+    const mine = tracked.has(cx.id), badge = ls.em === 'badge';
+    const bd = badge ? (cx.leader ? '<b class="cxb lead">대장</b>' : '') + (cx.isNew ? '<b class="cxb new">NEW</b>' : '') + (mine ? '<b class="cxb mine" title="시세트래킹에 담은 단지">★</b>' : '') : '';
     const sub = [cx.year ? `'${String(cx.year).slice(2)}` : '', cx.hh ? `${cx.hh.toLocaleString()}세대` : ''].filter(Boolean).join(' · ');
-    return `<div class="cxl-n">${ls.em === 'icon' && ic ? `<i>${ic}</i>` : ''}${U.esc(nameOf(cx))}</div>${sub ? `<div class="cxl-s">${sub}</div>` : ''}`;
+    return `<div class="cxl-n">${U.esc(nameOf(cx))}${bd}</div>${sub ? `<div class="cxl-s">${sub}</div>` : ''}`;
   }
   function labelCls(cx) {
-    return ['cxl', 'ds-' + ls.ds, 'th-' + ls.th, cx.leader ? 'lead' : '', cx.isNew ? 'new' : '', tracked.has(cx.id) ? 'mine' : '', ls.em !== 'icon' ? 'em-' + ls.em : ''].filter(Boolean).join(' ');
+    return ['cxl', 'ds-' + ls.ds, 'th-' + ls.th, cx.leader ? 'lead' : '', cx.isNew ? 'new' : '', tracked.has(cx.id) ? 'mine' : '', ls.em !== 'badge' ? 'em-' + ls.em : ''].filter(Boolean).join(' ');
   }
   function place(cx) {
     const p = pos.get(cx.id); if (!p || !map) return;
@@ -206,7 +230,7 @@ const CxMap = (() => {
   function showTip(cx, el, pin) {
     clearTimeout(tipTimer);
     const same = tip && tip.cx === cx;
-    tip = { cx, el, pc: same ? tip.pc : (st.py && cx.cls[st.py] ? st.py : cx.main) };
+    tip = { cx, el, pc: same ? tip.pc : focusPc(cx) };
     tipPin = pin || (same && tipPin);
     renderTip();
   }
@@ -263,9 +287,9 @@ const CxMap = (() => {
     const rows = cx.pcs.map(pc => {
       const c = cx.cls[pc], ref = c.last && c.last.price;
       const tr = c.trough ? cell(c.trough, ref, '▲') : c.peak ? `<td colspan="${A && P ? 2 : 1}" class="hot">🔥 신고가 중</td>` : '<td>-</td>' + (A && P ? '<td></td>' : '');
-      return `<tr class="${pc === cx.main ? 'main' : ''}${st.py === pc ? ' sel' : ''}"><td class="l"><b>${PYN[pc]}</b><small>${c.g}㎡</small></td><td>${eok(ref)}${D && c.last ? `<small>${ym(c.last.d)}</small>` : ''}</td>${cell(c.peak, ref, '▼')}${tr}</tr>`;
+      return `<tr class="${pc === cx.main ? 'main' : ''}${pyFilterOn() && matchPcs(cx).includes(pc) ? ' sel' : ''}"><td class="l"><b>${PYN[pc]}</b><small>${c.g}㎡</small></td><td>${eok(ref)}${D && c.last ? `<small>${ym(c.last.d)}</small>` : ''}</td>${cell(c.peak, ref, '▼')}${tr}</tr>`;
     }).join('');
-    const m = cx.cls[st.py] || cx.cls[cx.main], rr = m && m.rentLast, ratio = m && m.last && rr ? rr.price / m.last.price * 100 : null;
+    const m = cx.cls[focusPc(cx)] || cx.cls[cx.main], rr = m && m.rentLast, ratio = m && m.last && rr ? rr.price / m.last.price * 100 : null;
     return `<table class="cxt-tb">${head}${rows}</table>${ls.bRent && m ? `<div class="cxt-r">전세(${PYN[m.pc]}) ${eok(rr && rr.price)}${rr && D ? ` (${ym(rr.d)})` : ''} · 전세가율 ${ratio == null ? '-' : ratio.toFixed(0) + '%'}</div>` : ''}`;
   }
   async function tipClick(e) {
@@ -359,7 +383,7 @@ const CxMap = (() => {
 
   /* ── 아래 단지 표 ── */
   function cols() {
-    const N = ColFilter.numCol, T = ColFilter.txtCol, M = (cx) => cx.cls[st.py] || cx.cls[cx.main] || {};
+    const N = ColFilter.numCol, T = ColFilter.txtCol, M = (cx) => cx.cls[focusPc(cx)] || cx.cls[cx.main] || {};
     const last = (cx) => M(cx).last ? M(cx).last.price : null;
     return {
       gu: T('구', cx => cx.sgg), dong: T('동', cx => cx.dong), name: T('단지', cx => nameOf(cx)),
@@ -390,18 +414,25 @@ const CxMap = (() => {
   /* ── 조건 줄 ── */
   function syncCtl() {
     const seg = (id, v) => document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset.v === String(v)));
-    seg('cxmPy', st.py); seg('cxmHh', st.hh); seg('cxmAge', st.age);
+    document.querySelectorAll('#cxmPy button').forEach(b => { const v = b.dataset.v; b.classList.toggle('on', v === '' ? !st.pys.length && !st.pr : v === 'R' ? !!st.pr : st.pys.includes(v)); });
+    $('cxmPyCustom').hidden = !st.pr; $('cxmPyMin').value = st.pyMin; $('cxmPyMax').value = st.pyMax;
+    seg('cxmHh', st.hh); seg('cxmAge', st.age);
     $('cxmHhCustom').hidden = st.hh !== -1; $('cxmAgeCustom').hidden = st.age !== -1;
     $('cxmHhMin').value = st.hhMin; $('cxmHhMax').value = st.hhMax; $('cxmAgeMax').value = st.ageMax;
     $('cxmHidN').textContent = st.hide.length; $('cxmHidWrap').hidden = !st.hide.length; $('cxmShowHid').checked = !!st.showHidden;
     $('cxmAll').checked = !!st.showAll; $('cxmMine').checked = !!st.mine; $('cxmAuto').checked = !!st.auto;
-    $('cxmCondSum').textContent = [st.py ? PYN[st.py] : '', st.hh === -1 ? `${st.hhMin || 0}~${st.hhMax || ''}세대` : st.hh ? `${st.hh}세대↑` : '', st.age === -1 ? `${st.ageMax}년↓` : st.age ? `${st.age}년↓` : '', st.mine ? '⭐ 내 단지만' : ''].filter(Boolean).join(' · ') || '전체 단지';
+    $('cxmCondSum').textContent = [st.pys.map(p => PYN[p]).join('·'), rangeOn() ? `${st.pyMin || ''}~${st.pyMax || ''}평` : '', st.hh === -1 ? `${st.hhMin || 0}~${st.hhMax || ''}세대` : st.hh ? `${st.hh}세대↑` : '', st.age === -1 ? `${st.ageMax}년↓` : st.age ? `${st.age}년↓` : '', st.mine ? '⭐ 내 단지만' : ''].filter(Boolean).join(' · ') || '전체 단지';
   }
 
   /* ── 🎨 라벨 꾸미기 ── */
   function useFont() {
     const ft = FONTS.find(x => x.k === ls.ff) || FONTS[0];
     if (ft.css && !document.querySelector(`link[data-cxfont="${ft.k}"]`)) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = ft.css; l.dataset.cxfont = ft.k; document.head.appendChild(l); }
+    if (ft.faces && !document.querySelector(`style[data-cxfont="${ft.k}"]`)) {
+      const fam = ft.fam.split(',')[0].replace(/'/g, ''), st2 = document.createElement('style'); st2.dataset.cxfont = ft.k;
+      st2.textContent = ft.faces.map(([w, u, fmt]) => `@font-face{font-family:'${fam}';src:url('${u}') format('${fmt}');font-weight:${w};font-display:swap}`).join('\n');
+      document.head.appendChild(st2);
+    }
     $('cxmMap').style.setProperty('--cxff', ft.fam || 'inherit');
   }
   function styleUi() {
@@ -412,7 +443,7 @@ const CxMap = (() => {
       <div class="cxs-row" ${ls.tip === 'B' ? '' : 'hidden'}><b>B 표 칸</b>${chk('bAmt', '금액')}${chk('bPct', '%')}${chk('bDate', '날짜')}${chk('bRent', '전세 줄')}</div>
       <div class="cxs-row"><b>라벨 모양</b>${sel('ds', DESIGNS)}<b>색</b>${sel('th', THEMES)}</div>
       <div class="cxs-row"><b>크기</b><input type="range" min="0.7" max="1.6" step="0.05" data-lr="s" value="${ls.s}"><b>글자</b><input type="range" min="10" max="20" step="1" data-lr="f" value="${ls.f}"><span class="hint" style="margin:0">${(+ls.s).toFixed(2)}배 · ${ls.f}px</span></div>
-      <div class="cxs-row"><b>글씨체</b>${sel('ff', Object.fromEntries(FONTS.map(x => [x.k, x.name])))}<b>강조 표시</b>${sel('em', { icon: '아이콘 (👑🆕⭐)', color: '색 바꾸기', border: '굵은 테두리' })}${chk('mu', '지도 바탕 흐리게')}</div>
+      <div class="cxs-row"><b>글씨체</b>${sel('ff', Object.fromEntries(FONTS.map(x => [x.k, x.name])))}<span class="cxs-prev" style="font-family:${(FONTS.find(x => x.k === ls.ff) || FONTS[0]).fam || 'inherit'}">은평뉴타운 '10 · 486세대</span><b>강조 표시</b>${sel('em', { badge: '작은 뱃지 (대장·NEW·★)', color: '라벨 색 바꾸기', border: '굵은 테두리' })}${chk('mu', '지도 바탕 흐리게')}</div>
       <div class="cxs-row"><b>프리셋</b>${Object.entries(BUILTIN).map(([k, x]) => `<button class="mini" data-pre="${k}">${x.name}</button>`).join('')}${Object.keys(presets).map(n => `<span class="hmchip">${U.esc(n)}<button data-my="${U.esc(n)}" title="불러오기">↺</button><button data-del="${U.esc(n)}" title="지우기">✕</button></span>`).join('')}<button class="mini" data-savepre="1">＋ 지금 설정 저장</button></div>
       <div class="cxs-row"><button class="mini" data-cap="1">📷 깔끔하게 캡처 모드</button><button class="mini" data-reset="1">기본값으로</button><span class="hint" style="margin:0">캡처 모드: 버튼·조건 줄을 숨기고 지도와 라벨만 (Esc 로 돌아옴)</span></div>`;
   }
@@ -468,14 +499,24 @@ const CxMap = (() => {
 
   async function init() {
     if (!$('tab-cxmap')) return;
-    st = Object.assign({ ...DEF, codes: [] }, Store.get(SK, {}) || {});
-    ls = Object.assign({ ...LDEF }, Store.get(LK, {}) || {}); ls.cap = 0;
+    st = Object.assign({ ...DEF, codes: [], hide: [], pys: [] }, Store.get(SK, {}) || {});
+    if (typeof st.py === 'string') { if (st.py && !st.pys.length) st.pys = [st.py]; delete st.py; }
+    const sl = Store.get(LK, {}) || {};
+    ls = sl.v === 2 ? Object.assign({ ...LDEF }, sl) : Object.assign({ ...LDEF }, { tip: sl.tip || 'A', bDate: sl.bDate ?? 1, bAmt: sl.bAmt ?? 1, bPct: sl.bPct ?? 1, bRent: sl.bRent ?? 1, mu: sl.mu || 0 });   // 예전 노란 라벨 → 새 고급 디자인
+    ls.cap = 0;
     const R = await Data.regions(); regList = R; regs = new Map(R.map(r => [r[0], r]));
     names = await Data.names().catch(() => null);
     st.codes = st.codes.filter(c => regs.has(c));
     inited = true;
     // 조건 줄
-    $('cxmPy').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.py = b.dataset.v; save(); syncCtl(); redraw(); };
+    $('cxmPy').onclick = (e) => {                               // 여러 개 고르기 · [직접] = ○평~○평
+      const b = e.target.closest('button'); if (!b) return; const v = b.dataset.v;
+      if (v === '') { st.pys = []; st.pr = 0; } else if (v === 'R') st.pr = st.pr ? 0 : 1; else st.pys = st.pys.includes(v) ? st.pys.filter(x => x !== v) : [...st.pys, v];
+      st.pys = PYC.map(p => p[0]).filter(p => st.pys.includes(p));
+      save(); syncCtl(); redraw(); if (v === 'R' && st.pr) $('cxmPyMin').focus();
+    };
+    ['cxmPyMin', 'cxmPyMax'].forEach(id => { $(id).onchange = () => { st.pyMin = $('cxmPyMin').value.trim(); st.pyMax = $('cxmPyMax').value.trim(); save(); syncCtl(); redraw(); }; });
+    $('cxmLoc2').onclick = () => myLocation(false);
     $('cxmHh').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.hh = +b.dataset.v; save(); syncCtl(); redraw(); };
     $('cxmAge').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; st.age = +b.dataset.v; save(); syncCtl(); redraw(); };
     ['cxmHhMin', 'cxmHhMax', 'cxmAgeMax'].forEach(id => { $(id).onchange = () => { st.hhMin = $('cxmHhMin').value; st.hhMax = $('cxmHhMax').value; st.ageMax = $('cxmAgeMax').value; save(); syncCtl(); redraw(); }; });

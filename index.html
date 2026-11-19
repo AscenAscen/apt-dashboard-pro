@@ -68,11 +68,12 @@
       </div>
       <div class="hmrow">
         <span class="hmk">평형</span>
-        <span class="seg" id="cxmPy"><button data-v="">전체</button><button data-v="s">소형</button><button data-v="59">59</button><button data-v="74">74</button><button data-v="84">84</button><button data-v="L">대형</button></span>
+        <span class="seg" id="cxmPy" title="여러 개를 함께 고를 수 있습니다"><button data-v="">전체</button><button data-v="s">소형</button><button data-v="59">59</button><button data-v="74">74</button><button data-v="84">84</button><button data-v="L">대형</button><button data-v="R">직접 (○평~○평)</button></span>
+        <span id="cxmPyCustom" hidden><input id="cxmPyMin" type="number" min="0" max="120" placeholder="최소" style="width:70px"> ~ <input id="cxmPyMax" type="number" min="0" max="120" placeholder="최대" style="width:70px"> 평 <small class="hint" style="margin:0">공급평 (84㎡ ≈ 34평)</small></span>
       </div>
       <div class="hmrow">
         <span class="hmk">세대수</span>
-        <span class="seg" id="cxmHh"><button data-v="0">전체</button><button data-v="300">300↑</button><button data-v="500">500↑</button><button data-v="1000">1,000↑</button><button data-v="2000">2,000↑</button><button data-v="-1">직접</button></span>
+        <span class="seg" id="cxmHh"><button data-v="0">전체</button><button data-v="200">200↑</button><button data-v="300">300↑</button><button data-v="500">500↑</button><button data-v="1000">1,000↑</button><button data-v="2000">2,000↑</button><button data-v="-1">직접</button></span>
         <span id="cxmHhCustom" hidden><input id="cxmHhMin" type="number" min="0" step="50" placeholder="최소" style="width:80px"> ~ <input id="cxmHhMax" type="number" min="0" step="50" placeholder="최대" style="width:80px"> 세대</span>
       </div>
       <div class="hmrow">
@@ -91,7 +92,7 @@
     <div id="cxmStyle" class="cxmstyle" hidden></div>
   </section>
   <section class="panel cxmpanel">
-    <div id="cxmMap" class="cxmmap"></div>
+    <div class="cxmwrap"><div id="cxmMap" class="cxmmap"></div><button id="cxmLoc2" class="cxmloc" title="내 위치로 이동하고 주변 단지 불러오기"><span>◎</span><b>내 위치</b></button></div>
     <p class="hint" id="cxmMsg">지도를 준비하는 중…</p>
     <p class="hint cxmlegend">👑 동마다 대장 단지(200세대↑, 최근 1년 ㎡당 평균가 1위) · 🆕 5년 이내 신축 · ⭐ 시세트래킹에 담은 단지 · 라벨에 마우스를 올리면(휴대폰은 누르면) 실거래·전고점·전저점</p>
   </section>

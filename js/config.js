@@ -27,10 +27,10 @@ const CONFIG = {
   // LAND_SEARCH: 네이버페이 부동산의 "검색 결과 주소". {q} 자리에 단지 이름이 들어갑니다.
   //   비어 있으면: 네이버페이 부동산 첫 화면이 열리고, 단지 이름이 복사돼 있습니다 → 위쪽 검색칸에 붙여넣기(Ctrl+V) → Enter
   //   (주소 뒤의 #q=단지이름 은 네이버가 무시하는 부분이라 화면에는 영향이 없고, 이 사이트가 복사할 이름을 읽는 데만 씁니다)
-  LAND_SEARCH: '',
+  LAND_SEARCH: 'https://fin.land.naver.com/search?q={q}',   // 2026.11 확인: 이 주소로 열면 검색 결과가 바로 나옴
   landLink: (sgg, dong, name) => {
     const q = String(name || '').trim();
-    return CONFIG.LAND_SEARCH ? CONFIG.LAND_SEARCH.replace('{q}', encodeURIComponent(q)) + '#q=' + encodeURIComponent(q) : 'https://fin.land.naver.com/#q=' + encodeURIComponent(q);
+    return CONFIG.LAND_SEARCH ? CONFIG.LAND_SEARCH.replace('{q}', encodeURIComponent(q)) : 'https://fin.land.naver.com/#q=' + encodeURIComponent(q);
   },
 
   // ── 카카오맵 ──────────────────────────────────────────
