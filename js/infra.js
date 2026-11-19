@@ -179,5 +179,16 @@ const Infra = (() => {
     });
   }
 
-  return { init };
+  /** 다른 탭(앞마당 등)에서 단지를 보내 바로 분석: x = { code, key, sido } */
+  async function show(x) {
+    if (!x || !x.code || !x.key) return;
+    if (!regions.length) regions = await Data.regions();
+    const reg = regions.find(r => r[0] === x.code); if (!reg) return U.toast('그 지역을 찾지 못했습니다.');
+    $('inSido').value = reg[1]; await fillSgg(x.code);
+    $('inFind').value = ''; await fillApt(false); $('inApt').value = x.key;
+    if ($('inApt').value !== x.key) return U.toast('입지 분석 목록에서 그 단지를 찾지 못했습니다.');
+    run();
+  }
+
+  return { init, show };
 })();

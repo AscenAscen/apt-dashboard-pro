@@ -378,7 +378,7 @@ const Yard = (() => {
     name: T('단지명', r => r.name), sgg: T('시군구', r => r.sgg), dong: T('동', r => r.dong),
     area: { label: '평형', get: r => `${r.g}㎡ (${CONFIG.toPyeong(r.g)}평)`, num: r => r.g },
     s: N('매매 호가', r => r.s), r: N('전세 호가', r => r.rr), gap: N('투자금', r => r.gap), chg: N('지난 대비', r => r.chg, 'diff'),
-    by: N('연식', r => r.by || null, 'n'), hh: N('세대수', r => r.hh || null, 'n'), sale: N('최근 실거래', r => r.rl.sale?.price ?? null),
+    by: N('연식', r => r.by || null, 'n'), hh: N('세대수', r => r.hh || null, 'n'), sale: N('최근 실거래(매매)', r => r.rl.sale?.price ?? null), rent: N('최근 실거래(전세)', r => r.rl.rent?.price ?? null),
     drop: N('전고 대비', r => r.drop, 'pct'), rise: N('전저 대비', r => r.rise, 'pct'), memo: T('메모', r => cx[r.cid]?.memo || ''),
     sent: T('트래킹', r => (sent(r.id) ? '트래킹에 보냄' : '')),
   });
@@ -423,7 +423,7 @@ const Yard = (() => {
       <div class="cfbar" id="ydCfBar"></div>`;
 
     const H = (k, label, cls = '') => `<th class="${cls}">${label}${PF().btn(k)}</th>`;
-    const COLS = 17;
+    const COLS = 20;
     const rowHtml = (r) => {
       const isPk = picked(r.id), c = cx[r.cid] || {}, sd = sent(r.id);
       const moved = r.plo != null && r.lo != null && r.plo !== r.lo ? `<span class="tag yd-move" title="지난 입력(${esc(r.p.date)})에는 ${bandLabel(r.plo, r.plo + st)}">${bandLabel(r.plo, r.plo + st)}→${bandLabel(r.lo, r.lo + st)} ${r.lo > r.plo ? '⤴' : '⤵'}</span>` : '';
@@ -431,13 +431,15 @@ const Yard = (() => {
       return `<tr data-id="${esc(r.id)}" class="${isPk ? 'yd-pk' : 'yd-grey'}${r.isFirst ? ' yd-picked' : ''}"><td class="c"><input type="checkbox" data-chk ${checked.has(r.id) ? 'checked' : ''}></td>` +
         `<td class="c"><button class="yd-tick ${isPk ? 'on' : ''}" data-pk title="${isPk ? '픽 끄기' : '후보로 픽'}">${isPk ? '✔' : '○'}</button></td>` +
         `<td class="c">${r.lo == null ? '' : `<button class="yd-medal ${r.isFirst ? 'on' : ''}" data-first title="${r.isFirst ? '1등 지정 풀기' : '이 가격대 1등으로 지정'}">${r.isFirst ? '🥇' : '○'}</button>`}</td>` +
-        `<td class="l yd-nm"><button class="yd-x" data-rm title="목록에서 지우기">✕</button>${isPk ? '<b class="yd-ck">✔</b>' : ''}<a href="#" data-hist>${esc(r.name)}</a>${r.manual ? ' <span class="tag yd-manual" title="검색에 없어 직접 추가한 단지">직접</span>' : ''} <small>${esc(r.sgg)} ${esc(r.dong)}</small>${moved}</td>` +
+        `<td class="l yd-sgg">${esc(r.sgg || '')}</td><td class="l yd-dong">${esc(r.dong || '-')}</td>` +
+        `<td class="l yd-nm"><button class="yd-x" data-rm title="목록에서 지우기">✕</button>${isPk ? '<b class="yd-ck">✔</b>' : ''}<a href="#" data-hist>${esc(r.name)}</a>${r.manual ? ' <span class="tag yd-manual" title="검색에 없어 직접 추가한 단지">직접</span>' : ''}${moved}</td>` +
         `<td>${r.g}㎡<small>${CONFIG.toPyeong(r.g)}평</small></td>` +
         `<td class="yd-in"><input class="num" inputmode="decimal" data-f="s" value="${eokIn(r.s)}" placeholder="억">${old}</td><td class="yd-in"><input class="num" inputmode="decimal" data-f="r" value="${eokIn(r.rr)}" placeholder="억"></td>` +
         `<td data-gap>${eok(r.gap)}</td>` +
         `<td class="${U.cls(r.chg)}">${r.chg == null ? '-' : (r.chg > 0 ? '▲' : r.chg < 0 ? '▼' : '') + (r.chg ? eok(Math.abs(r.chg)) : '0')}</td>` +
         `<td>${r.by || '-'}${r.by ? `<small>${r.by > THIS_Y ? '입주 예정' : CONFIG.toAge(r.by) + '년차'}</small>` : ''}</td><td>${r.hh ? r.hh.toLocaleString() : '-'}</td>` +
         `<td>${r.rl.sale ? `${eok(r.rl.sale.price)}<small>${U.date(r.rl.sale.d)}</small>` : '-'}</td>` +
+        `<td>${r.rl.rent ? `${eok(r.rl.rent.price)}<small>${U.date(r.rl.rent.d)}</small>` : '-'}</td>` +
         `<td class="${U.cls(r.drop)}">${U.pct(r.drop, 0)}</td><td class="${U.cls(r.rise)}">${U.pct(r.rise, 0)}</td>` +
         `<td class="l"><input class="wide yd-memo" data-memo value="${esc(c.memo || '')}" placeholder="메모"></td>` +
         `<td class="c">${r.manual ? '<span class="yd-sent" title="직접 추가한 단지는 실거래 자료가 없어 시세트래킹에 담지 않습니다">-</span>' : sd ? `<span class="yd-sent" title="${esc(sd)}에 시세트래킹으로 보냄">트래킹에 보냄</span>` : '<button class="mini" data-trk>담기</button>'}</td>` +
@@ -453,15 +455,15 @@ const Yard = (() => {
         `<span class="yd-pickname">${p ? `🥇 1등: <b>${esc(pn)}</b> ${p.id.split('#')[1]}㎡` : '<span class="hint" style="margin:0">🥇 1등: 아직 안 고름</span>'}</span>`, list);
     };
     const table = rows.length ? `<div class="tablewrap yd-table"><table id="ydTable"><thead><tr><th class="c"><input type="checkbox" id="ydChkAll" title="보이는 단지 모두 체크"></th>` +
-      H('pick', '픽', 'c') + H('first', '1등', 'c') + H('name', '단지명', 'l') + H('area', '평형') + H('s', '매매(억)') + H('r', '전세(억)') + H('gap', '투자금') + H('chg', '지난 대비') +
-      H('by', '연식') + H('hh', '세대수') + H('sale', '최근 실거래') + H('drop', '전고 대비') + H('rise', '전저 대비') + H('memo', '메모', 'l') + H('sent', '트래킹', 'c') + '<th></th></tr></thead>' +
+      H('pick', '픽', 'c') + H('first', '1등', 'c') + H('sgg', '시·군·구', 'l') + H('dong', '동', 'l') + H('name', '단지명', 'l') + H('area', '평형') + H('s', '매매(억)') + H('r', '전세(억)') + H('gap', '투자금') + H('chg', '지난 대비') +
+      H('by', '연식') + H('hh', '세대수') + H('sale', '최근 실거래(매매)') + H('rent', '<span title="국토부 전세 실거래(월세 제외). 갱신계약도 섞여 있어 시세보다 낮게 보일 수 있습니다">최근 실거래(전세) ⓘ</span>') + H('drop', '전고 대비') + H('rise', '전저 대비') + H('memo', '메모', 'l') + H('sent', '트래킹', 'c') + '<th></th></tr></thead>' +
       (fresh.length ? section('fresh', `<b>🆕 새로 추가한 단지 · 호가 입력 필요</b> (${fresh.length}개)`, fresh.sort((a, b) => a.name.localeCompare(b.name, 'ko')), 'yd-new') : '') +
       los.map(bandHtml).join('') +
       (none.length ? section('none', `<b>미입력</b> · 호가를 아직 안 적은 ${none.length}개`, none.sort((a, b) => a.name.localeCompare(b.name, 'ko')), 'yd-none') : '') +
       '</table></div>'
       : `<p class="empty">${total ? (ui.onlyPick ? '픽한 단지가 없습니다. ○ 를 눌러 후보를 픽하거나 "픽한 단지만 보기"를 끄세요.' : '필터에 맞는 단지가 없습니다. 위의 [모두 풀기]를 눌러 보세요.') : `앞마당 단지 중 ${esc(ui.grp)}㎡ 그룹(전용 ${groupOf0(ui.grp)})에 맞는 평형이 없습니다. 다른 평형 버튼을 눌러 보세요.`}</p>`;
     el.innerHTML = head + table +
-      `<div class="bar yd-bulk" id="ydBulk" ${checked.size ? '' : 'hidden'}><b id="ydBulkN">체크한 ${checked.size}개</b><button id="ydBulkPk">✔ 픽 켜기</button><button id="ydBulkUnpk">픽 끄기</button><button id="ydBulkTrk">트래킹 담기</button><button id="ydBulkDel" class="danger">목록에서 지우기</button><button id="ydBulkClr">선택 해제</button></div>` +
+      `<div class="bar yd-bulk" id="ydBulk" ${checked.size ? '' : 'hidden'}><b id="ydBulkN">체크한 ${checked.size}개</b><button id="ydBulkPk">✔ 픽 켜기</button><button id="ydBulkUnpk">픽 끄기</button><button id="ydBulkTrk">트래킹 담기</button><button id="ydBulkCmp">단지 비교로 보내기</button><button id="ydBulkEval">비교 평가로 보내기</button><button id="ydBulkDel" class="danger">목록에서 지우기</button><button id="ydBulkClr">선택 해제</button></div>` +
       `<p class="hint">매매·전세 칸에 억 단위로 적으면 <b>오늘 날짜로 자동 기록</b>되고, 칸을 벗어나면 가격대 칸으로 옮겨집니다. 옆의 작은 날짜는 그날 적은 값이라는 뜻입니다.<br>픽(○/✔) = 후보 표시, 픽 안 한 줄은 회색입니다. 🥇 1등은 가격대마다 하나이고, 1등을 고르면 픽도 켜집니다. 머리글 ▾ 로 엑셀처럼 거르고 정렬할 수 있습니다.</p>`;
     PF().apply(preF, sortFn);                 // 필터 안내 줄(ydCfBar)을 그린 뒤 한 번 더 채움
     pickEvents(rows);
@@ -489,6 +491,8 @@ const Yard = (() => {
     $('ydBulkPk').onclick = bulk(ids => { if (setPick(ids, true)) { checked.clear(); renderPick(); } });
     $('ydBulkUnpk').onclick = bulk(ids => { if (setPick(ids, false)) { checked.clear(); renderPick(); } });
     $('ydBulkTrk').onclick = bulk(ids => { checked.clear(); toTracking(ids); });
+    $('ydBulkCmp').onclick = bulk(ids => { checked.clear(); bulkBar(); sendCompare(ids); });
+    $('ydBulkEval').onclick = bulk(ids => { checked.clear(); bulkBar(); sendEval(ids); });
     $('ydBulkDel').onclick = bulk(ids => removeCx([...new Set(ids.map(id => id.split('#')[0]))]));
     $('ydBulkClr').onclick = () => { checked.clear(); renderPick(); };
     const tb = $('ydTable');
@@ -552,9 +556,9 @@ const Yard = (() => {
 
   function pickExcel(rows) {
     const st = stepMan();
-    const sheet1 = [['가격대', '픽', '1등', '시도', '시군구', '동', '단지', '전용㎡', '평형 그룹', '매매 호가(만원)', '호가 적은 날', '전세 호가(만원)', '투자금(만원)', '지난 대비(만원)', '연식', '세대수', '최근 실거래(만원)', '실거래일', '전고 대비(%)', '전저 대비(%)', '트래킹', '메모']];
+    const sheet1 = [['가격대', '픽', '1등', '시도', '시군구', '동', '단지', '전용㎡', '평형 그룹', '매매 호가(만원)', '호가 적은 날', '전세 호가(만원)', '투자금(만원)', '지난 대비(만원)', '연식', '세대수', '최근 실거래 매매(만원)', '매매 거래일', '최근 실거래 전세(만원)', '전세 거래일', '전고 대비(%)', '전저 대비(%)', '트래킹', '메모']];
     [...rows].sort((a, b) => (a.lo ?? 1e12) - (b.lo ?? 1e12) || (a.s ?? 0) - (b.s ?? 0)).forEach(r => sheet1.push([r.lo == null ? '미입력' : bandLabel(r.lo, r.lo + st), picked(r.id) ? '픽' : '', r.isFirst ? '1등' : '', r.sido, r.sgg, r.dong, r.name, r.g, r.grp,
-      r.s ?? '', r.v?.date || '', r.rr ?? '', r.gap ?? '', r.chg ?? '', r.by || '', r.hh || '', r.rl.sale?.price ?? '', r.rl.sale ? U.date(r.rl.sale.d) : '', r.drop == null ? '' : +r.drop.toFixed(1), r.rise == null ? '' : +r.rise.toFixed(1), sent(r.id) ? '트래킹에 보냄' : '', cx[r.cid]?.memo || '']));
+      r.s ?? '', r.v?.date || '', r.rr ?? '', r.gap ?? '', r.chg ?? '', r.by || '', r.hh || '', r.rl.sale?.price ?? '', r.rl.sale ? U.date(r.rl.sale.d) : '', r.rl.rent?.price ?? '', r.rl.rent ? U.date(r.rl.rent.d) : '', r.drop == null ? '' : +r.drop.toFixed(1), r.rise == null ? '' : +r.rise.toFixed(1), sent(r.id) ? '트래킹에 보냄' : '', cx[r.cid]?.memo || '']));
     const sheet2 = [['달', '평형 그룹', '가격대', '1등 단지', '전용㎡', '지역']];
     Object.entries(picks[ui.ym] || {}).forEach(([gk, g]) => Object.keys(g).map(Number).sort((a, b) => a - b).forEach(lo => { const p = g[lo], c = cx[p.id.split('#')[0]] || {}; sheet2.push([ymLabel(ui.ym), gk, bandLabel(lo, p.hi), c.name || p.name || '', +p.id.split('#')[1], `${c.sgg || ''} ${c.dong || ''}`.trim()]); }));
     U.download(`앞마당_${ui.grp}_1등뽑기_${U.stamp()}`, [{ name: `${ui.grp} 가격대별`, rows: sheet1 }, { name: `${ymLabel(ui.ym)} 1등`, rows: sheet2 }]);
@@ -563,7 +567,8 @@ const Yard = (() => {
   /* ── ⋯ 메뉴 ── */
   function showMenu(btn, id) {
     const m = $('ydMenu'), r = btn.getBoundingClientRect(), c = cx[id.split('#')[0]] || {};
-    m.innerHTML = (c.manual ? '<button data-m="edit">✏ 정보 고치기</button>' : '') + `<button data-m="hist">📈 가격 이력</button><button data-m="naver">네이버 부동산</button>${typeof View3D !== 'undefined' ? '<button data-m="v3d">3D로 보기</button>' : ''}${$('tab-sat') ? '<button data-m="sat">위성지도</button>' : ''}`;
+    m.innerHTML = (c.manual ? '<button data-m="edit">✏ 정보 고치기</button>' : '') + `<button data-m="hist">📈 가격 이력</button><button data-m="naver">네이버 부동산</button>${typeof View3D !== 'undefined' ? '<button data-m="v3d">3D로 보기</button>' : ''}${$('tab-sat') ? '<button data-m="sat">위성지도</button>' : ''}` +
+      (c.manual ? '' : '<hr class="yd-hr"><button data-m="cmp">↗ 단지 비교로</button><button data-m="eval">↗ 비교 평가로</button><button data-m="infra">↗ 입지 분석으로</button>');
     m.hidden = false;
     m.style.top = (window.scrollY + r.bottom + 4) + 'px'; m.style.left = Math.max(8, window.scrollX + r.right - 170) + 'px';
     m.onclick = (e) => {
@@ -573,6 +578,9 @@ const Yard = (() => {
       if (k === 'v3d') { App.showTab('v3d'); View3D.show({ code: c.code, key: c.key, sido: c.sido, sgg: c.sgg, dong: c.dong, jibun: c.jibun, name: c.name }); }
       if (k === 'sat') openSat(c);
       if (k === 'edit') openManual(id.split('#')[0]);
+      if (k === 'cmp') sendCompare([id]);
+      if (k === 'eval') sendEval([id]);
+      if (k === 'infra') sendInfra(id);
     };
   }
   function hideMenu() { const m = $('ydMenu'); if (m) m.hidden = true; }
@@ -580,6 +588,80 @@ const Yard = (() => {
     App.showTab('sat');
     try { await navigator.clipboard.writeText(`${c.sgg} ${c.dong} ${c.name}`); U.toast(`「${c.sgg} ${c.dong} ${c.name}」을(를) 복사했습니다. 위성지도 검색칸에 붙여넣기(Ctrl+V) 하세요.`); }
     catch (e) { U.toast(`위성지도 검색칸에 「${c.name}」을(를) 입력하세요.`); }
+  }
+
+  /* ═════════ 다른 탭으로 보내기 (단지 비교 · 비교 평가 · 입지 분석) ═════════ */
+  const SEND_MAX = 4;
+  function sendRows(ids, where) {
+    ids = [...new Set(ids)];
+    const man = ids.filter(id => cx[id.split('#')[0]]?.manual);
+    if (man.length) U.toast(`직접 추가한 단지 ${man.length}개는 실거래 자료가 없어 ${where}(으)로 보내지 않았습니다.`);
+    return ids.filter(id => !man.includes(id)).map(id => { const p = Kit.parseId(id), c = cx[`${p.code}|${p.key}`] || {};
+      return { id, code: p.code, key: p.key, g: p.g, name: c.name || p.name, sido: c.sido, sgg: c.sgg, dong: c.dong ?? p.dong, jibun: c.jibun ?? p.jibun }; });
+  }
+  /** 꽉 찼을 때 바꿀 칸 고르기 → 고른 칸 번호 배열을 돌려줌 (취소하면 null) */
+  function chooseReplace(where, names, need) {
+    return new Promise((res) => {
+      const box = modal(`<div class="bar"><strong>${esc(where)} 칸이 모자랍니다</strong><span class="grow"></span><button data-close>✕</button></div>
+        <p class="hint" style="margin:0">${esc(where)}는 ${SEND_MAX}개까지 넣을 수 있습니다. 바꿀 칸을 <b>${need}개</b> 고르세요.</p>
+        <div class="yd-rep">${names.map((n, i) => `<label class="row" style="gap:8px"><input type="checkbox" value="${i}"> ${'ABCD'[i] || i + 1}. ${esc(n)}</label>`).join('')}</div>
+        <div class="bar"><span class="grow"></span><button data-close>취소</button><button class="primary" id="ydRepOk">바꾸기</button></div>`);
+      let done = false;
+      const fin = (v) => { if (done) return; done = true; res(v); };
+      box.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => fin(null)));
+      $('ydModal').addEventListener('click', (e) => { if (e.target.id === 'ydModal') fin(null); }, { once: true });
+      box.querySelector('#ydRepOk').onclick = () => {
+        const sel = [...box.querySelectorAll('.yd-rep input:checked')].map(i => +i.value);
+        if (sel.length !== need) return U.toast(`바꿀 칸을 ${need}개 골라 주세요. (지금 ${sel.length}개)`);
+        closeModal(); fin(sel);
+      };
+    });
+  }
+  /** slots(길이 4, 빈칸 null)에 새 단지들을 넣음 → 새 slots 또는 null(취소) */
+  async function fitSlots(where, slots, adds, nameOf, same) {
+    adds = adds.filter(a => { if (slots.some(s => s && same(s, a))) { U.toast(`${a.name} ${a.g}㎡ 는 이미 ${where}에 있습니다.`); return false; } return true; });
+    if (!adds.length) return null;
+    if (adds.length > SEND_MAX) { U.toast(`${where}는 ${SEND_MAX}개까지라서 앞의 ${SEND_MAX}개만 보냅니다.`); adds = adds.slice(0, SEND_MAX); }
+    const out = [...slots];
+    const empty = out.map((s, i) => (s ? -1 : i)).filter(i => i >= 0);
+    let spots = empty.slice(0, adds.length);
+    if (spots.length < adds.length) {
+      const need = adds.length - spots.length;
+      const filled = out.map((s, i) => (s ? i : -1)).filter(i => i >= 0);
+      const pick = await chooseReplace(where, filled.map(i => nameOf(out[i])), need);
+      if (!pick) return null;
+      spots = [...spots, ...pick.map(k => filled[k])].sort((a, b) => a - b);
+    }
+    adds.forEach((a, i) => { out[spots[i]] = a; });
+    return out;
+  }
+  async function sendCompare(ids) {
+    if (typeof Compare === 'undefined') return U.toast('단지 비교 탭을 찾지 못했습니다.');
+    const adds = sendRows(ids, '단지 비교'); if (!adds.length) return;
+    const st = Compare.getState();
+    const cur = Array.from({ length: SEND_MAX }, (_, i) => { const s = st.slots?.[i]; return s && s.key ? { code: s.code, key: s.key, g: +s.g || null, name: Data.parseKey(s.key).name } : null; });
+    const next = await fitSlots('단지 비교', cur, adds, (s) => `${s.name}${s.g ? ' ' + s.g + '㎡' : ''}`, (s, a) => s.code === a.code && s.key === a.key && +s.g === +a.g);
+    if (!next) return;
+    App.showTab('compare');
+    await Compare.setState({ ...st, slots: next.map(s => (s ? { code: s.code, key: s.key, g: s.g } : { code: '', key: '', g: '' })) });
+    U.toast(`단지 비교로 ${adds.length}개를 보냈습니다.`);
+  }
+  async function sendEval(ids) {
+    const adds = sendRows(ids, '비교 평가'); if (!adds.length) return;
+    const EKEY = 'apt.eval.v1', st = Store.get(EKEY, { list: [], mode: 'auto', custom: [], labels: {} });
+    const cur = Array.from({ length: SEND_MAX }, (_, i) => st.list[i] || null);
+    const next = await fitSlots('비교 평가', cur, adds, (s) => `${s.name} ${s.g}㎡`, (s, a) => s.code === a.code && s.key === a.key && +s.g === +a.g);
+    if (!next) return;
+    st.list = next.filter(Boolean).map(s => ({ code: s.code, key: s.key, g: s.g, name: s.name, dong: s.dong, jibun: s.jibun, sido: s.sido, sgg: s.sgg }));
+    Store.set(EKEY, st);
+    App.showTab('eval');
+    U.toast(`비교 평가로 ${adds.length}개를 보냈습니다.`);
+  }
+  function sendInfra(id) {
+    if (typeof Infra === 'undefined' || !Infra.show) return U.toast('입지 분석 탭이 단지를 받을 수 없습니다. js/infra.js 를 새 파일로 올렸는지 확인하세요.');
+    const [a] = sendRows([id], '입지 분석'); if (!a) return;
+    App.showTab('infra');
+    Infra.show(a);
   }
 
   /* ═════════ ② 조사 기록 ═════════ */
