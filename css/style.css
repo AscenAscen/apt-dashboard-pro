@@ -1209,3 +1209,17 @@ td.yd-rc a { font-weight: 600; }
 .yd-chg { color: var(--up); font-size: 11px; }
 .warn-hint { color: var(--rent); }
 #tab-yard .modalbox { max-height: 92vh; overflow: auto; }
+/* 앞마당: 픽(후보)·회색·입력칸 */
+#ydTable tr.yd-grey td, #ydETable tr.yd-grey td { opacity: .45; }
+#ydTable tr.yd-grey td:first-child, #ydTable tr.yd-grey td:nth-child(2), #ydTable tr.yd-grey:hover td { opacity: 1; }
+#ydTable tr.yd-grey:hover td { opacity: .85; }
+#ydTable tr.yd-pk td.yd-nm a, #ydETable tr.yd-pk td a { font-weight: 700; }
+.yd-ck { color: var(--accent); margin-right: 4px; }
+button.yd-tick { border: 1px solid var(--line); background: none; border-radius: 6px; font-size: 14px; line-height: 1; padding: 3px 7px; cursor: pointer; color: var(--sub); }
+button.yd-tick.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+td.yd-in input { width: 64px; }
+.yd-when { display: block; font-size: 10px; color: var(--sub); margin: 1px 0 0 !important; }
+.yd-sent { color: var(--sub); font-size: 11px; white-space: nowrap; }
+tr.yd-new td { color: var(--rent); }
+button.danger-fill { background: var(--danger, #e5484d); border-color: var(--danger, #e5484d); color: #fff; }
+#ydHPk.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
