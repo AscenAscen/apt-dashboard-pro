@@ -1250,3 +1250,7 @@ label.yd-gs small { color: var(--sub); margin-left: 2px; font-weight: 400; }
 .tag.yd-mg button { border: 0; background: none; color: var(--sub); cursor: pointer; padding: 0 4px; }
 .fdrop .yd-man { display: block; width: 100%; text-align: left; color: var(--accent); font-weight: 700; }
 .filters .yd-rgrp label { flex-direction: row; align-items: center; color: var(--text); font-size: 14px; gap: 3px; }
+/* 앞마당: 지역 칸 · 보내기 */
+#ydTable td.yd-sgg, #ydTable td.yd-dong { white-space: nowrap; color: var(--sub); font-size: 13px; }
+.yd-menu hr.yd-hr { border: 0; border-top: 1px solid var(--line); margin: 2px 0; width: 100%; }
+.yd-rep { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
