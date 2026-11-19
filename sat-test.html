@@ -28,6 +28,8 @@
   .thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .thumbs figure { margin: 0; text-align: center; font-size: 11px; color: #aaa; }
   .thumbs img { width: 96px; height: 96px; display: block; border: 1px solid #444; background: #000; }
+  select { padding: 7px; border-radius: 6px; border: 1px solid #444; background: #000; color: #eee; margin-left: 4px; }
+  label { font-size: 13px; color: #ccc; }
   textarea { width: 100%; height: 140px; background: #000; color: #ddd; border: 1px solid #444; border-radius: 6px; font-size: 12px; }
 </style>
 </head>
@@ -71,6 +73,35 @@
       <h2>4. 이 기기에서 만들 수 있는 사진 크기</h2>
       <button id="t4">시험 4 실행</button>
       <div class="res" id="r4">태블릿에서도 한 번 실행해 주세요.</div>
+    </div>
+
+    <div class="card">
+      <h2>5. 고화질 저장</h2>
+      <div class="row">
+        <label>범위
+          <select id="hqRange">
+            <option value="view">지금 보이는 화면</option>
+            <option value="250">지도 가운데 반경 250m</option>
+            <option value="500" selected>지도 가운데 반경 500m</option>
+            <option value="1000">지도 가운데 반경 1km</option>
+          </select>
+        </label>
+        <label>화질
+          <select id="hqLevel">
+            <option value="19" selected>레벨 19 (최고, 약 25cm)</option>
+            <option value="18">레벨 18 (고화질, 약 50cm)</option>
+            <option value="17">레벨 17 (보통, 약 1m)</option>
+            <option value="16">레벨 16 (약 2m)</option>
+            <option value="15">레벨 15 (약 4m)</option>
+          </select>
+        </label>
+      </div>
+      <div class="res" id="hqInfo"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="hqGo">고화질로 저장</button>
+        <button id="hqStop" class="gray" disabled>멈추기</button>
+      </div>
+      <div class="res" id="hqRes"></div>
     </div>
 
     <div class="card">
@@ -270,6 +301,148 @@
     set('r4', (max ? '<span class="ok">이 기기는 가로·세로 ' + max + '픽셀까지 만들 수 있어요.</span>' : '<span class="bad">큰 사진을 만들 수 없어요.</span>') +
       (bad.length ? '\n안 되는 크기: ' + bad.join(', ') : ''));
     record('4_최대크기', max + 'px (안 됨: ' + (bad.join(', ') || '없음') + ')');
+  };
+
+  // 5. 고화질 저장
+  function lonLatToPx(lon, lat, z) {
+    var size = 256 * Math.pow(2, z);
+    var r = lat * Math.PI / 180;
+    return {
+      x: (lon + 180) / 360 * size,
+      y: (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * size
+    };
+  }
+  var maxCanvasCache = 0;
+  function maxCanvas() {
+    if (maxCanvasCache) return maxCanvasCache;
+    var best = 2048;
+    [4096, 6144, 8192].forEach(function (s) {
+      try {
+        var cv = document.createElement('canvas'); cv.width = s; cv.height = s;
+        var ctx = cv.getContext('2d'); ctx.fillStyle = '#123456'; ctx.fillRect(s - 2, s - 2, 1, 1);
+        if (ctx.getImageData(s - 2, s - 2, 1, 1).data[2] === 0x56) best = s;
+        cv.width = 1; cv.height = 1;
+      } catch (e) {}
+    });
+    maxCanvasCache = best;
+    return best;
+  }
+  function getBox() {
+    var v = $('hqRange').value;
+    if (v === 'view') {
+      var b = map.getBounds();
+      return { w: b.getWest(), e: b.getEast(), s: b.getSouth(), n: b.getNorth() };
+    }
+    var r = parseInt(v, 10), c = map.getCenter();
+    var dLat = r / 111320, dLon = r / (111320 * Math.cos(c.lat * Math.PI / 180));
+    return { w: c.lng - dLon, e: c.lng + dLon, s: c.lat - dLat, n: c.lat + dLat };
+  }
+  function plan(z) {
+    var box = getBox();
+    var a = lonLatToPx(box.w, box.n, z), b = lonLatToPx(box.e, box.s, z);
+    var x0 = Math.floor(a.x), y0 = Math.floor(a.y);
+    var w = Math.round(b.x - a.x), h = Math.round(b.y - a.y);
+    var tx0 = Math.floor(a.x / 256), ty0 = Math.floor(a.y / 256);
+    var tx1 = Math.floor((b.x - 1) / 256), ty1 = Math.floor((b.y - 1) / 256);
+    return { z: z, x0: x0, y0: y0, w: w, h: h, tx0: tx0, ty0: ty0, tx1: tx1, ty1: ty1,
+             count: (tx1 - tx0 + 1) * (ty1 - ty0 + 1) };
+  }
+  function bestPlan() {
+    var want = parseInt($('hqLevel').value, 10), lim = maxCanvas();
+    for (var z = want; z >= 12; z--) {
+      var p = plan(z);
+      if (p.w <= lim && p.h <= lim) { p.wanted = want; p.lim = lim; return p; }
+    }
+    var p2 = plan(12); p2.wanted = want; p2.lim = lim; return p2;
+  }
+  function updateInfo() {
+    var p = bestPlan();
+    var sec = Math.max(1, Math.round(p.count / 12));
+    var msg = '저장될 사진: ' + p.w + ' × ' + p.h + '픽셀 (레벨 ' + p.z + ')\n조각 ' + p.count + '개, 예상 약 ' + sec + '초';
+    if (p.z < p.wanted) msg += '\n<span class="warn">⚠ 이 기기 한계(' + p.lim + '픽셀) 때문에 레벨 ' + p.wanted + ' → ' + p.z + '로 낮췄어요. 범위를 줄이면 더 높은 화질로 저장돼요.</span>';
+    set('hqInfo', msg);
+  }
+  $('hqRange').onchange = updateInfo; $('hqLevel').onchange = updateInfo;
+  map.on('moveend', updateInfo);
+  setTimeout(updateInfo, 300);
+
+  var stopFlag = false;
+  $('hqStop').onclick = function () { stopFlag = true; };
+
+  function loadTileRetry(key, z, y, x, tries) {
+    return loadImg(tileUrl(key, z, y, x), true).catch(function (e) {
+      if (tries > 0 && !stopFlag) {
+        return new Promise(function (r) { setTimeout(r, 600); }).then(function () { return loadTileRetry(key, z, y, x, tries - 1); });
+      }
+      throw e;
+    });
+  }
+
+  $('hqGo').onclick = function () {
+    if (needKey()) return;
+    var p = bestPlan();
+    if (p.count > 400 && !confirm('조각 ' + p.count + '개를 받아요. 시간이 좀 걸려요. 계속할까요?')) return;
+    var key = getKey();
+    stopFlag = false;
+    $('hqGo').disabled = true; $('hqStop').disabled = false;
+
+    var cv = document.createElement('canvas');
+    cv.width = p.w; cv.height = p.h;
+    var ctx = cv.getContext('2d');
+    ctx.fillStyle = '#222'; ctx.fillRect(0, 0, p.w, p.h);
+
+    var queue = [];
+    for (var ty = p.ty0; ty <= p.ty1; ty++) for (var tx = p.tx0; tx <= p.tx1; tx++) queue.push({ x: tx, y: ty });
+    var done = 0, failed = 0, t0 = Date.now();
+    function progress() {
+      set('hqRes', '받는 중... ' + done + ' / ' + p.count + (failed ? ' (실패 ' + failed + ')' : ''));
+    }
+    function worker() {
+      if (stopFlag || !queue.length) return Promise.resolve();
+      var t = queue.shift();
+      return loadTileRetry(key, p.z, t.y, t.x, 2).then(function (img) {
+        ctx.drawImage(img, t.x * 256 - p.x0, t.y * 256 - p.y0);
+      }).catch(function () { failed++; }).then(function () {
+        done++; progress();
+        return new Promise(function (r) { setTimeout(r, 30); });
+      }).then(worker);
+    }
+    progress();
+    var workers = []; for (var i = 0; i < 6; i++) workers.push(worker());
+
+    Promise.all(workers).then(function () {
+      if (stopFlag) { set('hqRes', '<span class="warn">멈췄어요.</span>'); return; }
+      var fs = Math.max(14, Math.round(p.w / 90));
+      ctx.font = fs + 'px sans-serif';
+      var label = '출처: 브이월드';
+      var tw = ctx.measureText(label).width + fs;
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(p.w - tw, p.h - fs * 1.8, tw, fs * 1.8);
+      ctx.fillStyle = '#fff'; ctx.fillText(label, p.w - tw + fs / 2, p.h - fs * 0.6);
+      return new Promise(function (resolve, reject) {
+        cv.toBlob(function (b) {
+          if (!b) { reject(new Error('사진 만들기 실패 (기기 메모리 부족 가능)')); return; }
+          var d = new Date();
+          var ds = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+          var name = 'sat_L' + p.z + '_' + p.w + 'x' + p.h + '_' + ds + '.jpg';
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(b); a.download = name;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+          var secs = Math.round((Date.now() - t0) / 1000);
+          var mb = (b.size / 1048576).toFixed(1);
+          set('hqRes', '<span class="ok">✅ 저장했어요: ' + name + '</span>\n' + p.w + '×' + p.h + '픽셀, ' + mb + 'MB, ' + secs + '초' +
+            (failed ? '\n<span class="warn">빠진 조각 ' + failed + '개는 회색으로 남았어요.</span>' : ''));
+          record('5_고화질', '성공 L' + p.z + ' ' + p.w + 'x' + p.h + ' ' + mb + 'MB ' + secs + '초 실패조각 ' + failed);
+          resolve();
+        }, 'image/jpeg', 0.92);
+      });
+    }).catch(function (e) {
+      set('hqRes', '<span class="bad">❌ 실패: ' + e.message + '</span>');
+      record('5_고화질', '실패 - ' + e.message);
+    }).then(function () {
+      cv.width = 1; cv.height = 1;
+      $('hqGo').disabled = false; $('hqStop').disabled = true;
+    });
   };
 
   $('copy').onclick = function () {
