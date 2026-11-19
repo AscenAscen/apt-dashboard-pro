@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>위성지도</title>
+<!--
+  satellite.html — [위성지도] 탭 (브이월드 위성영상 보기 · 고화질 저장)
+  · 대시보드의 [위성지도] 탭 안에 창(iframe)으로 열립니다. 이 주소를 직접 열어 따로 써도 됩니다.
+  · 다른 탭과 코드·화면을 나눠 쓰지 않습니다. 대시보드 자료(data/)와 설정(js/config.js)은 읽기만 합니다.
+  · 브이월드 인증키: js/config.js 의 VWORLD_KEY → 없으면 3D 탭에 넣은 키 → 없으면 여기서 직접 입력
+  · 단지 위치: 브이월드 주소 검색(지오코더). 3D 탭에서 [위치 고치기]로 고친 위치가 있으면 그걸 먼저 씁니다.
+  저장 위치 (모두 위성지도 전용 이름): apt.sat.ui.v1 화면 설정 · apt.sat.geo.v1 찾은 단지 위치 · apt.sat.key 직접 넣은 키
+-->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0b0b0b; color: #e8e8e8; font-family: -apple-system, "Malgun Gothic", sans-serif; font-size: 14px; }
+  .sat-wrap { display: flex; height: 100%; min-height: 560px; }
+  .sat-side { width: 330px; flex: none; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid #262626; background: #111; }
+  .sat-mapbox { flex: 1; position: relative; min-width: 0; }
+  #satMap { position: absolute; inset: 0; background: #1a1a1a; }
+  .sat-card { background: #181818; border: 1px solid #2c2c2c; border-radius: 10px; padding: 10px; }
+  .sat-card h3 { margin: 0 0 8px; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .sat-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .sat-col { display: flex; flex-direction: column; gap: 5px; }
+  .sat-side input[type=text], .sat-side input[type=search], .sat-side select { padding: 7px 8px; border-radius: 6px; border: 1px solid #3a3a3a; background: #000; color: #eee; font-size: 14px; }
+  .sat-side input[type=search] { flex: 1; min-width: 0; }
+  .sat-side select { flex: 1; min-width: 0; }
+  .sat-side label { font-size: 13px; color: #ccc; display: flex; align-items: center; gap: 6px; }
+  .sat-side button { padding: 7px 11px; border-radius: 6px; border: 0; background: #333; color: #fff; cursor: pointer; font-size: 13px; }
+  .sat-side button.pri { background: #2d6cdf; }
+  .sat-side button.on { background: #e08a1e; }
+  .sat-side button:disabled { opacity: .45; cursor: default; }
+  .sat-hint { font-size: 12px; color: #9a9a9a; line-height: 1.5; margin: 6px 0 0; white-space: pre-wrap; }
+  .ok { color: #5fd38d; } .bad { color: #ff6b6b; } .warn { color: #f2c94c; }
+  .sat-results { margin-top: 6px; max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .sat-results button { text-align: left; background: #222; padding: 6px 8px; line-height: 1.35; }
+  .sat-results button small { display: block; color: #9a9a9a; font-size: 11px; }
+  .sat-results .grp { font-size: 11px; color: #888; margin: 6px 2px 2px; }
+  .sat-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+  .sat-lvl { position: absolute; z-index: 1000; top: 10px; right: 10px; background: rgba(0,0,0,.75); padding: 6px 10px; border-radius: 6px; font-size: 13px; pointer-events: none; }
+  .sat-title { position: absolute; z-index: 1000; top: 10px; left: 54px; background: rgba(0,0,0,.75); padding: 6px 10px; border-radius: 6px; font-size: 13px; max-width: 60%; pointer-events: none; }
+  .sat-draw .leaflet-container { cursor: crosshair; }
+  .sat-lab { transform: translate(-50%, -100%); color: #fff; border-radius: 6px; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.6); line-height: 1.35; position: relative; pointer-events: auto; }
+  .sat-lab::after { content: ''; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border: 6px solid transparent; border-bottom: 0; border-top-color: inherit; }
+  .sat-lab b { font-weight: 700; }
+  .sat-keybox code { background: #000; padding: 1px 4px; border-radius: 4px; }
+  @media (max-width: 760px) {
+    .sat-wrap { flex-direction: column; height: auto; }
+    .sat-side { width: 100%; border-right: 0; border-bottom: 1px solid #262626; max-height: none; }
+    .sat-mapbox { height: 70vh; flex: none; }
+  }
+</style>
+</head>
+<body>
+<div class="sat-wrap">
+  <aside class="sat-side">
+
+    <div class="sat-card sat-keybox" id="satKeyBox" hidden>
+      <h3>🔑 브이월드 인증키</h3>
+      <p class="sat-hint" style="margin-top:0">js/config.js 에 키가 없어서 여기서 넣어야 해요. 키는 이 브라우저에만 저장돼요.</p>
+      <div class="sat-row" style="margin-top:6px"><input type="text" id="satKeyIn" placeholder="브이월드 인증키" style="flex:1"><button class="pri" id="satKeySave">저장</button></div>
+    </div>
+
+    <div class="sat-card">
+      <h3>🔎 검색</h3>
+      <div class="sat-row"><input type="search" id="satQ" placeholder="단지 이름, 동 이름, 주소" autocomplete="off"><button class="pri" id="satGo">검색</button></div>
+      <p class="sat-hint">단지 이름은 쓰는 동안 바로 찾아요. 동·주소·장소는 [검색]이나 Enter.</p>
+      <div class="sat-results" id="satRes"></div>
+    </div>
+
+    <div class="sat-card">
+      <h3>🗺 지도 위 표시</h3>
+      <div class="sat-col">
+        <label><input type="checkbox" id="ovHybrid"> 지명·도로명</label>
+        <label><input type="checkbox" id="ovCad"> 지적도 (필지 경계선 · 레벨 17 이상)</label>
+        <label><input type="checkbox" id="ovZone"> 용도지역 (반투명)</label>
+      </div>
+      <p class="sat-hint" id="ovNote"></p>
+    </div>
+
+    <div class="sat-card">
+      <h3>🏷 단지 라벨 <span style="flex:1"></span><label style="font-weight:400"><input type="checkbox" id="lbOn"> 보이기</label></h3>
+      <div class="sat-fields" id="lbFields">
+        <label><input type="checkbox" data-f="name"> 단지명</label>
+        <label><input type="checkbox" data-f="year"> 연식</label>
+        <label><input type="checkbox" data-f="hh"> 세대수</label>
+        <label><input type="checkbox" data-f="dong"> 동수</label>
+        <label><input type="checkbox" data-f="sale"> 최근 매매가</label>
+        <label><input type="checkbox" data-f="rent"> 최근 전세가</label>
+      </div>
+      <div class="sat-row" style="margin-top:8px">
+        <label>크기 <select id="lbSize"><option value="s">작게</option><option value="m">보통</option><option value="l">크게</option></select></label>
+        <label><input type="checkbox" id="lbDeclutter"> 겹치면 숨기기</label>
+      </div>
+      <div class="sat-row" style="margin-top:8px">
+        <button id="lbArea">📍 이 동네 단지 불러오기</button>
+        <button id="lbClear">라벨 지우기</button>
+      </div>
+      <p class="sat-hint" id="lbNote">단지를 검색해 고르면 그 단지와 같은 동 단지에 라벨이 붙어요. 가격은 전용 84㎡ 기준이고, 없으면 가장 가까운 평형으로 보여 줘요.</p>
+    </div>
+
+    <div class="sat-card">
+      <h3>💾 고화질 저장</h3>
+      <div class="sat-col">
+        <label>범위 <select id="svRange">
+          <option value="view">지금 보이는 화면</option>
+          <option value="250">지도 가운데 반경 250m</option>
+          <option value="500">지도 가운데 반경 500m</option>
+          <option value="1000">지도 가운데 반경 1km</option>
+          <option value="box" disabled>직접 그린 네모</option>
+        </select></label>
+        <div class="sat-row"><button id="svDraw">▭ 네모 그리기</button><span class="sat-hint" style="margin:0">지도에서 끌어서 범위를 그려요</span></div>
+        <label>화질 <select id="svLevel">
+          <option value="19">레벨 19 (최고 · 약 25cm)</option>
+          <option value="18">레벨 18 (고화질 · 약 50cm)</option>
+          <option value="17">레벨 17 (보통 · 약 1m)</option>
+          <option value="16">레벨 16 (약 2m)</option>
+          <option value="15">레벨 15 (약 4m)</option>
+        </select></label>
+      </div>
+      <p class="sat-hint" id="svInfo"></p>
+      <div class="sat-row" style="margin-top:8px"><button class="pri" id="svGo">고화질로 저장</button><button id="svStop" disabled>멈추기</button></div>
+      <p class="sat-hint" id="svRes"></p>
+    </div>
+
+    <p class="sat-hint">위성영상·지명·지적도·용도지역: 브이월드(국토교통부). 군사·보안시설은 가려져 있고, 촬영 시점은 지역마다 달라요. 단지 정보: K-apt·국토부 실거래.</p>
+  </aside>
+
+  <div class="sat-mapbox" id="satBox">
+    <div id="satMap"></div>
+    <div class="sat-title" id="satTitle" hidden></div>
+    <div class="sat-lvl" id="satLvl">레벨 -</div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var UKEY = 'apt.sat.ui.v1', GKEY = 'apt.sat.geo.v1', KKEY = 'apt.sat.key', FIX3D = 'apt.v3d.fix.v1', KEY3D = 'apt.v3d.key';
+  var CFG = (typeof CONFIG !== 'undefined' && CONFIG) || {};      /* js/config.js 의 설정 (읽기만) */
+  var DATA = CFG.DATA_URL || 'data';
+  var HALF = 20037508.342789244;
+
+  /* ── 저장 도구 (대시보드 저장소와 같은 모양: JSON 문자열) ── */
+  function lsGet(k, fb) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 가득 참 → 무시 */ } }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  var ui = Object.assign({
+    lat: 37.5663, lng: 126.9779, z: 17, range: '250', level: '19', lbOn: true, lsize: 'm', declutter: true,
+    f: { name: true, year: true, hh: true, dong: false, sale: false, rent: false },
+    ov: { hybrid: false, cad: false, zone: false }
+  }, lsGet(UKEY, {}));
+  ui.f = Object.assign({ name: true, year: true, hh: true, dong: false, sale: false, rent: false }, ui.f || {});
+  ui.ov = Object.assign({ hybrid: false, cad: false, zone: false }, ui.ov || {});
+  if (ui.range === 'box') ui.range = '250';
+  var saveUiTimer = null;
+  function saveUi() { clearTimeout(saveUiTimer); saveUiTimer = setTimeout(function () { lsSet(UKEY, ui); }, 300); }
+
+  function getKey() {
+    var k = CFG.VWORLD_KEY || lsGet(KEY3D, '') || lsGet(KKEY, '');
+    return String(k || '').trim();
+  }
+
+  /* ── 지도 ── */
+  var map = L.map('satMap', { minZoom: 7, maxZoom: 21, zoomControl: true }).setView([ui.lat, ui.lng], ui.z);
+  var base = null;
+  function tileUrl(key, layer, z, y, x, ext) {
+    return 'https://api.vworld.kr/req/wmts/1.0.0/' + encodeURIComponent(key) + '/' + layer + '/' + z + '/' + y + '/' + x + '.' + ext;
+  }
+  function setBase() {
+    if (base) { map.removeLayer(base); base = null; }
+    var key = getKey();
+    $('satKeyBox').hidden = !!key;
+    if (!key) return;
+    base = L.tileLayer(tileUrl(key, 'Satellite', '{z}', '{y}', '{x}', 'jpeg'), { maxNativeZoom: 19, maxZoom: 21, attribution: '위성영상: 브이월드' }).addTo(map);
+  }
+  function showLvl() {
+    var z = map.getZoom();
+    $('satLvl').textContent = '레벨 ' + z + (z > 19 ? ' · 19 넘음(늘려 보기만 해요)' : z === 19 ? ' · 최대 확대' : '');
+  }
+  map.on('zoomend', function () { showLvl(); if (ui.declutter && labeled.size) drawLabels(); });
+  map.on('moveend', function () { var c = map.getCenter(); ui.lat = +c.lat.toFixed(6); ui.lng = +c.lng.toFixed(6); ui.z = map.getZoom(); saveUi(); updateInfo(); drawPreview(); });
+  showLvl();
+
+  $('satKeySave').onclick = function () {
+    var v = $('satKeyIn').value.trim();
+    if (!/^[A-Za-z0-9-]{10,60}$/.test(v)) { alert('키 모양이 맞지 않아요. 브이월드에서 받은 키를 그대로 붙여 넣어 주세요.'); return; }
+    lsSet(KKEY, v); setBase(); Object.keys(OV).forEach(function (id) { if (ui.ov[id]) enableOv(id); });
+  };
+
+  function setTitle(t) { var el = $('satTitle'); el.textContent = t || ''; el.hidden = !t; }
+
+  /* ── 브이월드 API (주소·검색) : fetch 가 막히면 JSONP 로 다시 ── */
+  var jpSeq = 0;
+  function vw(svc, params) {
+    var key = getKey();
+    if (!key) return Promise.reject(new Error('인증키 없음'));
+    var q = new URLSearchParams(Object.assign({ key: key, format: 'json', errorformat: 'json', domain: location.origin }, params));
+    var url = 'https://api.vworld.kr/req/' + svc + '?' + q.toString();
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .catch(function () {
+        return new Promise(function (resolve, reject) {
+          var cb = '__satjp' + (++jpSeq) + '_' + Date.now();
+          var s = document.createElement('script');
+          var t = setTimeout(function () { done(); reject(new Error('응답 없음')); }, 12000);
+          function done() { clearTimeout(t); try { delete window[cb]; } catch (e) { window[cb] = undefined; } s.remove(); }
+          window[cb] = function (d) { done(); resolve(d); };
+          s.onerror = function () { done(); reject(new Error('불러오기 실패')); };
+          s.src = url + '&callback=' + cb;
+          document.head.appendChild(s);
+        });
+      });
+  }
+  function vwOk(d) { return d && d.response && d.response.status === 'OK' ? d.response.result : null; }
+
+  /* ── 대시보드 자료 (읽기만) ── */
+  var jcache = new Map();
+  function getJson(path, fb) {
+    if (!jcache.has(path)) jcache.set(path, fetch(DATA + '/' + path, { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : fb; }).catch(function () { return fb; }));
+    return jcache.get(path);
+  }
+  var regionsP = null, regionMap = {};
+  function regions() {
+    if (!regionsP) regionsP = getJson('regions.json', []).then(function (list) { list.forEach(function (r) { regionMap[r[0]] = { sido: r[1], sgg: r[2] }; }); return list; });
+    return regionsP;
+  }
+  var namesP = null, nameIndex = [];
+  function norm(s) { return String(s || '').replace(/\s+/g, '').toLowerCase(); }
+  function names() {
+    if (!namesP) namesP = Promise.all([regions(), getJson('names.json', { r: {} })]).then(function (a) {
+      var r = (a[1] && a[1].r) || {};
+      Object.keys(r).forEach(function (code) {
+        var rg = regionMap[code] || {};
+        r[code].forEach(function (key) {
+          var p = key.split('|');
+          nameIndex.push({ code: code, key: key, dong: p[0], jibun: p[1] || '', name: p.slice(2).join('|'), sido: rg.sido || '', sgg: rg.sgg || '', n: norm(p.slice(2).join('|')) });
+        });
+      });
+      return nameIndex;
+    });
+    return namesP;
+  }
+
+  /* ── 검색 ── */
+  var lastLocal = [], lastRemote = [];
+  function renderResults(msg) {
+    var box = $('satRes'), h = '';
+    if (lastLocal.length) h += '<div class="grp">단지</div>' + lastLocal.map(function (x, i) {
+      return '<button data-l="' + i + '">' + esc(x.name) + '<small>' + esc(x.sido + ' ' + x.sgg + ' ' + x.dong + ' ' + x.jibun) + '</small></button>';
+    }).join('');
+    if (lastRemote.length) h += '<div class="grp">지역·주소·장소</div>' + lastRemote.map(function (x, i) {
+      return '<button data-r="' + i + '">' + esc(x.title) + '<small>' + esc(x.sub) + '</small></button>';
+    }).join('');
+    if (msg) h += '<p class="sat-hint">' + msg + '</p>';
+    box.innerHTML = h;
+  }
+  var qTimer = null;
+  $('satQ').addEventListener('input', function () {
+    clearTimeout(qTimer);
+    var q = norm(this.value);
+    if (q.length < 2) { lastLocal = []; lastRemote = []; renderResults(); return; }
+    qTimer = setTimeout(function () {
+      names().then(function (list) {
+        var starts = [], has = [];
+        for (var i = 0; i < list.length && starts.length < 15; i++) {
+          var x = list[i];
+          if (x.n.indexOf(q) === 0) starts.push(x); else if (has.length < 15 && x.n.indexOf(q) > 0) has.push(x);
+        }
+        lastLocal = starts.concat(has).slice(0, 15); lastRemote = [];
+        renderResults(lastLocal.length ? '' : '단지 이름으로는 못 찾았어요. 동·주소면 [검색]을 눌러 주세요.');
+      });
+    }, 180);
+  });
+  function remoteSearch() {
+    var q = $('satQ').value.trim();
+    if (!q) return;
+    renderResults('찾는 중…');
+    var c = map.getCenter();
+    var common = { service: 'search', request: 'search', version: '2.0', crs: 'EPSG:4326', size: '8', page: '1', query: q, point: c.lng + ',' + c.lat };
+    var jobs = [
+      vw('search', Object.assign({ type: 'district', category: 'L4' }, common)),
+      vw('search', Object.assign({ type: 'district', category: 'L2' }, common)),
+      vw('search', Object.assign({ type: 'address', category: 'road' }, common)),
+      vw('search', Object.assign({ type: 'address', category: 'parcel' }, common)),
+      vw('search', Object.assign({ type: 'place' }, common))
+    ].map(function (p) { return p.then(vwOk).catch(function () { return null; }); });
+    Promise.all(jobs).then(function (rs) {
+      var out = [], seen = {};
+      rs.forEach(function (res, i) {
+        var items = (res && res.items) || [];
+        items.forEach(function (it) {
+          if (!it.point) return;
+          var addr = it.address ? (it.address.road || it.address.parcel || '') : '';
+          var title = it.title || addr || '';
+          var sub = i <= 1 ? '지역' : i <= 3 ? '주소' : (addr || it.category || '장소');
+          var id = title + '|' + (+it.point.x).toFixed(4) + '|' + (+it.point.y).toFixed(4);
+          if (seen[id]) return; seen[id] = 1;
+          out.push({ title: title, sub: sub, lat: +it.point.y, lng: +it.point.x, zoom: i <= 1 ? (i === 1 ? 14 : 16) : 18 });
+        });
+      });
+      lastRemote = out.slice(0, 20);
+      renderResults(out.length ? '' : (lastLocal.length ? '' : '찾지 못했어요. 다른 이름으로 검색해 보세요.'));
+    });
+  }
+  $('satGo').onclick = remoteSearch;
+  $('satQ').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); remoteSearch(); } });
+  $('satRes').onclick = function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.l != null) pickComplex(lastLocal[+b.dataset.l]);
+    else if (b.dataset.r != null) { var r = lastRemote[+b.dataset.r]; map.setView([r.lat, r.lng], r.zoom); setTitle(r.title); curName = r.title; }
+  };
+
+  /* ── 단지 위치 찾기 ── */
+  var geo = lsGet(GKEY, {});
+  var geoSaveT = null;
+  function saveGeo() { clearTimeout(geoSaveT); geoSaveT = setTimeout(function () { lsSet(GKEY, geo); }, 500); }
+  function idOf(x) { return x.code + '|' + x.key; }
+  function locate(x) {
+    var fix = lsGet(FIX3D, {})[idOf(x)];
+    if (fix && fix.lat) return Promise.resolve({ lat: fix.lat, lng: fix.lng, src: '3D에서 고친 위치' });
+    var g = geo[idOf(x)];
+    if (g) return Promise.resolve(g[0] == null ? null : { lat: g[0], lng: g[1], src: g[2] });
+    var addr = (x.sido + ' ' + x.sgg + ' ' + x.dong + ' ' + x.jibun).replace(/\s+/g, ' ').trim();
+    var netErr = false;
+    function soft(e) { netErr = true; return null; }
+    return vw('address', { service: 'address', request: 'getcoord', version: '2.0', crs: 'epsg:4326', address: addr, refine: 'true', simple: 'true', type: 'parcel' })
+      .then(vwOk, soft)
+      .then(function (res) {
+        if (res && res.point) return { lat: +res.point.y, lng: +res.point.x, src: '지번 주소' };
+        return vw('search', { service: 'search', request: 'search', version: '2.0', crs: 'EPSG:4326', size: '5', page: '1', type: 'place', query: x.dong + ' ' + x.name })
+          .then(vwOk, soft)
+          .then(function (r2) {
+            var it = ((r2 && r2.items) || []).filter(function (i) { var a = i.address ? (i.address.parcel || i.address.road || '') : ''; return a.indexOf(x.dong) >= 0 || a.indexOf(x.sgg.split(' ')[0]) >= 0; })[0];
+            return it ? { lat: +it.point.y, lng: +it.point.x, src: '장소 검색(대략)' } : null;
+          });
+      })
+      .then(function (p) {
+        if (p) geo[idOf(x)] = [+p.lat.toFixed(6), +p.lng.toFixed(6), p.src];
+        else if (!netErr) geo[idOf(x)] = [null, null, ''];          /* 브이월드가 "없다"고 답한 것만 기억 (연결 실패는 다음에 다시 시도) */
+        saveGeo();
+        return p;
+      });
+  }
+
+  /* ── 단지 정보 (연식·세대수·동수·최근 거래) ── */
+  var infoCache = {};
+  function regionInfo(code, needTrades) {
+    var c = infoCache[code] || (infoCache[code] = {});
+    if (!c.base) c.base = Promise.all([getJson('index/' + code + '.json', { c: {}, y: { sale: [], rent: [] } }), getJson('kapt/' + code + '.json', { m: {} })])
+      .then(function (a) { return { idx: a[0], kapt: (a[1] && a[1].m) || {} }; });
+    if (!needTrades) return c.base;
+    if (!c.trades) c.trades = c.base.then(function (b) {
+      var y = b.idx.y || {}, jobs = [];
+      var out = { sale: {}, rent: {} };
+      ['sale', 'rent'].forEach(function (kind) {
+        (y[kind] || []).slice().sort().slice(-2).forEach(function (yr) {
+          jobs.push(getJson(kind + '/' + code + '/' + yr + '.json', {}).then(function (d) { out[kind][yr] = d; }));
+        });
+      });
+      return Promise.all(jobs).then(function () { b.tr = out; return b; });
+    });
+    return c.trades;
+  }
+  function recent(yearMap, key) {
+    var byArea = {};
+    Object.keys(yearMap || {}).forEach(function (yr) {
+      var areas = (yearMap[yr] || {})[key]; if (!areas) return;
+      Object.keys(areas).forEach(function (ak) {
+        if (/d$/.test(ak)) return;
+        var area = parseFloat(ak), flat = areas[ak];
+        for (var i = 0; i + 2 < flat.length; i += 3) {
+          var d = (+yr) * 10000 + flat[i];
+          var cur = byArea[area];
+          if (!cur || d > cur.d) byArea[area] = { area: area, d: d, price: flat[i + 2] };
+        }
+      });
+    });
+    var list = Object.keys(byArea).map(function (k) { return byArea[k]; });
+    if (!list.length) return null;
+    list.sort(function (a, b) { return Math.abs(a.area - 84) - Math.abs(b.area - 84) || b.d - a.d; });
+    var best = list[0];
+    var near = list.filter(function (t) { return Math.round(t.area) === Math.round(best.area); });
+    near.sort(function (a, b) { return b.d - a.d; });
+    return near[0];
+  }
+  function won(m) { return m >= 10000 ? (Math.round(m / 1000) / 10).toFixed(1).replace(/\.0$/, '') + '억' : m.toLocaleString('ko-KR') + '만'; }
+  function ym(d) { var s = String(d); return s.slice(2, 4) + '.' + s.slice(4, 6); }
+  function priceText(tag, t) {
+    if (!t) return '';
+    var a = Math.round(t.area), area = (a >= 80 && a <= 89) ? '' : ' ' + a + '㎡';
+    return tag + ' ' + won(t.price) + area + '(' + ym(t.d) + ')';
+  }
+
+  /* ── 라벨 ── */
+  var labeled = new Map();         // id → { x, pos, info, marker, main }
+  var labelLayer = L.layerGroup().addTo(map);
+  var SIZE = { s: 11, m: 13, l: 15 };
+  function lines(l) {
+    var f = ui.f, x = l.x, info = l.info || {}, out = [];
+    if (f.name) out.push({ t: x.name, b: true });
+    var row = [];
+    if (f.year && info.year) row.push(info.year + '년');
+    if (f.hh && info.hh) row.push(info.hh.toLocaleString('ko-KR') + '세대');
+    if (f.dong && info.dong) row.push(info.dong + '개동');
+    if (row.length) out.push({ t: row.join(' · ') });
+    var pr = [];
+    if (f.sale && info.sale) pr.push(priceText('매', info.sale));
+    if (f.rent && info.rent) pr.push(priceText('전', info.rent));
+    if (pr.length) out.push({ t: pr.join(' · ') });
+    if (!out.length) out.push({ t: x.name, b: true });
+    return out;
+  }
+  function labelHtml(l) {
+    var fs = SIZE[ui.lsize] || 13, bg = l.main ? '#e08a1e' : '#2d6cdf';
+    return '<div class="sat-lab" style="background:' + bg + ';border-top-color:' + bg + ';font-size:' + fs + 'px;padding:' + Math.round(fs * .3) + 'px ' + Math.round(fs * .6) + 'px">' +
+      lines(l).map(function (ln) { return ln.b ? '<b>' + esc(ln.t) + '</b>' : '<span style="font-size:.88em;opacity:.95">' + esc(ln.t) + '</span>'; }).join('<br>') + '</div>';
+  }
+  /* 라벨 크기 어림 (화면·저장 공통) → 겹치는 라벨 고르기: 고른 단지 먼저, 그다음 세대수가 많은 순 */
+  var mctx = document.createElement('canvas').getContext('2d');
+  function labelSize(l, scale) {
+    var fs = (SIZE[ui.lsize] || 13) * scale, pad = fs * 0.55, gap = fs * 0.25, w = 0, h = pad * 2 - gap;
+    lines(l).forEach(function (ln) {
+      var sz = ln.b ? fs : fs * 0.88;
+      mctx.font = (ln.b ? 'bold ' : '') + Math.round(sz) + 'px "Malgun Gothic", sans-serif';
+      w = Math.max(w, mctx.measureText(ln.t).width); h += sz + gap;
+    });
+    return { w: w + pad * 2, h: h + 6 * scale };
+  }
+  function pickVisible(list, toPt, scale) {
+    var sorted = list.filter(function (l) { return l.pos; }).sort(function (a, b) {
+      return (b.main ? 1 : 0) - (a.main ? 1 : 0) || ((b.info && b.info.hh) || 0) - ((a.info && a.info.hh) || 0);
+    });
+    if (!ui.declutter) return sorted;
+    var placed = [], out = [];
+    sorted.forEach(function (l) {
+      var pt = toPt(l), sz = labelSize(l, scale), m = 2 * scale;
+      var bx = { x0: pt.x - sz.w / 2 - m, x1: pt.x + sz.w / 2 + m, y0: pt.y - sz.h - m, y1: pt.y + m };
+      var hit = placed.some(function (q) { return bx.x0 < q.x1 && bx.x1 > q.x0 && bx.y0 < q.y1 && bx.y1 > q.y0; });
+      if (!hit) { placed.push(bx); out.push(l); }
+    });
+    return out;
+  }
+  var hiddenCount = 0;
+  function drawLabels() {
+    labelLayer.clearLayers();
+    if (!ui.lbOn) return;
+    var all = []; labeled.forEach(function (l) { all.push(l); });
+    var vis = pickVisible(all, function (l) { return map.latLngToContainerPoint([l.pos.lat, l.pos.lng]); }, 1);
+    hiddenCount = all.filter(function (l) { return l.pos; }).length - vis.length;
+    vis.forEach(function (l) {
+      l.marker = L.marker([l.pos.lat, l.pos.lng], { icon: L.divIcon({ className: '', iconSize: null, html: labelHtml(l) }), zIndexOffset: l.main ? 1000 : 0 });
+      l.marker.addTo(labelLayer);
+    });
+  }
+  function fillInfo(list) {
+    var needTr = ui.f.sale || ui.f.rent;
+    var byCode = {};
+    list.forEach(function (l) { (byCode[l.x.code] = byCode[l.x.code] || []).push(l); });
+    return Promise.all(Object.keys(byCode).map(function (code) {
+      return regionInfo(code, needTr).then(function (b) {
+        byCode[code].forEach(function (l) {
+          var k = l.x.key, kp = b.kapt[k] || [];
+          l.info = l.info || {};
+          l.info.year = (b.idx.c || {})[k] || l.info.year;
+          l.info.hh = kp[0] || l.info.hh;
+          l.info.dong = kp[1] || l.info.dong;
+          if (needTr && b.tr) { l.info.sale = recent(b.tr.sale, k); l.info.rent = recent(b.tr.rent, k); }
+        });
+      });
+    }));
+  }
+  function addLabels(items, mainId, progressEl) {
+    var todo = items.filter(function (x) { return !labeled.has(idOf(x)); });
+    items.forEach(function (x) { var l = labeled.get(idOf(x)); if (l) l.main = idOf(x) === mainId; });
+    var i = 0, done = 0, miss = 0;
+    function worker() {
+      if (i >= todo.length) return Promise.resolve();
+      var x = todo[i++];
+      return locate(x).then(function (p) {
+        done++; if (!p) miss++;
+        if (p) labeled.set(idOf(x), { x: x, pos: p, info: null, main: idOf(x) === mainId });
+        if (progressEl) progressEl.textContent = '단지 위치 찾는 중… ' + done + ' / ' + todo.length;
+      }).catch(function () { done++; miss++; }).then(worker);
+    }
+    var ws = []; for (var w = 0; w < 4; w++) ws.push(worker());
+    return Promise.all(ws).then(function () {
+      var list = []; labeled.forEach(function (l) { list.push(l); });
+      return fillInfo(list);
+    }).then(function () { drawLabels(); return { added: todo.length - miss, miss: miss }; });
+  }
+  function sameDong(x) {
+    return names().then(function (list) { return list.filter(function (y) { return y.code === x.code && y.dong === x.dong; }).slice(0, 120); });
+  }
+
+  var curName = '';
+  function pickComplex(x) {
+    if (!x) return;
+    setTitle(x.name + ' · ' + x.sgg + ' ' + x.dong); curName = x.name;
+    $('lbNote').textContent = '위치를 찾는 중…';
+    locate(x).then(function (p) {
+      if (!p) { $('lbNote').innerHTML = '<span class="warn">' + esc(x.name) + ' 위치를 찾지 못했어요. 동 이름으로 검색해서 지도를 옮겨 주세요.</span>'; return; }
+      map.setView([p.lat, p.lng], Math.max(map.getZoom(), 17));
+      if (!ui.lbOn) { $('lbNote').textContent = '위치: ' + p.src; return; }
+      sameDong(x).then(function (list) {
+        if (!list.some(function (y) { return idOf(y) === idOf(x); })) list.unshift(x);
+        return addLabels(list, idOf(x), $('lbNote'));
+      }).then(function (r) {
+        $('lbNote').textContent = x.name + ' 위치: ' + p.src + '. 같은 동 단지 ' + labeled.size + '곳에 라벨을 붙였어요' + (r && r.miss ? ' (위치 못 찾음 ' + r.miss + '곳)' : '') + '.';
+      });
+    });
+  }
+
+  $('lbArea').onclick = function () {
+    if (!getKey()) return;
+    var c = map.getCenter(), note = $('lbNote');
+    note.textContent = '지도 가운데 동네를 확인하는 중…';
+    Promise.all([regions(), names(), vw('address', { service: 'address', request: 'getAddress', version: '2.0', crs: 'epsg:4326', point: c.lng + ',' + c.lat, type: 'parcel', simple: 'false' }).then(vwOk).catch(function () { return null; })])
+      .then(function (a) {
+        var res = a[2], st = res && res[0] && res[0].structure;
+        if (!st) { note.innerHTML = '<span class="warn">이 위치의 동네를 찾지 못했어요. 지도를 아파트 단지 쪽으로 옮겨 다시 눌러 주세요.</span>'; return; }
+        var sido = st.level1 || '', sgg = (st.level2 || '').trim(), dong = (st.level4L || st.level4A || '').trim();
+        var code = (a[0].filter(function (r) { return r[2] === sgg && (r[1] === sido || sido.indexOf(r[1].slice(0, 2)) === 0); })[0] ||
+                    a[0].filter(function (r) { return r[2] === sgg || r[2].replace(/\s/g, '') === sgg.replace(/\s/g, ''); })[0] || [])[0];
+        if (!code) { note.innerHTML = '<span class="warn">' + esc(sido + ' ' + sgg) + '는 대시보드 수집 지역이 아니라서 단지 자료가 없어요.</span>'; return; }
+        var list = a[1].filter(function (y) { return y.code === code && y.dong === dong; }).slice(0, 120);
+        if (!list.length) { note.textContent = sgg + ' ' + dong + '에는 대시보드에 있는 단지가 없어요.'; return; }
+        if (!ui.lbOn) { ui.lbOn = true; $('lbOn').checked = true; saveUi(); }
+        return addLabels(list, null, note).then(function (r) {
+          note.textContent = sgg + ' ' + dong + ' 단지 ' + r.added + '곳에 라벨을 붙였어요' + (r.miss ? ' (위치 못 찾음 ' + r.miss + '곳)' : '') + '. 지금 라벨 ' + labeled.size + '곳.';
+        });
+      });
+  };
+  $('lbClear').onclick = function () { labeled.clear(); drawLabels(); $('lbNote').textContent = '라벨을 모두 지웠어요.'; };
+  $('lbOn').checked = ui.lbOn;
+  $('lbOn').onchange = function () { ui.lbOn = this.checked; saveUi(); drawLabels(); };
+  document.querySelectorAll('#lbFields input').forEach(function (cb) {
+    cb.checked = !!ui.f[cb.dataset.f];
+    cb.onchange = function () {
+      ui.f[cb.dataset.f] = cb.checked; saveUi();
+      if ((cb.dataset.f === 'sale' || cb.dataset.f === 'rent') && cb.checked) {
+        var list = []; labeled.forEach(function (l) { list.push(l); });
+        $('lbNote').textContent = '거래 자료를 읽는 중…';
+        fillInfo(list).then(function () { drawLabels(); $('lbNote').textContent = '가격은 전용 84㎡ 기준이고, 없으면 가장 가까운 평형으로 보여 줘요. 괄호는 거래 연.월이에요.'; });
+      } else drawLabels();
+    };
+  });
+  $('lbDeclutter').checked = ui.declutter;
+  $('lbDeclutter').onchange = function () { ui.declutter = this.checked; saveUi(); drawLabels(); };
+  $('lbSize').value = ui.lsize;
+  $('lbSize').onchange = function () { ui.lsize = this.value; saveUi(); drawLabels(); };
+
+  /* ── 지도 위 표시 (지명·지적도·용도지역) ── */
+  var OV = {
+    zone:   { name: '용도지역', type: 'wms', cands: ['lt_c_uq111', 'lt_c_uq112', 'lt_c_landinfobasemap'], alpha: 0.5 },
+    cad:    { name: '지적도', type: 'wms', cands: ['lp_pa_cbnd_bubun', 'lp_pa_cbnd_bonbun'] },
+    hybrid: { name: '지명·도로명', type: 'wmts', layer: 'Hybrid', ext: 'png' }
+  };
+  var ORDER = ['zone', 'cad', 'hybrid'];
+  var CB = { hybrid: 'ovHybrid', cad: 'ovCad', zone: 'ovZone' };
+  var ovLayer = {}, ovNotes = {};
+  function box3857(z, x, y) { var s = 2 * HALF / Math.pow(2, z), mx = -HALF + x * s, my = HALF - y * s; return [mx, my - s, mx + s, my]; }
+  function ovUrl(o, key, z, y, x, crs, lyr) {
+    if (o.type === 'wmts') return tileUrl(key, o.layer, z, y, x, o.ext);
+    var l = lyr || o.layer;
+    return 'https://api.vworld.kr/req/wms?' + new URLSearchParams({
+      service: 'WMS', request: 'GetMap', version: '1.3.0', key: key, domain: location.origin,
+      layers: l, styles: l, crs: crs || o.crs || 'EPSG:900913', bbox: box3857(z, x, y).join(','),
+      width: '256', height: '256', format: 'image/png', transparent: 'true', exceptions: 'text/xml'
+    }).toString();
+  }
+  function loadImg(url, cors) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image(); if (cors) img.crossOrigin = 'anonymous';
+      var t = setTimeout(function () { img.src = ''; reject(new Error('시간 초과')); }, 15000);
+      img.onload = function () { clearTimeout(t); resolve(img); };
+      img.onerror = function () { clearTimeout(t); reject(new Error('불러오기 실패')); };
+      img.src = url;
+    });
+  }
+  function canSave(url) {
+    return loadImg(url, true).then(function (img) {
+      var cv = document.createElement('canvas'); cv.width = 8; cv.height = 8;
+      cv.getContext('2d').drawImage(img, 0, 0, 8, 8); cv.toDataURL('image/png'); return true;
+    });
+  }
+  function lonLatToPx(lon, lat, z) {
+    var size = 256 * Math.pow(2, z), r = lat * Math.PI / 180;
+    return { x: (lon + 180) / 360 * size, y: (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * size };
+  }
+  function detect(id) {
+    var o = OV[id], key = getKey(), c = map.getCenter(), z = 17;
+    var p = lonLatToPx(c.lng, c.lat, z), tx = Math.floor(p.x / 256), ty = Math.floor(p.y / 256);
+    if (o.checked) return Promise.resolve(o.savable);
+    if (o.type === 'wmts') return canSave(ovUrl(o, key, z, ty, tx)).then(function () { o.checked = true; o.savable = true; return true; }, function () { o.checked = true; o.savable = false; return false; });
+    var tries = [];
+    o.cands.forEach(function (ly) { ['EPSG:900913', 'EPSG:3857'].forEach(function (crs) { tries.push({ ly: ly, crs: crs }); }); });
+    var i = 0;
+    function next() {
+      if (i >= tries.length) {
+        o.layer = o.cands[0]; o.crs = 'EPSG:900913';
+        return loadImg(ovUrl(o, key, z, ty, tx), false).then(function () { o.checked = true; o.savable = false; return false; }, function () { return null; });
+      }
+      var t = tries[i++];
+      return canSave(ovUrl(o, key, z, ty, tx, t.crs, t.ly)).then(function () { o.layer = t.ly; o.crs = t.crs; o.checked = true; o.savable = true; return true; }, next);
+    }
+    return next();
+  }
+  function ovNoteRender() {
+    var msgs = ORDER.map(function (id) { return ovNotes[id]; }).filter(Boolean);
+    $('ovNote').innerHTML = msgs.join('\n');
+  }
+  function enableOv(id) {
+    if (!getKey()) return;
+    var o = OV[id];
+    ovNotes[id] = o.name + ' 확인 중…'; ovNoteRender();
+    detect(id).then(function (r) {
+      if (!$(CB[id]).checked) { ovNotes[id] = ''; ovNoteRender(); return; }
+      if (r === null) {
+        ovNotes[id] = '<span class="bad">' + o.name + ' 표시를 불러오지 못했어요. 잠시 뒤 다시 켜 보세요.</span>';
+        $(CB[id]).checked = false; ui.ov[id] = false; saveUi(); o.checked = false; ovNoteRender(); return;
+      }
+      ovNotes[id] = r ? '' : '<span class="warn">' + o.name + ': 화면에는 보이지만 저장 사진에는 안 들어가요.</span>';
+      ovNoteRender();
+      if (ovLayer[id]) map.removeLayer(ovLayer[id]);
+      var key = getKey();
+      var Lyr = L.TileLayer.extend({ getTileUrl: function (c) { return ovUrl(o, key, c.z, c.y, c.x); } });
+      ovLayer[id] = new Lyr('', { maxNativeZoom: 19, maxZoom: 21, opacity: o.alpha || 1, zIndex: 10 + ORDER.indexOf(id) }).addTo(map);
+    });
+  }
+  Object.keys(CB).forEach(function (id) {
+    var el = $(CB[id]);
+    el.checked = !!ui.ov[id];
+    el.onchange = function () {
+      ui.ov[id] = el.checked; saveUi();
+      if (ovLayer[id]) { map.removeLayer(ovLayer[id]); ovLayer[id] = null; }
+      if (el.checked) enableOv(id); else { ovNotes[id] = ''; ovNoteRender(); }
+    };
+  });
+
+  /* ── 저장 범위 ── */
+  var drawnBox = null, previewRect = null, drawMode = false;
+  function getBox() {
+    var v = $('svRange').value;
+    if (v === 'view') { var b = map.getBounds(); return { w: b.getWest(), e: b.getEast(), s: b.getSouth(), n: b.getNorth() }; }
+    if (v === 'box' && drawnBox) return drawnBox;
+    var r = parseInt(v, 10) || 250, c = map.getCenter();
+    var dLat = r / 111320, dLon = r / (111320 * Math.cos(c.lat * Math.PI / 180));
+    return { w: c.lng - dLon, e: c.lng + dLon, s: c.lat - dLat, n: c.lat + dLat };
+  }
+  function drawPreview() {
+    var v = $('svRange').value;
+    if (v === 'view') { if (previewRect) { map.removeLayer(previewRect); previewRect = null; } return; }
+    var b = getBox(), bounds = [[b.s, b.w], [b.n, b.e]];
+    if (!previewRect) previewRect = L.rectangle(bounds, { color: '#ffcc00', weight: 2, dashArray: '6 4', fill: false, interactive: false }).addTo(map);
+    else previewRect.setBounds(bounds);
+  }
+  $('svRange').value = ui.range;
+  $('svLevel').value = ui.level;
+  $('svRange').onchange = function () { if (this.value !== 'box') { ui.range = this.value; saveUi(); } updateInfo(); drawPreview(); };
+  $('svLevel').onchange = function () { ui.level = this.value; saveUi(); updateInfo(); };
+
+  var drawStart = null;
+  function setDraw(on) {
+    drawMode = on;
+    $('svDraw').classList.toggle('on', on);
+    $('svDraw').textContent = on ? '✕ 그리기 취소' : '▭ 네모 그리기';
+    document.body.classList.toggle('sat-draw', on);
+    if (on) map.dragging.disable(); else map.dragging.enable();
+  }
+  $('svDraw').onclick = function () { setDraw(!drawMode); };
+  var mc = map.getContainer();
+  mc.addEventListener('pointerdown', function (e) {
+    if (!drawMode || e.button > 0) return;
+    e.preventDefault(); e.stopPropagation();
+    drawStart = map.mouseEventToLatLng(e);
+    try { mc.setPointerCapture(e.pointerId); } catch (x) { /* 무시 */ }
+  }, true);
+  mc.addEventListener('pointermove', function (e) {
+    if (!drawMode || !drawStart) return;
+    var p = map.mouseEventToLatLng(e);
+    drawnBox = { w: Math.min(drawStart.lng, p.lng), e: Math.max(drawStart.lng, p.lng), s: Math.min(drawStart.lat, p.lat), n: Math.max(drawStart.lat, p.lat) };
+    $('svRange').querySelector('option[value=box]').disabled = false;
+    $('svRange').value = 'box'; drawPreview();
+  }, true);
+  mc.addEventListener('pointerup', function () {
+    if (!drawMode || !drawStart) return;
+    drawStart = null; setDraw(false);
+    if (!drawnBox || drawnBox.e - drawnBox.w < 1e-5) { drawnBox = null; $('svRange').value = ui.range; }
+    updateInfo(); drawPreview();
+  }, true);
+
+  /* ── 기기 한계 · 저장 계획 ── */
+  var maxCv = 0;
+  function maxCanvas() {
+    if (maxCv) return maxCv;
+    var best = 2048;
+    [4096, 6144, 8192].forEach(function (s) {
+      try {
+        var cv = document.createElement('canvas'); cv.width = s; cv.height = s;
+        var ctx = cv.getContext('2d'); ctx.fillStyle = '#123456'; ctx.fillRect(s - 2, s - 2, 1, 1);
+        if (ctx.getImageData(s - 2, s - 2, 1, 1).data[2] === 0x56) best = s;
+        cv.width = 1; cv.height = 1;
+      } catch (e) { /* 이 크기는 안 됨 */ }
+    });
+    return (maxCv = best);
+  }
+  function plan(z) {
+    var box = getBox(), a = lonLatToPx(box.w, box.n, z), b = lonLatToPx(box.e, box.s, z);
+    var tx0 = Math.floor(a.x / 256), ty0 = Math.floor(a.y / 256), tx1 = Math.floor((b.x - 1) / 256), ty1 = Math.floor((b.y - 1) / 256);
+    return { z: z, x0: Math.floor(a.x), y0: Math.floor(a.y), w: Math.max(1, Math.round(b.x - a.x)), h: Math.max(1, Math.round(b.y - a.y)),
+             tx0: tx0, ty0: ty0, tx1: tx1, ty1: ty1, count: (tx1 - tx0 + 1) * (ty1 - ty0 + 1) };
+  }
+  function bestPlan() {
+    var want = parseInt($('svLevel').value, 10), lim = maxCanvas(), p;
+    for (var z = want; z >= 12; z--) { p = plan(z); if (p.w <= lim && p.h <= lim) break; }
+    p.wanted = want; p.lim = lim; return p;
+  }
+  function updateInfo() {
+    var p = bestPlan(), n = ORDER.filter(function (id) { return ui.ov[id] && OV[id].savable; }).length;
+    var sec = Math.max(1, Math.round(p.count * (1 + n) / 14));
+    var mb = Math.max(0.1, p.w * p.h * 0.18 / 1048576).toFixed(1);
+    var msg = '저장될 사진: ' + p.w.toLocaleString() + ' × ' + p.h.toLocaleString() + '픽셀 (레벨 ' + p.z + ')\n조각 ' + p.count.toLocaleString() + '개 · 예상 약 ' + sec + '초 · 약 ' + mb + 'MB';
+    if (p.z < p.wanted) msg += '\n<span class="warn">⚠ 이 기기 한계(' + p.lim.toLocaleString() + '픽셀) 때문에 레벨 ' + p.wanted + ' → ' + p.z + '로 낮췄어요. 범위를 줄이면 더 선명해요.</span>';
+    $('svInfo').innerHTML = msg;
+  }
+
+  /* ── 저장용 라벨 그리기 ── */
+  function drawLabelCanvas(ctx, l, x, y, scale) {
+    var fs = (SIZE[ui.lsize] || 13) * scale, pad = fs * 0.55, gap = fs * 0.25;
+    var ls = lines(l).map(function (ln) { return { t: ln.t, f: (ln.b ? 'bold ' : '') + Math.round(ln.b ? fs : fs * 0.88) + 'px "Malgun Gothic", sans-serif', h: ln.b ? fs : fs * 0.88 }; });
+    var w = 0, h = pad * 2 - gap;
+    ls.forEach(function (ln) { ctx.font = ln.f; w = Math.max(w, ctx.measureText(ln.t).width); h += ln.h + gap; });
+    w += pad * 2;
+    var tip = 6 * scale, bx = x - w / 2, by = y - h - tip, bg = l.main ? '#e08a1e' : '#2d6cdf', r = 5 * scale;
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(bx + 2 * scale, by + 2 * scale, w, h);
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by); ctx.lineTo(bx + w - r, by); ctx.quadraticCurveTo(bx + w, by, bx + w, by + r);
+    ctx.lineTo(bx + w, by + h - r); ctx.quadraticCurveTo(bx + w, by + h, bx + w - r, by + h);
+    ctx.lineTo(x + tip, by + h); ctx.lineTo(x, y); ctx.lineTo(x - tip, by + h);
+    ctx.lineTo(bx + r, by + h); ctx.quadraticCurveTo(bx, by + h, bx, by + h - r);
+    ctx.lineTo(bx, by + r); ctx.quadraticCurveTo(bx, by, bx + r, by); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textBaseline = 'top';
+    var cy = by + pad;
+    ls.forEach(function (ln) { ctx.font = ln.f; ctx.fillText(ln.t, bx + pad, cy); cy += ln.h + gap; });
+  }
+
+  /* ── 고화질 저장 ── */
+  var stopFlag = false, saving = false;
+  $('svStop').onclick = function () { stopFlag = true; };
+  function loadTileRetry(url, tries) {
+    return loadImg(url, true).catch(function (e) {
+      if (tries > 0 && !stopFlag) return sleep(700).then(function () { return loadTileRetry(url, tries - 1); });
+      throw e;
+    });
+  }
+  function fileName(p) {
+    var d = new Date(), ds = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+    var nm = (curName || '위성지도').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40);
+    return nm + '_위성_L' + p.z + '_' + p.w + 'x' + p.h + '_' + ds + '.jpg';
+  }
+  $('svGo').onclick = function () {
+    var key = getKey();
+    if (!key) { $('svRes').innerHTML = '<span class="warn">먼저 브이월드 인증키를 넣어 주세요.</span>'; return; }
+    if (saving) return;
+    var p = bestPlan();
+    if (p.count > 400 && !confirm('사진 조각 ' + p.count.toLocaleString() + '개를 받아요. 시간이 좀 걸려요. 계속할까요?')) return;
+    saving = true; stopFlag = false;
+    $('svGo').disabled = true; $('svStop').disabled = false;
+    var ovs = ORDER.filter(function (id) { return ui.ov[id] && OV[id].savable; });
+    var cv = document.createElement('canvas'); cv.width = p.w; cv.height = p.h;
+    var ctx = cv.getContext('2d'); ctx.fillStyle = '#222'; ctx.fillRect(0, 0, p.w, p.h);
+    var queue = [];
+    for (var ty = p.ty0; ty <= p.ty1; ty++) for (var tx = p.tx0; tx <= p.tx1; tx++) queue.push({ x: tx, y: ty });
+    var done = 0, failed = 0, ovFailed = 0, t0 = Date.now();
+    function progress() { $('svRes').textContent = '받는 중… ' + done.toLocaleString() + ' / ' + p.count.toLocaleString() + (failed ? ' (실패 ' + failed + ')' : ''); }
+    function worker() {
+      if (stopFlag || !queue.length) return Promise.resolve();
+      var t = queue.shift(), dx = t.x * 256 - p.x0, dy = t.y * 256 - p.y0;
+      var jobs = [loadTileRetry(tileUrl(key, 'Satellite', p.z, t.y, t.x, 'jpeg'), 2).catch(function () { failed++; return null; })]
+        .concat(ovs.map(function (id) { return loadImg(ovUrl(OV[id], key, p.z, t.y, t.x), true).catch(function () { ovFailed++; return null; }); }));
+      return Promise.all(jobs).then(function (imgs) {
+        if (imgs[0]) ctx.drawImage(imgs[0], dx, dy);
+        ovs.forEach(function (id, i) { var im = imgs[i + 1]; if (!im) return; ctx.globalAlpha = OV[id].alpha || 1; ctx.drawImage(im, dx, dy); ctx.globalAlpha = 1; });
+        done++; progress();
+        return sleep(30);
+      }).then(worker);
+    }
+    progress();
+    var ws = []; for (var i = 0; i < 6; i++) ws.push(worker());
+    Promise.all(ws).then(function () {
+      if (stopFlag) { $('svRes').innerHTML = '<span class="warn">멈췄어요.</span>'; return; }
+      var nLab = 0;
+      if (ui.lbOn && labeled.size) {
+        var scale = Math.min(6, Math.max(1, Math.pow(2, p.z - map.getZoom())));
+        var all = []; labeled.forEach(function (l) {
+          if (!l.pos) return;
+          var lp = lonLatToPx(l.pos.lng, l.pos.lat, p.z), lx = lp.x - p.x0, ly = lp.y - p.y0;
+          if (lx >= 0 && ly >= 0 && lx <= p.w && ly <= p.h) { l._sx = lx; l._sy = ly; all.push(l); }
+        });
+        pickVisible(all, function (l) { return { x: l._sx, y: l._sy }; }, scale).forEach(function (l) { drawLabelCanvas(ctx, l, l._sx, l._sy, scale); nLab++; });
+      }
+      var fs = Math.max(13, Math.round(Math.max(p.w, p.h) / 110));
+      var src = '출처: 브이월드' + (nLab ? ' · K-apt · 국토부 실거래' : '');
+      ctx.font = fs + 'px "Malgun Gothic", sans-serif'; ctx.textBaseline = 'alphabetic';
+      var tw = ctx.measureText(src).width + fs;
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(p.w - tw, p.h - fs * 1.8, tw, fs * 1.8);
+      ctx.fillStyle = '#fff'; ctx.fillText(src, p.w - tw + fs / 2, p.h - fs * 0.6);
+      return new Promise(function (resolve, reject) {
+        cv.toBlob(function (b) {
+          if (!b) { reject(new Error('사진을 만들지 못했어요 (기기 메모리 부족일 수 있어요). 범위를 줄이거나 화질을 낮춰 주세요.')); return; }
+          var name = fileName(p), a = document.createElement('a');
+          a.href = URL.createObjectURL(b); a.download = name;
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 15000);
+          var secs = Math.round((Date.now() - t0) / 1000);
+          var inc = ovs.map(function (id) { return OV[id].name; }).concat(nLab ? ['단지 라벨 ' + nLab + '곳'] : []);
+          $('svRes').innerHTML = '<span class="ok">✅ 저장했어요: ' + esc(name) + '</span>\n' + p.w.toLocaleString() + '×' + p.h.toLocaleString() + '픽셀 · ' + (b.size / 1048576).toFixed(1) + 'MB · ' + secs + '초' +
+            (inc.length ? '\n포함: ' + inc.join(', ') : '') +
+            (failed ? '\n<span class="warn">빠진 위성 조각 ' + failed + '개는 회색으로 남았어요.</span>' : '') +
+            (ovFailed ? '\n<span class="warn">표시 조각 ' + ovFailed + '개를 못 받았어요.</span>' : '');
+          resolve();
+        }, 'image/jpeg', 0.92);
+      });
+    }).catch(function (e) {
+      $('svRes').innerHTML = '<span class="bad">❌ ' + esc(e.message) + '</span>';
+    }).then(function () {
+      cv.width = 1; cv.height = 1;
+      saving = false; $('svGo').disabled = false; $('svStop').disabled = true;
+    });
+  };
+
+  /* ── 시작 ── */
+  setBase();
+  Object.keys(CB).forEach(function (id) { if (ui.ov[id]) enableOv(id); });
+  setTimeout(function () { map.invalidateSize(); updateInfo(); drawPreview(); }, 200);
+  window.addEventListener('resize', function () { map.invalidateSize(); });
+  /* 대시보드 탭이 다시 보일 때 지도 크기 맞추기 */
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || !e.data || e.data.to !== 'sat') return;
+    if (e.data.type === 'shown') setTimeout(function () { map.invalidateSize(); }, 50);
+  });
+})();
+</script>
+</body>
+</html>
