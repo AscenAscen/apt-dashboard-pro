@@ -1172,3 +1172,40 @@ body.cxm-cap .cxmloc{display:none}
   .v3-map { height: 58vh; }
   .v3-road { height: 320px; min-height: 0; }
 }
+
+/* ═════════ 앞마당 탭 (js/yard.js) — 이름이 모두 yd- 로 시작해 다른 탭과 섞이지 않습니다 ═════════ */
+.yd-head .filters { align-items: flex-end; }
+.yd-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+.yd-subs { margin: 0 0 12px; }
+.yd-subs button { padding: 8px 18px; font-size: 14px; }
+.yd-ctl { margin-bottom: 10px; }
+.yd-table { max-height: 72vh; }
+.yd-table td small { white-space: nowrap; }
+tr.yd-band td { background: var(--group, var(--panel2)); text-align: left; cursor: pointer; font-size: 14px; position: sticky; top: 30px; z-index: 0; }
+tr.yd-band:hover td { background: var(--hover, var(--panel2)); }
+tr.yd-band .yd-pickname { margin-left: 18px; }
+tr.yd-none td { color: var(--sub); }
+tbody.yd-closed tr:not(.yd-band) { display: none; }
+tr.yd-picked td { background: rgba(245, 167, 66, .10); }
+button.yd-medal { border: 0; background: none; font-size: 17px; line-height: 1; padding: 2px 6px; cursor: pointer; color: var(--sub); }
+button.yd-medal:hover { transform: scale(1.25); color: var(--rent); }
+.yd-trk { color: var(--rent); font-weight: 700; font-size: 12px; white-space: nowrap; }
+.tag.yd-move { margin-left: 6px; font-size: 11px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 1px 7px; color: var(--rent); }
+input.yd-memo { width: 140px; }
+.yd-bulk { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 8px 0; margin: 0; z-index: 3; }
+.yd-menu { position: absolute; z-index: 60; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px; width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+.yd-menu[hidden] { display: none; }
+.yd-menu button { text-align: left; }
+.yd-chips { margin: 4px 0 14px; }
+.yd-chips button small { color: var(--sub); }
+.yd-sec { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px; }
+.modalbox.yd-small { width: min(460px, 100%); display: flex; flex-direction: column; gap: 10px; }
+.yd-field { display: flex; flex-direction: column; gap: 4px; color: var(--sub); font-size: 12px; }
+.yd-field input { font-size: 14px; }
+.yd-otable { width: auto; }
+.yd-otable td, .yd-otable th { padding: 4px 8px; }
+.yd-chart { position: relative; height: 300px; margin: 8px 0 12px; }
+td.yd-rc a { font-weight: 600; }
+.yd-chg { color: var(--up); font-size: 11px; }
+.warn-hint { color: var(--rent); }
+#tab-yard .modalbox { max-height: 92vh; overflow: auto; }
