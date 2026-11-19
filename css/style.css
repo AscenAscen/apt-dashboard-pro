@@ -1223,3 +1223,14 @@ td.yd-in input { width: 64px; }
 tr.yd-new td { color: var(--rent); }
 button.danger-fill { background: var(--danger, #e5484d); border-color: var(--danger, #e5484d); color: #fff; }
 #ydHPk.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+/* 앞마당: 검색 결과 줄 · 목록에서 지우기 · 저장 */
+.yd-found { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; padding: 8px 12px; border: 1px dashed var(--accent); border-radius: 10px; background: var(--panel2); }
+.yd-found.in { border-style: solid; border-color: var(--line); }
+.yd-found small { color: var(--sub); }
+.fdrop .yd-in-mark { font-size: 11px; color: var(--accent); font-weight: 700; margin-left: 4px; }
+button.yd-x { border: 0; background: none; color: var(--sub); font-size: 12px; padding: 0 6px 0 0; cursor: pointer; opacity: .55; }
+button.yd-x:hover { color: var(--danger, #e5484d); opacity: 1; }
+#ydTable tr.yd-flash td { background: rgba(79, 156, 255, .28) !important; opacity: 1 !important; transition: background .4s; }
+.yd-saved { font-size: 12px; color: var(--sub); white-space: nowrap; }
+.yd-saved.bad { color: var(--up); font-weight: 700; }
+.yd-remind { margin: 6px 0 0; color: var(--rent); }
