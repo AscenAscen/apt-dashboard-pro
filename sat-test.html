@@ -319,7 +319,7 @@
   var HALF = 20037508.342789244;
   var OV = {
     hybrid: { name: '지명·도로명', type: 'wmts', layer: 'Hybrid', ext: 'png' },
-    zone:   { name: '용도지역', type: 'wms', layer: 'lt_c_uq111', alpha: 0.5 },
+    zone:   { name: '용도지역', type: 'wms', layer: 'lt_c_uq111', alpha: 0.5, alt: ['lt_c_uq112', 'lt_c_landinfobasemap'] },
     cad:    { name: '지적도', type: 'wms', layer: 'lp_pa_cbnd_bubun' }
   };
   var ORDER = ['zone', 'cad', 'hybrid'];
@@ -328,14 +328,21 @@
     var minx = -HALF + x * span, maxy = HALF - y * span;
     return [minx, maxy - span, minx + span, maxy];
   }
-  function ovUrl(o, key, z, y, x) {
+  function ovUrl(o, key, z, y, x, crsOverride, layerOverride) {
     if (o.type === 'wmts') {
       return 'https://api.vworld.kr/req/wmts/1.0.0/' + encodeURIComponent(key) + '/' + o.layer + '/' + z + '/' + y + '/' + x + '.' + o.ext;
     }
-    return 'https://api.vworld.kr/req/wms?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0' +
-      '&LAYERS=' + o.layer + '&STYLES=' + o.layer + '&CRS=EPSG:3857&BBOX=' + tileBox3857(z, x, y).join(',') +
-      '&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true' +
-      '&KEY=' + encodeURIComponent(key) + '&DOMAIN=' + encodeURIComponent(location.origin);
+    var lyr = layerOverride || o.layer;
+    var q = new URLSearchParams({
+      service: 'WMS', request: 'GetMap', version: '1.3.0',
+      key: key, domain: location.origin,
+      layers: lyr, styles: lyr,
+      crs: crsOverride || o.crs || 'EPSG:900913',
+      bbox: tileBox3857(z, x, y).join(','),
+      width: '256', height: '256',
+      format: 'image/png', transparent: 'true', exceptions: 'text/xml'
+    });
+    return 'https://api.vworld.kr/req/wms?' + q.toString();
   }
   var ovLayers = {};
   function makeOvLayer(id) {
@@ -393,16 +400,54 @@
     var c = map.getCenter();
     var z = Math.max(16, Math.min(map.getZoom(), 19));
     var t = lonLatToTile(c.lng, c.lat, z);
+    function canSave(url) {
+      return loadImg(url, true).then(function (img) {
+        var cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
+        cv.getContext('2d').drawImage(img, 0, 0); cv.toDataURL('image/png');
+        return true;
+      });
+    }
+    function serverMsg(url) {
+      return fetch(url).then(function (r) {
+        var ct = r.headers.get('content-type') || '';
+        if (ct.indexOf('image') >= 0) return '이미지 응답(정상)';
+        return r.text().then(function (s) {
+          var m = s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+          return '서버 메시지: ' + m.slice(0, 160);
+        });
+      }).catch(function () { return '서버 메시지를 읽을 수 없음 (CORS 차단 가능)'; });
+    }
+    function testWms(id) {
+      var o = OV[id];
+      var tries = [];
+      [o.layer].concat(o.alt || []).forEach(function (ly) {
+        ['EPSG:900913', 'EPSG:3857'].forEach(function (crs) { tries.push({ ly: ly, crs: crs }); });
+      });
+      var i = 0;
+      function next() {
+        if (i >= tries.length) {
+          var first = ovUrl(o, key, z, t.y, t.x, tries[0].crs, tries[0].ly);
+          return loadImg(first, false).then(function () {
+            return '⚠ ' + o.name + ': 화면에는 보이지만 저장에는 못 넣어요 (CORS 차단)';
+          }).catch(function () {
+            return serverMsg(first).then(function (m) { return '❌ ' + o.name + ': 안 돼요 — ' + m; });
+          });
+        }
+        var tr = tries[i++];
+        return canSave(ovUrl(o, key, z, t.y, t.x, tr.crs, tr.ly)).then(function () {
+          o.crs = tr.crs; o.layer = tr.ly;
+          if ($(cb[id]).checked) { $(cb[id]).onchange.call($(cb[id])); }
+          return '✅ ' + o.name + ': 저장에 넣을 수 있어요 (' + tr.ly + ', ' + tr.crs + ')';
+        }).catch(next);
+      }
+      return next();
+    }
     Promise.all(ORDER.map(function (id) {
       var o = OV[id];
-      return loadImg(ovUrl(o, key, z, t.y, t.x), true).then(function (img) {
-        var cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
-        var ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
-        cv.toDataURL('image/png');
+      if (o.type === 'wms') return testWms(id);
+      return canSave(ovUrl(o, key, z, t.y, t.x)).then(function () {
         return '✅ ' + o.name + ': 저장에 넣을 수 있어요';
-      }).catch(function (e) {
-        return '❌ ' + o.name + ': 안 돼요 (' + e.message + ')';
-      });
+      }).catch(function (e) { return '❌ ' + o.name + ': 안 돼요 (' + e.message + ')'; });
     })).then(function (r) {
       r.push('✅ 단지 라벨: 직접 그리는 방식이라 항상 저장돼요');
       set('r6', r.join('\n') + '\n\n(레벨 ' + z + ', 지도 가운데 기준으로 확인했어요)');
