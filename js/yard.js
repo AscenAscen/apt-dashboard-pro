@@ -31,10 +31,18 @@ const Yard = (() => {
     if (!opts.groups.some(g => g.k === ui.grp)) ui.grp = opts.groups[opts.groups.length - 1].k;
     if (!opts.groups.some(g => g.k === ui.rgrp)) ui.rgrp = ui.grp;
   }
-  const saveCx = () => Store.set(KEY, cx);
-  const saveSv = () => Store.set(SKEY, sv);
-  const savePk = () => Store.set(PKEY, picks);
-  const saveOpts = () => Store.set(OKEY, opts);
+  let savedAt = null;
+  function mark(ok) {
+    savedAt = new Date();
+    const el = document.getElementById('ydSaved'); if (!el) return;
+    el.textContent = ok === false ? '⚠ 저장 실패 — 앞마당 파일로 저장해 두세요' : `✓ 저장됨 ${String(savedAt.getHours()).padStart(2, '0')}:${String(savedAt.getMinutes()).padStart(2, '0')}`;
+    el.classList.toggle('bad', ok === false);
+  }
+  const put = (k, v) => { const ok = Store.set(k, v); mark(ok !== false); return ok; };
+  const saveCx = () => put(KEY, cx);
+  const saveSv = () => put(SKEY, sv);
+  const savePk = () => put(PKEY, picks);
+  const saveOpts = () => put(OKEY, opts);
   const saveUi = () => Store.set(UKEY, ui);
   const locked = () => { if (typeof Vault !== 'undefined' && Vault.isLocked()) { U.toast('잠금 상태입니다. 오른쪽 위 [잠금]을 풀면 고칠 수 있습니다.'); return true; } return false; };
 
@@ -88,9 +96,14 @@ const Yard = (() => {
     root.innerHTML = `
     <section class="panel yd-head">
       <div class="bar"><strong>🏡 앞마당</strong><span class="hint" style="margin:0" id="ydStatus"></span><span class="grow"></span>
+        <span class="yd-saved" id="ydSaved" title="호가·픽·1등·메모는 입력하는 순간 이 브라우저에 자동 저장됩니다">✓ 자동 저장 중</span>
+        <button id="ydSave" title="지금 상태를 이 브라우저에 저장 (입력할 때마다 자동으로도 저장됩니다)">💾 저장</button>
+        <button id="ydExport" title="앞마당 단지·호가 기록·픽·1등 기록·설정을 파일 하나로 내려받기">📤 앞마당 파일 저장</button>
+        <button id="ydImport" title="다른 기기에서 저장한 앞마당 파일 불러오기">📥 앞마당 파일 불러오기</button><input type="file" id="ydImportFile" accept=".json,application/json" hidden>
         <button id="ydOpts">⚙ 평형·가격대 설정</button></div>
+      <p class="hint yd-remind" id="ydRemind" hidden></p>
       <div class="filters">
-        <label class="findlab">🔎 전국 단지 검색 → 고르면 바로 앞마당에 추가 <input type="search" id="ydFind" placeholder="단지 이름 (예: 평촌 꿈마을)" autocomplete="off" style="min-width:280px"></label>
+        <label class="findlab">🔎 전국 단지 검색 <input type="search" id="ydFind" placeholder="단지 이름 (예: 평촌 꿈마을)" autocomplete="off" style="min-width:280px"></label>
         <span class="yd-sep"></span>
         <label>시/도 <select id="ydRSido"></select></label>
         <label>시/군/구 <select id="ydRSgg"></select></label>
@@ -99,6 +112,7 @@ const Yard = (() => {
         <label class="row" style="flex-direction:row;align-items:center;padding-bottom:7px"><input type="checkbox" id="ydRUnk"> 세대수 모르는 단지도</label>
         <button id="ydRAdd">📍 지역 단지 한꺼번에 추가</button>
       </div>
+      <div class="yd-found" id="ydFound" hidden></div>
     </section>
     <div class="presets yd-subs" id="ydSubs"><button data-s="pick">① 1등 뽑기</button><button data-s="survey">② 조사 기록</button><button data-s="record">③ 1등 기록</button></div>
     <div id="ydEmpty" class="panel empty" hidden></div>
@@ -125,10 +139,11 @@ const Yard = (() => {
     hideMenu();
     if (!empty) { if (ui.sub === 'pick') renderPick(); else if (ui.sub === 'survey') renderSurvey(); else renderRecord(); }
     status();
+    remind();
   }
 
   /* ═════════ 단지 추가·빼기 ═════════ */
-  async function addOne(x) {
+  async function addOne(x, preGs) {
     if (locked()) return;
     const cid = cidOf(x), old = cx[cid];
     if (old) {
@@ -137,7 +152,8 @@ const Yard = (() => {
     }
     U.toast(`${x.name} 평형을 확인하는 중…`);
     let gs = [];
-    try { const a = await Finder.areas(x.code, x.key); gs = a.list.map(v => v.g); } catch (e) { console.error(e); }
+    if (preGs && preGs.length) gs = preGs;
+    else try { const a = await Finder.areas(x.code, x.key); gs = a.list.map(v => v.g); } catch (e) { console.error(e); }
     if (!gs.length) return U.toast('이 단지는 아직 거래 자료가 없어 평형을 알 수 없습니다.');
     cx[cid] = { code: x.code, key: x.key, sido: x.sido, sgg: x.sgg, dong: x.dong, jibun: x.jibun, name: x.name, gs, t: Date.now(), memo: '' };
     saveCx();
@@ -145,7 +161,69 @@ const Yard = (() => {
     const back = surveysAsc().some(s => Object.keys(s.q || {}).some(id => id.startsWith(cid + '#')));
     U.toast(`${x.name} 을(를) 앞마당에 추가했습니다.${back ? ' 예전에 적은 호가 기록도 그대로 살아났습니다.' : ''}${inGrp.length ? '' : ' (지금 평형 그룹에 맞는 평형이 없어 표에는 안 보입니다 — ⚙ 설정에서 그룹을 늘려 보세요)'}`);
     if (!inGrp.some(g => groupOf(g).k === ui.grp) && inGrp.length) { ui.grp = groupOf(inGrp[inGrp.length - 1]).k; saveUi(); }
-    show();
+    show(); foundBox();
+  }
+
+  /* ── 검색 결과 줄: [＋ 앞마당에 추가] / ✓ 앞마당에 있음 [표에서 보기] [목록에서 지우기] ── */
+  let found = null;
+  async function foundBox(x) {
+    if (x) found = { x, gs: null };
+    const el = $('ydFound'); if (!el) return;
+    if (!found) { el.hidden = true; return; }
+    const f = found, cid = cidOf(f.x), c = cx[cid];
+    el.hidden = false;
+    const where = `${esc(f.x.sido)} ${esc(f.x.sgg)} ${esc(f.x.dong)}`;
+    if (c) {
+      const vis = (c.gs || []).filter(g => !(c.hide || []).includes(g));
+      el.className = 'yd-found in';
+      el.innerHTML = `<span>✓ <b>${esc(c.name)}</b> <small>${where}</small> · 앞마당에 있음 (${vis.length ? vis.join('·') + '㎡' : '모든 평형을 지워 둠'})</span><span class="grow"></span>` +
+        (c.hide?.length ? '<button data-fd="unhide">지운 평형 다시 보이기</button>' : '') + '<button data-fd="go">표에서 보기</button><button data-fd="del" class="danger">목록에서 지우기</button><button data-fd="x" class="mini" title="닫기">✕</button>';
+    } else {
+      el.className = 'yd-found';
+      el.innerHTML = `<span><b>${esc(f.x.name)}</b> <small>${where}</small> · 평형 <span id="ydFoundGs">확인 중…</span></span><span class="grow"></span><button data-fd="add" class="primary">＋ 앞마당에 추가</button><button data-fd="x" class="mini" title="닫기">✕</button>`;
+      if (!f.gs) { try { const a = await Finder.areas(f.x.code, f.x.key); f.gs = a.list.map(v => v.g); } catch (e) { console.error(e); f.gs = []; } }
+      if (found !== f || !$('ydFoundGs')) return;
+      $('ydFoundGs').textContent = f.gs.length ? f.gs.join('·') + '㎡' : '거래 자료가 없어 알 수 없음';
+    }
+    el.onclick = (e) => {
+      const k = e.target.closest('[data-fd]')?.dataset.fd; if (!k) return;
+      if (k === 'x') { found = null; return foundBox(); }
+      if (k === 'add') return addOne(f.x, f.gs);
+      if (k === 'go') return goToCx(cid);
+      if (k === 'del') return askRemoveCx(cid);
+      if (k === 'unhide') { if (locked()) return; delete c.hide; saveCx(); show(); foundBox(); U.toast('지운 평형을 다시 보이게 했습니다.'); }
+    };
+  }
+  /** 표에서 그 단지 줄로 이동해 잠깐 강조 */
+  let goTo = null;
+  function goToCx(cid) {
+    const c = cx[cid]; if (!c) return;
+    const gs = (c.gs || []).filter(g => !(c.hide || []).includes(g) && groupOf(g));
+    if (!gs.length) return U.toast('이 단지는 지금 평형 그룹에 맞는 평형이 없어 표에 안 보입니다. ⚙ 설정에서 그룹을 늘려 보세요.');
+    if (!gs.some(g => groupOf(g).k === ui.grp)) ui.grp = groupOf(gs.find(g => groupOf(g).k === '84') || gs[gs.length - 1]).k;
+    ui.sub = 'pick'; saveUi(); goTo = cid; show();
+  }
+  function flashGoTo() {
+    if (!goTo) return;
+    const cid = goTo; goTo = null;
+    const trs = [...document.querySelectorAll(`#ydTable tr[data-id^="${CSS.escape(cid)}#"]`)];
+    if (!trs.length) return U.toast('필터나 "픽한 단지만 보기" 때문에 표에 안 보입니다. 위의 [모두 풀기]를 눌러 보세요.');
+    trs.forEach(tr => { tr.closest('tbody')?.classList.remove('yd-closed'); tr.classList.add('yd-flash'); setTimeout(() => tr.classList.remove('yd-flash'), 2600); });
+    trs[0].scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  /** 검색 목록에 이미 추가한 단지 ✓ 표시 */
+  function markDrop() {
+    const box = $('ydFind')?.parentElement?.querySelector('.fdrop'); if (!box || box.dataset.ydw) return;
+    box.dataset.ydw = '1';
+    const keyOf = (name, where) => `${name}|${where}`;
+    new MutationObserver(() => {
+      const have = new Set(Object.values(cx).map(c => keyOf(c.name, `${c.sido} ${c.sgg} ${c.dong}`)));
+      box.querySelectorAll('button[data-i]').forEach(b => {
+        if (b.querySelector('.yd-in-mark')) return;
+        const name = b.querySelector('b')?.textContent || '', where = (b.querySelector('small')?.textContent || '').split(' · ')[0].trim();
+        if (have.has(keyOf(name, where))) b.querySelector('b').insertAdjacentHTML('afterend', ' <span class="yd-in-mark">✓ 앞마당</span>');
+      });
+    }).observe(box, { childList: true });
   }
 
   async function fillRegion(level) {
@@ -196,30 +274,31 @@ const Yard = (() => {
   function removeCx(cids, ask = true) {
     if (locked() || !cids.length) return;
     const names = cids.map(c => cx[c]?.name).filter(Boolean);
-    if (ask && !Vault.sure(`앞마당에서 ${names.length}개 단지를 뺍니다: ${names.slice(0, 5).join(', ')}${names.length > 5 ? ' …' : ''}\n(적어 둔 호가 기록은 남아서, 다시 추가하면 그대로 살아납니다)`, names.length >= 5)) return;
+    if (ask && !Vault.sure(`${names.length}개 단지를 앞마당 목록에서 지웁니다: ${names.slice(0, 5).join(', ')}${names.length > 5 ? ' …' : ''}\n(적어 둔 호가 기록은 남아서, 다시 추가하면 그대로 살아납니다)`, names.length >= 5)) return;
     cids.forEach(c => delete cx[c]);
     checked.forEach(id => { if (cids.includes(id.split('#')[0])) checked.delete(id); });
-    saveCx(); show();
-    U.toast(`${names.length}개 단지를 앞마당에서 뺐습니다.`);
+    saveCx(); show(); foundBox();
+    U.toast(`${names.length}개 단지를 목록에서 지웠습니다. 다시 추가하면 예전 기록이 살아납니다.`);
   }
-  /** [✕ 빼기] — 이 평형만 / 단지 통째로 */
+  /** [목록에서 지우기] — 이 평형만 / 단지 통째로. id = 평형 줄(단지#평형) 또는 단지(cid) */
   function askRemove(id) {
     if (locked()) return;
-    const p = Kit.parseId(id), cid = `${p.code}|${p.key}`, c = cx[cid]; if (!c) return;
-    const shownGs = (c.gs || []).filter(g => !(c.hide || []).includes(g) && groupOf(g));
-    const box = modal(`<div class="bar"><strong>${esc(c.name)} 빼기</strong><span class="grow"></span><button data-close>✕</button></div>
-      <label class="row" style="gap:8px"><input type="radio" name="ydRm" value="g" checked> ${p.g}㎡ 평형만 빼기</label>
-      <label class="row" style="gap:8px"><input type="radio" name="ydRm" value="all"> 단지 통째로 빼기 <small class="hint" style="margin:0">(모든 평형 ${(c.gs || []).join('·')}㎡)</small></label>
-      <p class="hint" style="margin:0">적어 둔 호가 기록은 남습니다. 다시 추가하면 그대로 살아납니다.</p>
-      <div class="bar"><span class="grow"></span><button data-close>취소</button><button class="primary danger-fill" id="ydRmOk">빼기</button></div>`);
+    const hasG = id.includes('#'), cid = hasG ? id.split('#')[0] : id, g = hasG ? +id.split('#')[1] : null, c = cx[cid]; if (!c) return;
+    const shownGs = (c.gs || []).filter(x => !(c.hide || []).includes(x));
+    const box = modal(`<div class="bar"><strong>${esc(c.name)} — 목록에서 지우기</strong><span class="grow"></span><button data-close>✕</button></div>
+      ${hasG && shownGs.length > 1 ? `<label class="row" style="gap:8px"><input type="radio" name="ydRm" value="g" checked> ${g}㎡ 평형만 지우기</label>` : ''}
+      <label class="row" style="gap:8px"><input type="radio" name="ydRm" value="all" ${hasG && shownGs.length > 1 ? '' : 'checked'}> 단지 통째로 지우기 <small class="hint" style="margin:0">(모든 평형 ${(c.gs || []).join('·')}㎡)</small></label>
+      <p class="hint" style="margin:0">앞마당 목록에서만 지워집니다. 적어 둔 호가 기록은 남아서, 다시 추가하면 그대로 살아납니다. 다른 탭에는 영향이 없습니다.</p>
+      <div class="bar"><span class="grow"></span><button data-close>취소</button><button class="primary danger-fill" id="ydRmOk">목록에서 지우기</button></div>`);
     box.querySelector('#ydRmOk').onclick = () => {
-      const all = box.querySelector('input[name="ydRm"]:checked').value === 'all' || shownGs.length <= 1;
+      const all = box.querySelector('input[name="ydRm"]:checked').value === 'all';
       closeModal();
       if (all) return removeCx([cid], false);
-      c.hide = [...new Set([...(c.hide || []), p.g])]; checked.delete(id); saveCx(); show();
-      U.toast(`${c.name} ${p.g}㎡ 를 뺐습니다. 단지를 다시 검색해 고르면 다시 보입니다.`);
+      c.hide = [...new Set([...(c.hide || []), g])]; checked.delete(id); saveCx(); show(); foundBox();
+      U.toast(`${c.name} ${g}㎡ 를 목록에서 지웠습니다. 단지를 다시 검색하면 [지운 평형 다시 보이기]가 나옵니다.`);
     };
   }
+  const askRemoveCx = (cid) => askRemove(cid);
 
   /* ═════════ 픽 (후보 표시) — 평형별, 1등과 별개 ═════════ */
   const picked = (id) => { const p = id.split('#'); return !!cx[p[0]]?.pick?.[p[1]]; };
@@ -306,7 +385,7 @@ const Yard = (() => {
       <div class="cfbar" id="ydCfBar"></div>`;
 
     const H = (k, label, cls = '') => `<th class="${cls}">${label}${PF().btn(k)}</th>`;
-    const COLS = 18;
+    const COLS = 17;
     const rowHtml = (r) => {
       const isPk = picked(r.id), c = cx[r.cid] || {}, sd = sent(r.id);
       const moved = r.plo != null && r.lo != null && r.plo !== r.lo ? `<span class="tag yd-move" title="지난 입력(${esc(r.p.date)})에는 ${bandLabel(r.plo, r.plo + st)}">${bandLabel(r.plo, r.plo + st)}→${bandLabel(r.lo, r.lo + st)} ${r.lo > r.plo ? '⤴' : '⤵'}</span>` : '';
@@ -314,7 +393,7 @@ const Yard = (() => {
       return `<tr data-id="${esc(r.id)}" class="${isPk ? 'yd-pk' : 'yd-grey'}${r.isFirst ? ' yd-picked' : ''}"><td class="c"><input type="checkbox" data-chk ${checked.has(r.id) ? 'checked' : ''}></td>` +
         `<td class="c"><button class="yd-tick ${isPk ? 'on' : ''}" data-pk title="${isPk ? '픽 끄기' : '후보로 픽'}">${isPk ? '✔' : '○'}</button></td>` +
         `<td class="c">${r.lo == null ? '' : `<button class="yd-medal ${r.isFirst ? 'on' : ''}" data-first title="${r.isFirst ? '1등 지정 풀기' : '이 가격대 1등으로 지정'}">${r.isFirst ? '🥇' : '○'}</button>`}</td>` +
-        `<td class="l yd-nm">${isPk ? '<b class="yd-ck">✔</b>' : ''}<a href="#" data-hist>${esc(r.name)}</a> <small>${esc(r.sgg)} ${esc(r.dong)}</small>${moved}</td>` +
+        `<td class="l yd-nm"><button class="yd-x" data-rm title="목록에서 지우기">✕</button>${isPk ? '<b class="yd-ck">✔</b>' : ''}<a href="#" data-hist>${esc(r.name)}</a> <small>${esc(r.sgg)} ${esc(r.dong)}</small>${moved}</td>` +
         `<td>${r.g}㎡<small>${CONFIG.toPyeong(r.g)}평</small></td>` +
         `<td class="yd-in"><input class="num" inputmode="decimal" data-f="s" value="${eokIn(r.s)}" placeholder="억">${old}</td><td class="yd-in"><input class="num" inputmode="decimal" data-f="r" value="${eokIn(r.rr)}" placeholder="억"></td>` +
         `<td data-gap>${eok(r.gap)}</td>` +
@@ -324,7 +403,6 @@ const Yard = (() => {
         `<td class="${U.cls(r.drop)}">${U.pct(r.drop, 0)}</td><td class="${U.cls(r.rise)}">${U.pct(r.rise, 0)}</td>` +
         `<td class="l"><input class="wide yd-memo" data-memo value="${esc(c.memo || '')}" placeholder="메모"></td>` +
         `<td class="c">${sd ? `<span class="yd-sent" title="${esc(sd)}에 시세트래킹으로 보냄">트래킹에 보냄</span>` : '<button class="mini" data-trk>담기</button>'}</td>` +
-        `<td class="c"><button class="mini danger" data-rm title="앞마당에서 빼기">✕ 빼기</button></td>` +
         `<td class="c"><button class="mini" data-menu title="가격 이력·네이버·3D·위성지도">⋯</button></td></tr>`;
     };
     const section = (k, title, list, extraCls = '') => {
@@ -338,18 +416,19 @@ const Yard = (() => {
     };
     const table = rows.length ? `<div class="tablewrap yd-table"><table id="ydTable"><thead><tr><th class="c"><input type="checkbox" id="ydChkAll" title="보이는 단지 모두 체크"></th>` +
       H('pick', '픽', 'c') + H('first', '1등', 'c') + H('name', '단지명', 'l') + H('area', '평형') + H('s', '매매(억)') + H('r', '전세(억)') + H('gap', '투자금') + H('chg', '지난 대비') +
-      H('by', '연식') + H('hh', '세대수') + H('sale', '최근 실거래') + H('drop', '전고 대비') + H('rise', '전저 대비') + H('memo', '메모', 'l') + H('sent', '트래킹', 'c') + '<th></th><th></th></tr></thead>' +
+      H('by', '연식') + H('hh', '세대수') + H('sale', '최근 실거래') + H('drop', '전고 대비') + H('rise', '전저 대비') + H('memo', '메모', 'l') + H('sent', '트래킹', 'c') + '<th></th></tr></thead>' +
       (fresh.length ? section('fresh', `<b>🆕 새로 추가한 단지 · 호가 입력 필요</b> (${fresh.length}개)`, fresh.sort((a, b) => a.name.localeCompare(b.name, 'ko')), 'yd-new') : '') +
       los.map(bandHtml).join('') +
       (none.length ? section('none', `<b>미입력</b> · 호가를 아직 안 적은 ${none.length}개`, none.sort((a, b) => a.name.localeCompare(b.name, 'ko')), 'yd-none') : '') +
       '</table></div>'
       : `<p class="empty">${total ? (ui.onlyPick ? '픽한 단지가 없습니다. ○ 를 눌러 후보를 픽하거나 "픽한 단지만 보기"를 끄세요.' : '필터에 맞는 단지가 없습니다. 위의 [모두 풀기]를 눌러 보세요.') : `앞마당 단지 중 ${esc(ui.grp)}㎡ 그룹(전용 ${groupOf0(ui.grp)})에 맞는 평형이 없습니다. 다른 평형 버튼을 눌러 보세요.`}</p>`;
     el.innerHTML = head + table +
-      `<div class="bar yd-bulk" id="ydBulk" ${checked.size ? '' : 'hidden'}><b id="ydBulkN">체크한 ${checked.size}개</b><button id="ydBulkPk">✔ 픽 켜기</button><button id="ydBulkUnpk">픽 끄기</button><button id="ydBulkTrk">트래킹 담기</button><button id="ydBulkDel" class="danger">✕ 앞마당에서 빼기</button><button id="ydBulkClr">선택 해제</button></div>` +
+      `<div class="bar yd-bulk" id="ydBulk" ${checked.size ? '' : 'hidden'}><b id="ydBulkN">체크한 ${checked.size}개</b><button id="ydBulkPk">✔ 픽 켜기</button><button id="ydBulkUnpk">픽 끄기</button><button id="ydBulkTrk">트래킹 담기</button><button id="ydBulkDel" class="danger">목록에서 지우기</button><button id="ydBulkClr">선택 해제</button></div>` +
       `<p class="hint">매매·전세 칸에 억 단위로 적으면 <b>오늘 날짜로 자동 기록</b>되고, 칸을 벗어나면 가격대 칸으로 옮겨집니다. 옆의 작은 날짜는 그날 적은 값이라는 뜻입니다.<br>픽(○/✔) = 후보 표시, 픽 안 한 줄은 회색입니다. 🥇 1등은 가격대마다 하나이고, 1등을 고르면 픽도 켜집니다. 머리글 ▾ 로 엑셀처럼 거르고 정렬할 수 있습니다.</p>`;
     PF().apply(preF, sortFn);                 // 필터 안내 줄(ydCfBar)을 그린 뒤 한 번 더 채움
     pickEvents(rows);
     status();
+    flashGoTo();
   }
   const groupOf0 = (k) => { const g = opts.groups.find(x => x.k === k); return g ? `${g.min}~${g.max}㎡` : ''; };
 
@@ -791,12 +870,62 @@ const Yard = (() => {
     };
   }
 
+  /* ═════════ 저장 · 앞마당 파일 ═════════ */
+  const FKEY = 'apt.yardFile.v1', REMIND_DAYS = 14;
+  function saveAll() {
+    const ok = [Store.set(KEY, cx), Store.set(SKEY, sv), Store.set(PKEY, picks), Store.set(OKEY, opts), Store.set(UKEY, ui)].every(v => v !== false);
+    mark(ok);
+    U.toast(ok ? '앞마당을 저장했습니다. (입력할 때마다 자동으로도 저장됩니다)' : '브라우저 저장에 실패했습니다. [📤 앞마당 파일 저장]으로 파일을 받아 두세요.');
+  }
+  function remind() {
+    const el = $('ydRemind'); if (!el) return;
+    const last = Store.get(FKEY, 0), n = Object.keys(cx).length;
+    const days = last ? Math.floor((Date.now() - last) / 864e5) : null;
+    el.hidden = !n || (days != null && days < REMIND_DAYS);
+    el.innerHTML = days == null ? '💡 앞마당 파일을 아직 저장한 적이 없습니다. 브라우저 기록을 지우면 사라질 수 있으니 <b>[📤 앞마당 파일 저장]</b>으로 받아 두세요.'
+      : `💡 앞마당 파일을 저장한 지 ${days}일 지났습니다. <b>[📤 앞마당 파일 저장]</b>을 권장합니다.`;
+  }
+  function exportFile() {
+    const data = { type: 'apt-yard', v: 1, savedAt: new Date().toISOString(), cx, sv, picks, opts };
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `앞마당_${U.stamp()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    Store.set(FKEY, Date.now()); remind();
+    U.toast(`앞마당 파일을 저장했습니다. (단지 ${Object.keys(cx).length}개 · 조사 ${Object.keys(sv).length}회)`);
+  }
+  async function importFile(file) {
+    let d;
+    try { d = JSON.parse(await file.text()); } catch (e) { return U.toast('파일을 읽지 못했습니다. 앞마당 파일(.json)이 맞는지 확인하세요.'); }
+    if (!d || d.type !== 'apt-yard' || typeof d.cx !== 'object') return U.toast('앞마당 파일이 아닙니다. [📤 앞마당 파일 저장]으로 만든 파일을 골라 주세요.');
+    const info = `단지 ${Object.keys(d.cx || {}).length}개 · 조사 ${Object.keys(d.sv || {}).length}회 · ${String(d.savedAt || '').slice(0, 10)} 저장`;
+    const merge = Object.keys(cx).length ? confirm(`앞마당 파일을 불러옵니다 (${info}).\n\n[확인] 합치기 — 지금 기록과 파일 기록을 모두 살립니다. 같은 칸이 겹치면 파일 값을 씁니다.\n[취소] 바꾸기 — 지금 앞마당을 지우고 파일 내용으로 바꿉니다.`) : false;
+    if (!merge && Object.keys(cx).length && !confirm('지금 앞마당 기록을 지우고 파일 내용으로 바꿀까요? 되돌릴 수 없습니다.')) return;
+    if (merge) {
+      for (const [k, v] of Object.entries(d.cx || {})) { const o = cx[k] || {}; cx[k] = { ...o, ...v, pick: { ...(o.pick || {}), ...(v.pick || {}) }, sent: { ...(o.sent || {}), ...(v.sent || {}) } };
+        if (!Object.keys(cx[k].pick).length) delete cx[k].pick; if (!Object.keys(cx[k].sent).length) delete cx[k].sent; }
+      for (const [k, v] of Object.entries(d.sv || {})) { const o = sv[k]; sv[k] = o ? { ...o, ...v, q: { ...(o.q || {}), ...(v.q || {}) } } : v; }
+      for (const [ym, g] of Object.entries(d.picks || {})) { picks[ym] = picks[ym] || {}; for (const [gk, bands] of Object.entries(g)) picks[ym][gk] = { ...(picks[ym][gk] || {}), ...bands }; }
+    } else {
+      cx = d.cx || {}; sv = d.sv || {}; picks = d.picks || {};
+      if (d.opts && Array.isArray(d.opts.groups) && d.opts.groups.length) opts = d.opts;
+    }
+    saveAll(); loadState(); checked.clear(); show(); foundBox();
+    U.toast(`앞마당 파일을 ${merge ? '합쳤습니다' : '불러왔습니다'}. (${info})`);
+  }
+
   /* ═════════ 시작 ═════════ */
   function init() {
     if (inited) return; inited = true;
     loadState();
     frame();
-    Finder.attach($('ydFind'), (x) => { addOne(x); $('ydFind').value = ''; });
+    Finder.attach($('ydFind'), (x) => { foundBox(x); });
+    markDrop();
+    $('ydSave').onclick = saveAll;
+    $('ydExport').onclick = exportFile;
+    $('ydImport').onclick = () => { if (!locked()) $('ydImportFile').click(); };
+    $('ydImportFile').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importFile(f); };
     $('ydRSido').onchange = () => fillRegion(1);
     $('ydRSgg').onchange = () => fillRegion(2);
     $('ydRAdd').onclick = addRegion;
@@ -805,9 +934,9 @@ const Yard = (() => {
     document.addEventListener('click', (e) => { if (!e.target.closest('#ydMenu') && !e.target.closest('[data-menu]')) hideMenu(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('ydModal').hidden) closeModal(); });
     fillRegion(0).catch(console.error);
-    show();
+    show(); remind();
   }
-  function open() { if (!inited) init(); else { loadState(); show(); } }
+  function open() { if (!inited) init(); else { loadState(); show(); remind(); } }
   /** 백업·코드 가져오기 뒤에 다시 읽기 (vault.js) */
   function reload() { if (inited) { loadState(); if (!root.hidden) show(); } }
 
