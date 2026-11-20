@@ -14,7 +14,7 @@ const Start = (() => {
   const PYC = [['s', '소형'], ['59', '59'], ['74', '74'], ['84', '84'], ['L', '대형']];
   const PYN = Object.fromEntries(PYC);
   const PY_PICK = ['59', '74', '84'];
-  const DEF = { codes: [], view: null, mode: 'basic', trk: 0, pys: [], hh: 300, age: 0, tip: 'A', layers: {}, other: 0 };
+  const DEF = { codes: [], view: null, mode: 'basic', trk: 0, pys: [], hh: 300, age: 0, tip: 'A', layers: {}, other: 0, autoLv: 3 };
   const NOW_Y = new Date().getFullYear();
   const D5 = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); return U.ymd(d); })();
   const MAX_REG = 6;                                   // 한 번에 불러 두는 시군구 수 (넘으면 오래된 것부터 내림)
@@ -141,7 +141,7 @@ const Start = (() => {
     const want = new Set(shown().map(cx => cx.id));
     for (const [id, o] of ovs) if (!want.has(id)) o.ov.setMap(null);
     for (const id of want) { const cx = cxs.get(id); if (pos.has(id)) place(cx); else enqueue(cx); }
-    pump(); declutterSoon(); sideState();
+    pump(); declutterSoon(); sideState(); autoRefreshSoon();
   }
 
   /* 위치 찾기: 강조 단지 → 화면 가운데 동 → 세대수 큰 순, 6개씩 동시에 */
@@ -151,7 +151,7 @@ const Start = (() => {
     while (working < 6 && queue.length) {
       const cx = queue.shift(); working++;
       KMap.geocode(cx).then(p => { if (p) { pos.set(cx.id, p); if (st.codes.includes(cx.code) && passes(cx)) { place(cx); declutterSoon(); } } })
-        .catch(() => {}).finally(() => { cx.qd = 0; working--; progress(); pump(); });
+        .catch(() => {}).finally(() => { cx.qd = 0; working--; progress(); pump(); if (!queue.length && !working) autoRefreshSoon(); });
     }
     progress();
   }
@@ -343,7 +343,7 @@ const Start = (() => {
         if (r) { centerDong = r.dong; if (!st.codes.includes(r.code) || !loaded.has(r.code)) addRegion(r.code); }
       }
       refreshLayers();
-      if (OL.cx) olLabelsVis();
+      olLabelsVis(); autoRefreshSoon();
     }, 450);
   }
 
@@ -406,13 +406,22 @@ const Start = (() => {
   const inside = (pt, poly) => { try { return turf.booleanPointInPolygon(pt, poly); } catch (e) { return false; } };
   const fid = (f) => String(f.id || (f.properties && f.properties.pnu) || JSON.stringify(f.geometry.coordinates).slice(0, 80));
 
-  /* ═════════ 단지 경계선 + 동 번호 (시험 페이지와 같은 방법) ═════════ */
+  /* ═════════ 단지 경계선 + 동 번호 ═════════
+     · 라벨을 누르거나 검색한 단지: 굵은 빨간 선 + 왼쪽 아래 조절 상자 (필지 추가/빼기)
+     · 지도를 확대하면(필터의 "단지 경계 자동", 기본 레벨 3 이하) 화면 안 단지들의 경계를 저절로 (가는 선)
+     · 한 번 구한 경계는 이번 접속 동안 기억 → 다시 와도 바로 그림. 건물 자료는 약 500m 칸 단위로 한 번만 받음 */
   const NAME_KEYS = ['buld_nm', 'bld_nm', 'bldg_nm', 'build_nm'];
   const DONG_KEYS = ['buld_nm_dc', 'dong_nm', 'bld_dong_nm', 'dongnm'];
   const FLOOR_KEYS = ['gro_flo_co', 'grnd_flr', 'ground_floor', 'flo_co'];
-  const OL = { cx: null, parcels: new Map(), blds: new Map(), drawn: [], labels: [], manual: false, seq: 0 };
+  const OL = { cx: null, data: null, view: null, manual: false, seq: 0 };
+  const olCache = new Map();                  // 단지 id → Promise<{ parcels: Map, pool: Map, u, labels } | null>
+  const tiles = new Map();                    // 건물 칸 → Promise<[건물]>
+  const TILE = 0.005, AUTO_MAX = 20;
+  const auto = new Map();                     // 단지 id → 저절로 그린 경계 { remove, vis }
+  let autoSeq = 0;
   const pick = (p, keys) => { p = p || {}; for (const k of keys) if (p[k] != null && String(p[k]).trim() !== '') return String(p[k]).trim(); return ''; };
   const normNm = (s) => String(s || '').replace(/\(.*?\)/g, '').replace(/\s/g, '').replace(/아파트|apt/gi, '').toLowerCase();
+  const pnu = (f) => pick(f.properties, ['pnu']) || fid(f);
   function dongLabel(p) {
     let s = pick(p, DONG_KEYS);
     if (!s) { const m = pick(p, NAME_KEYS).match(/(\d{1,4})\s*동/); if (m) s = m[1] + '동'; }
@@ -433,55 +442,57 @@ const Start = (() => {
     $('stManual').classList.toggle('on', OL.manual);
     $('stManual').textContent = OL.manual ? '필지 추가/빼기: 켜짐' : '필지 추가/빼기';
   }
-  function olClearDrawn() { OL.drawn.forEach(d => d.setMap(null)); OL.drawn = []; OL.labels.forEach(o => o.setMap(null)); OL.labels = []; }
-  function olClear() {
-    OL.seq++; olClearDrawn(); OL.parcels.clear(); OL.blds.clear();
-    const prev = OL.cx; OL.cx = null; OL.manual = false;
-    if (prev) place(prev);
-    olBox(); declutterSoon();
+
+  /* 건물 자료: 약 500m 칸으로 나눠 칸마다 한 번만 받기 */
+  function tileBlds(tx, ty) {
+    const k = tx + ',' + ty;
+    if (!tiles.has(k)) tiles.set(k, (async () => {
+      const box = boxOf([tx * TILE, ty * TILE, (tx + 1) * TILE, (ty + 1) * TILE]);
+      let f = await vwAll('LT_C_SPBD', box, 3);
+      if (!f.length) f = await vwAll('LT_C_BLDGINFO', box, 3);
+      return f;
+    })().catch(e => { tiles.delete(k); throw e; }));
+    return tiles.get(k);
   }
-  async function outline(cx) {
-    const p = pos.get(cx.id);
-    if (!p) return U.toast('이 단지의 위치를 아직 찾는 중입니다.');
-    const prev = OL.cx;
-    OL.seq++; const my = OL.seq;
-    olClearDrawn(); OL.parcels.clear(); OL.blds.clear(); OL.manual = false;
-    OL.cx = cx; if (prev && prev !== cx) place(prev); place(cx);
-    olBox(); olMsg('경계 불러오는 중…');
-    try {
+  async function bldsNear(p, r) {
+    const b = boxAround(p, r), out = new Map(), jobs = [];
+    for (let tx = Math.floor(b[0] / TILE); tx <= Math.floor(b[2] / TILE); tx++)
+      for (let ty = Math.floor(b[1] / TILE); ty <= Math.floor(b[3] / TILE); ty++) jobs.push(tileBlds(tx, ty));
+    (await Promise.all(jobs)).forEach(list => list.forEach(f => out.set(fid(f), f)));
+    return out;
+  }
+
+  /* 한 단지의 경계 구하기 (결과는 기억) */
+  function computeOl(cx) {
+    if (olCache.has(cx.id)) return olCache.get(cx.id);
+    const pr = (async () => {
+      const p = pos.get(cx.id); if (!p) return null;
       await loadTurf();
-      if (my !== OL.seq) return;
       const here = turf.point([p.lng, p.lat]);
-      // ① 단지 주소(지번) 위치의 필지
-      const seed = vwFeatures(await vw({ data: 'LP_PA_CBND_BUBUN', geomFilter: `POINT(${p.lng} ${p.lat})` }));
-      // ② 주변 건물 (반경 300m)
-      let layer = 'LT_C_SPBD', blds = await vwAll(layer, boxOf(boxAround(p, 300)), 3);
-      if (!blds.length) { layer = 'LT_C_BLDGINFO'; blds = await vwAll(layer, boxOf(boxAround(p, 300)), 3); }
-      if (my !== OL.seq) return;
-      blds.forEach(b => OL.blds.set(fid(b), b));
+      // ① 단지 주소(지번) 위치의 필지  ② 주변 건물 (반경 300m)
+      const [seed, pool] = await Promise.all([vw({ data: 'LP_PA_CBND_BUBUN', geomFilter: `POINT(${p.lng} ${p.lat})` }).then(vwFeatures), bldsNear(p, 300)]);
       // ③ 이 단지 건물 고르기: 이름 일치 → 주소 필지 안 건물 → 가까운 5층 이상 건물과 같은 이름
       const target = normNm(cx.name), alias = normNm(cx.alias);
-      const info = blds.map(b => { const nm = pick(b.properties, NAME_KEYS); return { b, n: normNm(nm), fl: Number(pick(b.properties, FLOOR_KEYS)) || 0, pt: ptOf(b) }; });
+      const info = [...pool.values()].map(b => ({ b, n: normNm(pick(b.properties, NAME_KEYS)), fl: Number(pick(b.properties, FLOOR_KEYS)) || 0, pt: ptOf(b) }));
       const nameHit = (n) => n.length >= 2 && [target, alias].some(t => t && (n.includes(t) || (n.length >= 4 && t.includes(n))));
-      let sel = info.filter(x => nameHit(x.n));
+      let sel = info.filter(x => nameHit(x.n) && turf.distance(here, x.pt, { units: 'meters' }) <= 600);
       if (!sel.length && seed.length) sel = info.filter(x => inside(x.pt, seed[0]));
       if (!sel.length) {
         const tall = info.filter(x => x.fl >= 5).map(x => ({ ...x, d: turf.distance(here, x.pt, { units: 'meters' }) })).sort((a, b) => a.d - b.d);
-        if (tall.length && tall[0].n) sel = info.filter(x => x.n === tall[0].n); else sel = tall.filter(x => x.d <= 150);
+        if (tall.length && tall[0].n) sel = info.filter(x => x.n === tall[0].n && turf.distance(here, x.pt, { units: 'meters' }) <= 600); else sel = tall.filter(x => x.d <= 150);
       }
       // ④ 고른 건물이 서 있는 필지 + 주소 필지 → 단지 경계
-      if (seed[0]) OL.parcels.set(pick(seed[0].properties, ['pnu']) || fid(seed[0]), seed[0]);
+      const parcels = new Map();
+      if (seed[0]) parcels.set(pnu(seed[0]), seed[0]);
       if (sel.length) {
         const bb = turf.bbox(turf.featureCollection(sel.map(x => x.b))), pad = 0.0002;
-        const parcels = await vwAll('LP_PA_CBND_BUBUN', boxOf([bb[0] - pad, bb[1] - pad, bb[2] + pad, bb[3] + pad]), 3);
-        if (my !== OL.seq) return;
-        parcels.forEach(pc => { if (sel.some(x => inside(x.pt, pc))) OL.parcels.set(pick(pc.properties, ['pnu']) || fid(pc), pc); });
+        const ps = await vwAll('LP_PA_CBND_BUBUN', boxOf([bb[0] - pad, bb[1] - pad, bb[2] + pad, bb[3] + pad]), 3);
+        ps.forEach(pc => { if (sel.some(x => inside(x.pt, pc))) parcels.set(pnu(pc), pc); });
       }
-      olDraw(true);
-    } catch (e) {
-      console.error(e);
-      if (my === OL.seq) olMsg(`<span class="warn">${U.esc(e.message || String(e))}</span>`);
-    }
+      return { parcels, pool, u: null, labels: null };
+    })().catch(e => { olCache.delete(cx.id); throw e; });
+    olCache.set(cx.id, pr);
+    return pr;
   }
   function unionAll(list) {
     let u = null;
@@ -493,52 +504,131 @@ const Start = (() => {
     try { const s = u && turf.buffer(u, -0.5, { units: 'meters' }); if (s) u = s; } catch (e) { /* 그대로 */ }
     return u;
   }
-  function olDraw(fit) {
-    olClearDrawn();
-    const parcels = [...OL.parcels.values()];
-    if (!parcels.length) { olMsg('경계를 찾지 못했습니다. <b>필지 추가/빼기</b>를 켜고 단지 땅을 눌러 보세요.'); return; }
-    const u = unionAll(parcels);
-    if (u) OL.drawn.push(...drawPoly(u.geometry, { strokeWeight: 3, strokeColor: '#e5322d', strokeOpacity: 1, fillColor: '#e5322d', fillOpacity: 0.07 }));
-    const inner = [...OL.blds.values()].filter(b => { const pt = ptOf(b); return parcels.some(pc => inside(pt, pc)); });
-    let apt = 0, none = 0;
-    const seen = new Set();
-    inner.forEach(b => {
+  /* 경계 모양·동 번호 위치 계산 (필지가 바뀌면 다시) */
+  function finalize(d) {
+    const parcels = [...d.parcels.values()];
+    d.u = parcels.length ? unionAll(parcels) : null;
+    const bb = d.u ? turf.bbox(d.u) : null, seen = new Set();
+    d.labels = [];
+    if (!bb) return;
+    for (const b of d.pool.values()) {
+      const pt = ptOf(b), c = pt.geometry.coordinates;
+      if (c[0] < bb[0] || c[0] > bb[2] || c[1] < bb[1] || c[1] > bb[3]) continue;
+      if (!parcels.some(pc => inside(pt, pc))) continue;
       const lb = dongLabel(b.properties);
-      if (!lb.text) { none++; return; }
-      if (!lb.apt && !st.other) return;
-      const c = ptOf(b).geometry.coordinates, k = lb.text + '@' + c[0].toFixed(4) + ',' + c[1].toFixed(4);
-      if (seen.has(k)) return; seen.add(k);
-      const el = document.createElement('div'); el.className = 'st-dong' + (lb.apt ? '' : ' other'); el.textContent = lb.text;
-      const ov = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(c[1], c[0]), content: el, yAnchor: 0.5, zIndex: lb.apt ? 7 : 6 });
-      OL.labels.push(ov);
-      if (lb.apt) apt++;
+      if (!lb.text) { d.labels.push({ text: '', apt: false, c }); continue; }
+      const k = lb.text + '@' + c[0].toFixed(4) + ',' + c[1].toFixed(4);
+      if (seen.has(k)) continue; seen.add(k);
+      d.labels.push({ ...lb, c });
+    }
+  }
+  /* 그리기: strong = 고른 단지(굵게) / 아니면 저절로 그린 경계(가늘게) */
+  function drawOl(d, strong) {
+    if (!d.labels) finalize(d);
+    const objs = d.u ? drawPoly(d.u.geometry, strong
+      ? { strokeWeight: 3, strokeColor: '#e5322d', strokeOpacity: 1, fillColor: '#e5322d', fillOpacity: 0.08 }
+      : { strokeWeight: 2, strokeColor: '#e5322d', strokeOpacity: 0.75, fillColor: '#e5322d', fillOpacity: 0.03 }) : [];
+    const labs = d.labels.filter(l => l.text && (l.apt || st.other)).map(l => {
+      const el = document.createElement('div'); el.className = 'st-dong' + (l.apt ? '' : ' other') + (strong ? '' : ' sm'); el.textContent = l.text;
+      return new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(l.c[1], l.c[0]), content: el, yAnchor: 0.5, zIndex: strong ? 7 : 5 });
     });
-    olLabelsVis();
-    if (fit && u) {
-      const bb = turf.bbox(u);
+    const g = {
+      vis() { const on = !!map && map.getLevel() <= 4; labs.forEach(o => o.setMap(on ? map : null)); },
+      remove() { objs.forEach(o => o.setMap(null)); labs.forEach(o => o.setMap(null)); },
+    };
+    g.vis();
+    return g;
+  }
+  function olLabelsVis() { if (OL.view) OL.view.vis(); auto.forEach(g => g.vis()); }
+
+  /* 고른 단지 (라벨 누르기·검색) */
+  async function outline(cx) {
+    if (!pos.get(cx.id)) return U.toast('이 단지의 위치를 아직 찾는 중입니다.');
+    const prev = OL.cx;
+    OL.seq++; const my = OL.seq;
+    if (OL.view) OL.view.remove();
+    OL.view = null; OL.data = null; OL.manual = false;
+    OL.cx = cx; if (prev && prev !== cx) place(prev); place(cx);
+    autoRemove(cx.id);
+    olBox(); olMsg('경계 불러오는 중…');
+    try {
+      const d = await computeOl(cx);
+      if (my !== OL.seq) return;
+      if (!d) return olMsg('위치를 찾지 못했습니다.');
+      OL.data = d; olShow(true);
+      if (prev && prev !== cx) autoRefreshSoon();
+    } catch (e) {
+      console.error(e);
+      if (my === OL.seq) olMsg(`<span class="warn">${U.esc(e.message || String(e))}</span>`);
+    }
+  }
+  function olShow(fit) {
+    if (OL.view) OL.view.remove();
+    OL.view = null;
+    const d = OL.data; if (!d) return;
+    if (!d.labels) finalize(d);
+    if (!d.parcels.size) { olMsg('경계를 찾지 못했습니다. <b>필지 추가/빼기</b>를 켜고 단지 땅을 눌러 보세요.'); return; }
+    OL.view = drawOl(d, true);
+    if (fit && d.u) {
+      const bb = turf.bbox(d.u);
       map.setBounds(new kakao.maps.LatLngBounds(new kakao.maps.LatLng(bb[1], bb[0]), new kakao.maps.LatLng(bb[3], bb[2])), 80, 80, 80, 80);
       if (map.getLevel() > 3) map.setLevel(3);
     }
-    olMsg(`필지 ${parcels.length}개 · 동 번호 ${apt}개${none ? ` · 이름 없는 건물 ${none}개` : ''}${map.getLevel() > 4 ? ' · 확대하면 동 번호가 보입니다' : ''}`);
+    const apt = d.labels.filter(l => l.apt).length, none = d.labels.filter(l => !l.text).length;
+    olMsg(`필지 ${d.parcels.size}개 · 동 번호 ${apt}개${none ? ` · 이름 없는 건물 ${none}개` : ''}${map.getLevel() > 4 ? ' · 확대하면 동 번호가 보입니다' : ''}`);
     declutterSoon();
   }
-  function olLabelsVis() { const on = map && map.getLevel() <= 4; OL.labels.forEach(o => o.setMap(on ? map : null)); }
+  function olClear() {
+    OL.seq++;
+    if (OL.view) OL.view.remove();
+    const prev = OL.cx;
+    OL.view = null; OL.cx = null; OL.data = null; OL.manual = false;
+    if (prev) place(prev);
+    olBox(); declutterSoon(); autoRefreshSoon();
+  }
   async function toggleParcel(latLng) {
+    const d = OL.data; if (!d) return;
     const lng = latLng.getLng(), lat = latLng.getLat();
     try {
       await loadTurf();
       olMsg('필지 확인 중…');
       const f = vwFeatures(await vw({ data: 'LP_PA_CBND_BUBUN', geomFilter: `POINT(${lng} ${lat})` }));
       if (!f.length) return olMsg('이 위치의 필지를 찾지 못했습니다.');
-      const pc = f[0], key = pick(pc.properties, ['pnu']) || fid(pc);
-      if (OL.parcels.has(key)) OL.parcels.delete(key);
-      else {
-        OL.parcels.set(key, pc);
-        const blds = await vwAll('LT_C_SPBD', boxOf(turf.bbox(pc)), 2);
-        blds.forEach(b => OL.blds.set(fid(b), b));
-      }
-      olDraw(false);
+      const pc = f[0], key = pnu(pc);
+      if (d.parcels.has(key)) d.parcels.delete(key);
+      else { d.parcels.set(key, pc); (await bldsNear({ lat, lng }, 150)).forEach((b, k) => d.pool.set(k, b)); }
+      d.labels = null; d.u = null;                // 바뀐 필지로 다시 계산 (기억해 둔 결과에도 반영)
+      if (OL.data === d) olShow(false);
     } catch (e) { olMsg(`<span class="warn">${U.esc(e.message || String(e))}</span>`); }
+  }
+  /* 동 번호(상가·관리동 표시) 설정이 바뀌면 다시 그리기 */
+  function olRestyle() { if (OL.data) olShow(false); autoClear(); autoRefreshSoon(); }
+
+  /* 확대하면 화면 안 단지들의 경계를 저절로 */
+  function autoRemove(id) { const g = auto.get(id); if (g) { g.remove(); auto.delete(id); } }
+  function autoClear() { [...auto.keys()].forEach(autoRemove); }
+  function autoRefreshSoon() { clearTimeout(autoRefreshSoon.t); autoRefreshSoon.t = setTimeout(autoRefresh, 300); }
+  async function autoRefresh() {
+    if (!map) return;
+    const my = ++autoSeq;
+    if (!st.autoLv || map.getLevel() > st.autoLv) return autoClear();
+    const b = viewBox(), c = map.getCenter();
+    const cand = shown().filter(cx => { const p = pos.get(cx.id); return p && p.lng >= b[0] && p.lng <= b[2] && p.lat >= b[1] && p.lat <= b[3] && !(OL.cx && OL.cx.id === cx.id); })
+      .map(cx => { const p = pos.get(cx.id); return { cx, d: Math.hypot(p.lat - c.getLat(), p.lng - c.getLng()) }; })
+      .sort((a, z) => a.d - z.d).slice(0, AUTO_MAX).map(x => x.cx);
+    const want = new Set(cand.map(cx => cx.id));
+    [...auto.keys()].filter(id => !want.has(id)).forEach(autoRemove);
+    const todo = cand.filter(cx => !auto.has(cx.id));
+    for (let i = 0; i < todo.length; i += 3) {                  // 가까운 단지부터 3개씩
+      await Promise.all(todo.slice(i, i + 3).map(async (cx) => {
+        try {
+          const d = await computeOl(cx);
+          if (my !== autoSeq || !d || !d.parcels.size || auto.has(cx.id) || (OL.cx && OL.cx.id === cx.id)) return;
+          auto.set(cx.id, drawOl(d, false));
+        } catch (e) { console.warn('단지 경계', cx.name, e); }
+      }));
+      if (my !== autoSeq) return;
+    }
   }
 
   /* ═════════ 위쪽 레이어 ═════════ */
@@ -715,6 +805,7 @@ const Start = (() => {
         <div class="st-sub">세대수</div>${seg('hh', [[0, '전체'], [200, '200↑'], [300, '300↑'], [500, '500↑'], [1000, '1,000↑']], st.hh)}
         <div class="st-sub">연식</div>${seg('age', [[0, '전체'], [5, '5년↓'], [10, '10년↓'], [20, '20년↓'], [30, '30년↓']], st.age)}
         <div class="st-sub">마우스 올렸을 때 창</div>${seg('tip', [['A', 'A 한 평형씩'], ['B', 'B 평형별 표']], st.tip)}
+        <div class="st-sub">단지 경계 자동 표시 <small>(지도를 이만큼 확대하면 화면 안 단지 경계가 저절로)</small></div>${seg('aol', [[0, '끄기'], [2, '많이 확대'], [3, '확대 (기본)'], [4, '조금 확대']], st.autoLv)}
         <div class="st-sub">단지 경계</div><label class="inline"><input type="checkbox" id="stOther2" ${st.other ? 'checked' : ''}> 상가·관리동 이름도 표시</label>
         <p class="hint">평형은 왼쪽 아래 59·74·84 체크로 고릅니다.</p>`;
     }
@@ -734,10 +825,11 @@ const Start = (() => {
     if (d.hh != null) { st.hh = +d.hh; save(); redraw(); return renderPop(); }
     if (d.age != null) { st.age = +d.age; save(); redraw(); return renderPop(); }
     if (d.tip) { st.tip = d.tip; save(); if (tip) renderTip(); return renderPop(); }
+    if (d.aol != null) { st.autoLv = +d.aol; save(); autoClear(); autoRefreshSoon(); if (st.autoLv && map && map.getLevel() > st.autoLv) U.toast('지도를 더 확대하면 단지 경계가 저절로 나옵니다.'); return renderPop(); }
   }
   function onPopChange(e) {
     if (e.target.id === 'stSido') { $('stPop').dataset.sido = e.target.value; return renderPop(); }
-    if (e.target.id === 'stOther2') { st.other = e.target.checked ? 1 : 0; save(); olBox(); if (OL.cx) olDraw(false); }
+    if (e.target.id === 'stOther2') { st.other = e.target.checked ? 1 : 0; save(); olBox(); olRestyle(); }
   }
 
   /* ═════════ 화면 만들기 ═════════ */
@@ -787,7 +879,7 @@ const Start = (() => {
     $('stPop').addEventListener('click', onPopClick);
     $('stPop').addEventListener('change', onPopChange);
     $('stOlClear').onclick = olClear;
-    $('stOther').onchange = () => { st.other = $('stOther').checked ? 1 : 0; save(); if (OL.cx) olDraw(false); };
+    $('stOther').onchange = () => { st.other = $('stOther').checked ? 1 : 0; save(); olRestyle(); };
     $('stManual').onclick = () => { OL.manual = !OL.manual; olBox(); if (OL.manual) olMsg('지도에서 단지 땅을 누르면 필지가 들어가거나 빠집니다.'); };
     if (typeof Finder !== 'undefined') Finder.attach($('stQ'), goTo);
   }
@@ -811,7 +903,7 @@ const Start = (() => {
     geocoder = new kakao.maps.services.Geocoder();
     places = new kakao.maps.services.Places();
     kakao.maps.event.addListener(map, 'idle', onIdle);
-    kakao.maps.event.addListener(map, 'zoom_changed', () => { declutterSoon(); if (OL.cx) olLabelsVis(); });
+    kakao.maps.event.addListener(map, 'zoom_changed', () => { declutterSoon(); olLabelsVis(); if (st.autoLv && map.getLevel() > st.autoLv) autoClear(); });
     kakao.maps.event.addListener(map, 'click', (e) => { if (OL.manual) return toggleParcel(e.latLng); if (tipPin) hideTip(); if (pop) { pop = ''; renderPop(); } });
     fitHeight();
     const saved = st.codes.slice(); st.codes = [];
