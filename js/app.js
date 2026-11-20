@@ -22,6 +22,7 @@ const App = (() => {
     if (name === 'supplymap' && typeof SupplyMap !== 'undefined') SupplyMap.open();
     if (name === 'cxmap' && typeof CxMap !== 'undefined') CxMap.open();
     if (typeof View3D !== 'undefined') { if (name === 'v3d') View3D.open(); else View3D.leave(); }     // 3D 탭 (js/view3d.js)
+    if (typeof Start !== 'undefined') { if (name === 'start') Start.open(); else Start.leave(); }     // 홈 탭 (js/start.js)
   }
 
   /** 지도 창 열기. 단지 정보(code, key, sido, sgg, dong, jibun, name)가 있으면 됩니다.
@@ -134,6 +135,7 @@ const App = (() => {
     Compare.init();
     Infra.init();
     Home.init();
+    if (typeof Start !== 'undefined') Start.init();     // 홈 탭 (js/start.js)
     if (typeof CxMap !== 'undefined') CxMap.init();
     if (typeof Supply !== 'undefined') Supply.init();
     if (typeof SupplyMap !== 'undefined') SupplyMap.init();

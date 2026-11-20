@@ -13,13 +13,15 @@
   try { var t = JSON.parse(localStorage.getItem('apt.theme') || '""'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/start.css">
 </head>
 <body>
 
 <header class="top">
   <h1>아파트 실거래가 대시보드</h1>
   <nav class="tabs" id="tabs">
-    <button data-tab="cxmap" class="on">단지 지도</button>
+    <button data-tab="start" class="on">홈</button>
+    <button data-tab="cxmap">단지 지도</button>
     <button data-tab="home">최근 거래</button>
     <button data-tab="search">실거래 조회</button>
     <button data-tab="compare">단지 비교</button>
@@ -58,8 +60,11 @@
 
 <!-- ═══════════════ 1. 실거래 조회 ═══════════════ -->
 <!-- ═══════════════ 0. 최근 거래 (첫 화면) ═══════════════ -->
-<!-- ═══════════════ 0. 단지 지도 (첫 화면) ═══════════════ -->
-<main id="tab-cxmap" class="tab">
+<!-- ═══════════════ 홈 (첫 화면 · 화면 전체 지도) — 내용은 js/start.js 가 채움 ═══════════════ -->
+<main id="tab-start" class="tab"></main>
+
+<!-- ═══════════════ 0. 단지 지도 ═══════════════ -->
+<main id="tab-cxmap" class="tab" hidden>
   <section class="panel hmcond cxmcond">
     <details id="cxmCond" open>
       <summary><span id="cxmCondSum">전체 단지</span> <span class="hmchg">조건 바꾸기 ▾</span></summary>
@@ -1470,7 +1475,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/view3d.js', 'js/satview.js', 'js/count.js', 'js/yard.js', 'js/app.js'];
+  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/view3d.js', 'js/satview.js', 'js/count.js', 'js/yard.js', 'js/start.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;
