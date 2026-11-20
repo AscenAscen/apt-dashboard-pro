@@ -150,6 +150,7 @@ const App = (() => {
     Saves.register('grouping', { name: '시세그룹핑', keys: ['apt.grouping.v1'], hint: '그룹핑 판(생활권·가격대·배치) 전체를 저장합니다.' });
     const xa = $('btnXlAll'); if (xa) xa.onclick = () => Xl.all();
     showStatus();
+    if (typeof AutoSync !== 'undefined') AutoSync.init();     // 시세트래킹·앞마당 자동 동기화 (js/autosync.js)
     if (typeof CmdK !== 'undefined') CmdK.init();
     if (typeof Health !== 'undefined') Health.init();
     const back = sessionStorage.getItem('apt.openTab');       // 저장함에서 불러온 뒤 다시 열린 경우 그 탭으로
