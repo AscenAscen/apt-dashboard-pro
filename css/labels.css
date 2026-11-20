@@ -1,0 +1,172 @@
+/* ─────────────────────────────────────────────────────────
+   labels.css — 모든 지도가 함께 쓰는 단지 라벨 모양 (js/labelkit.js)
+   색(--lkc)은 라벨마다 자바스크립트가 넣고, 크기(--lks)·글자(--lkf)·글꼴(--lkff)은 지도 상자에 들어 있습니다.
+   라벨 색·모서리·그림자를 바꾸고 싶으면 이 파일만 고치면 모든 지도에 같이 적용됩니다.
+   ───────────────────────────────────────────────────────── */
+
+/* ── 공통 ── */
+.lk { --lkw: #fff; --lkink: #1a1f2b; --lksub: #6b7280; --lkbd: rgba(17,24,39,.13);
+  --lksh: 0 1px 2px rgba(15,23,42,.14), 0 4px 12px rgba(15,23,42,.16);
+  position: relative; margin-bottom: 8px; cursor: pointer; white-space: nowrap; line-height: 1.22; user-select: none; -webkit-user-select: none;
+  font-family: var(--lkff, 'Pretendard', system-ui, sans-serif); font-size: var(--lkf, 13px);
+  transform: scale(var(--lks, 1)); transform-origin: 50% 100%; transition: transform .16s cubic-bezier(.2,.8,.3,1.2), filter .16s; }
+.lk:hover { transform: scale(var(--lks, 1)) translateY(-3px) scale(1.06); filter: drop-shadow(0 6px 10px rgba(15,23,42,.18)); z-index: 999; }
+.lk:active { transform: scale(var(--lks, 1)) scale(.97); }
+.lk-b { position: relative; }
+.lk-tail { position: absolute; left: 50%; bottom: -5px; margin-left: -5px; width: 0; height: 0; border: 5px solid transparent; border-bottom: 0; border-top-color: var(--lkc); }
+.lk-dt { display: none; }
+.lk-star { color: #f5b301; margin-right: 2px; font-weight: 900; }
+.lk-up { color: #dc2626; } .lk-dn { color: #2563eb; }
+.lk .lk-bd { display: inline-block; font-style: normal; font-size: max(9px, calc(var(--lkf, 13px) - 4px)); font-weight: 800; line-height: 1; padding: 3px 4px 2px; border-radius: 4px; margin-left: 4px; vertical-align: 1px; background: #eef2ff; color: #3730a3; letter-spacing: 0; }
+.lk .lk-bd.lead { background: linear-gradient(135deg, #e7c66b, #b8892b); color: #fff; }
+.lk .lk-bd.new { background: #ede9fe; color: #5b3fd1; }
+.lk .lk-bd.land { background: #fee2e2; color: #b91c1c; }
+.lk .lk-bd.cmp { background: #2563eb; color: #fff; }
+.lk .lk-bd.mine { background: transparent; color: #f5b301; padding: 0 1px; font-size: var(--lkf, 13px); }
+
+/* ── A 2단 태그: 위 흰 칸 = 이름, 아래 색 띠 = 정보 ── */
+.lk-tag .lk-b { display: flex; flex-direction: column; border-radius: 9px; box-shadow: var(--lksh); }
+.lk-tag .lk-n { background: var(--lkw); color: var(--lkink); font-weight: 700; letter-spacing: -.3px; padding: 4px 10px 3px; border: 1px solid var(--lkbd); border-bottom: 0; border-radius: 9px 9px 0 0; text-align: center; }
+.lk-tag .lk-i { background: var(--lkc); color: #fff; font-size: calc(var(--lkf, 13px) - 1.5px); font-weight: 700; padding: 2px 10px 3px; border-radius: 0 0 9px 9px; text-align: center; font-variant-numeric: tabular-nums; }
+.lk-tag .lk-i span { font-weight: 500; opacity: .82; margin-right: 6px; }
+.lk-tag .lk-n:only-child { border-radius: 9px; border-bottom: 3px solid var(--lkc); }
+
+/* ── B 연식 블록: [연식][이름][세대수] 가로 한 줄 ── */
+.lk-block .lk-b { display: flex; align-items: stretch; border-radius: 8px; overflow: hidden; box-shadow: var(--lksh); }
+.lk-block .lk-y { background: var(--lkc); color: #fff; font-weight: 800; padding: 4px 7px; font-variant-numeric: tabular-nums; }
+.lk-block .lk-y0 { padding: 0 3px; }
+.lk-block .lk-n { background: var(--lkw); color: var(--lkink); font-weight: 700; letter-spacing: -.3px; padding: 4px 8px; }
+.lk-block .lk-h { background: #f3f4f6; color: #374151; font-weight: 700; padding: 4px 7px; font-size: calc(var(--lkf, 13px) - 1px); font-variant-numeric: tabular-nums; display: flex; align-items: center; }
+.lk-block .lk-tail, .lk-chip .lk-tail { border: 0; width: 7px; height: 7px; margin-left: -3.5px; bottom: -9px; border-radius: 50%; background: var(--lkc); box-shadow: 0 0 0 2px #fff, 0 1px 3px rgba(0,0,0,.35); }
+
+/* ── C 한 줄 칩: 둥근 알약, 왼쪽 색 동그라미 ── */
+.lk-chip .lk-b { display: flex; align-items: center; gap: 6px; background: var(--lkw); color: var(--lkink); border-radius: 999px; padding: 3px 10px 3px 3px; box-shadow: var(--lksh); font-weight: 700; letter-spacing: -.3px; }
+.lk-chip .lk-y { background: var(--lkc); color: #fff; font-size: calc(var(--lkf, 13px) - 2px); border-radius: 999px; padding: 2px 7px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.lk-chip .lk-y0 { padding: 0; width: 10px; height: 10px; margin-left: 3px; }
+.lk-chip small { font-size: calc(var(--lkf, 13px) - 1.5px); color: var(--lksub); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ── D 시세 카드: 위 색 띠 + 가격 크게 ── */
+.lk-price .lk-b { background: var(--lkw); border-radius: 10px; padding: 4px 10px 5px; box-shadow: var(--lksh); border-top: 4px solid var(--lkc); text-align: left; }
+.lk-price .lk-n { font-size: calc(var(--lkf, 13px) - 1px); font-weight: 600; color: #4b5563; letter-spacing: -.3px; }
+.lk-price .lk-v { font-size: calc(var(--lkf, 13px) + 2px); font-weight: 800; color: #111; font-variant-numeric: tabular-nums; letter-spacing: -.2px; }
+.lk-price .lk-v i { font-style: normal; font-size: calc(var(--lkf, 13px) - 2px); font-weight: 700; margin-left: 4px; }
+.lk-price .lk-tail { border-top-color: var(--lkw); filter: drop-shadow(0 1px 1px rgba(0,0,0,.12)); }
+
+/* ── 상태: 내 단지(빨간 테두리) · 선택 · 숨김 ── */
+.lk.emph .lk-b { box-shadow: 0 0 0 2px #e5322d, var(--lksh); }
+.lk.emph.lk-tag .lk-n, .lk.emph.lk-block .lk-n { color: #b91c1c; }
+.lk.on .lk-b { outline: 2.5px solid #111827; outline-offset: 2px; }
+.lk.lk-hid { display: none; }
+
+/* ── 작은 점 (겹칠 때 · 중간 거리의 작은 단지) ── */
+.lk.mini, .lk.sp-dot, .lk-host[data-lkz="mid"] .lk.lk-small:not(.on):not(.emph) {
+  width: 11px; height: 11px; margin: 0; border-radius: 50%; background: var(--lkc); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); transform: translateY(50%); filter: none; }
+.lk.mini > *, .lk.sp-dot > *, .lk-host[data-lkz="mid"] .lk.lk-small:not(.on):not(.emph) > * { display: none; }
+.lk.sp-hide { display: none; }
+
+/* ── 멀리 볼 때: 세대수 크기 동그라미 ── */
+.lk-host[data-lkz="far"] .lk:not(.on):not(.emph) { width: calc(var(--lkr) * 2); height: calc(var(--lkr) * 2); margin: 0; border-radius: 50%; background: var(--lkc); border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center; transform: translateY(50%); filter: none; }
+.lk-host[data-lkz="far"] .lk:not(.on):not(.emph) > * { display: none; }
+.lk-host[data-lkz="far"] .lk:not(.on):not(.emph) > .lk-dt { display: block; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: -.3px; font-family: 'Pretendard', sans-serif; }
+.lk-host[data-lkz="far"] .lk.mini:not(.on):not(.emph) { width: calc(var(--lkr) * 2); height: calc(var(--lkr) * 2); }
+
+/* ── 중간 거리: 이름만 ── */
+.lk-host[data-lkz="mid"] .lk:not(.on):not(.emph) .lk-i,
+.lk-host[data-lkz="mid"] .lk:not(.on):not(.emph) .lk-h,
+.lk-host[data-lkz="mid"] .lk:not(.on):not(.emph) small,
+.lk-host[data-lkz="mid"] .lk-price:not(.on):not(.emph) .lk-v { display: none; }
+.lk-host[data-lkz="mid"] .lk-tag:not(.on):not(.emph) .lk-n { border-radius: 9px; border-bottom: 3px solid var(--lkc); }
+
+/* ── 직접 고치기(편집 모드) ── */
+.lk-host.lk-editing .lk { cursor: grab; touch-action: none; }
+.lk-host.lk-editing .lk .lk-b { outline: 1.5px dashed #2563eb; outline-offset: 2px; }
+.lk-host.lk-editing .lk.lk-hid { display: block; opacity: .35; }
+.lk.lk-drag { cursor: grabbing; transition: none; z-index: 9999; }
+
+/* ── 지도 위 버튼 · 설정 창 · 범례 ── */
+.lk-host { position: relative; }
+.lk-btn { position: absolute; z-index: 30; top: 10px; right: 10px; display: flex; align-items: center; gap: 4px; min-height: 0; padding: 7px 12px; border-radius: 999px;
+  background: #fff; color: #111827; border: 1px solid rgba(17,24,39,.15); box-shadow: 0 2px 10px rgba(0,0,0,.18); font: 600 13px/1 'Pretendard', system-ui, sans-serif; cursor: pointer; transition: transform .1s, box-shadow .15s; }
+.lk-btn:hover { box-shadow: 0 4px 14px rgba(0,0,0,.25); border-color: rgba(17,24,39,.3); }
+.lk-btn:active { transform: scale(.95); }
+.lk-btn.on { background: #111827; color: #fff; }
+.lk-btn.editing::after { content: '편집 중'; margin-left: 4px; font-size: 11px; font-weight: 800; color: #fff; background: #2563eb; border-radius: 999px; padding: 2px 6px; }
+.lk-host[data-lkmap="start"] .lk-btn { top: 10px; right: 10px; }
+.lk-panel { position: absolute; z-index: 31; top: 52px; right: 10px; width: 312px; max-height: calc(100% - 64px); overflow-y: auto; padding: 10px 12px 12px; border-radius: 14px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.32); font: 13px/1.45 'Pretendard', system-ui, sans-serif; text-align: left; }
+.lk-ph { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.lk-ph small { color: var(--sub); }
+.lk-x { min-height: 0; padding: 2px 8px; border-radius: 6px; background: none; border: 1px solid var(--line); color: var(--sub); }
+.lk-sec { padding: 8px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+.lk-sec > span { font-size: 12px; font-weight: 700; color: var(--sub); }
+.lk-seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.lk-seg button, .lk-pre button, .lk-mini { min-height: 0; padding: 5px 10px; border-radius: 999px; font-size: 12px; background: var(--panel2); color: var(--text); border: 1px solid var(--line); transition: background .12s, transform .08s; }
+.lk-seg button:active, .lk-pre button:active { transform: scale(.95); }
+.lk-seg button.on, .lk-pre button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+.lk-pre { display: flex; flex-wrap: wrap; gap: 4px; }
+.lk-pre button:disabled { opacity: .45; cursor: default; }
+.lk-my { display: inline-flex; } .lk-my button:first-child { border-radius: 999px 0 0 999px; } .lk-my button:last-child { border-radius: 0 999px 999px 0; border-left: 0; padding: 5px 7px; }
+.lk-chk { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.lk-chk label, .lk-inl { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--text); cursor: pointer; }
+.lk-inl input[type=text] { flex: 1; min-height: 0; padding: 5px 8px; }
+.lk-inl select, .lk-sec > select { min-height: 0; padding: 4px 6px; }
+.lk-rng { display: flex; align-items: center; gap: 8px; } .lk-rng input { flex: 1; padding: 0; } .lk-rng em { font-style: normal; font-size: 12px; color: var(--sub); min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+.lk-note { margin: 0; font-size: 11.5px; color: var(--sub); }
+.lk-edit { min-height: 0; padding: 8px 12px; border-radius: 10px; font-weight: 700; background: var(--panel2); border: 1px dashed var(--accent); color: var(--text); }
+.lk-edit.on { background: #2563eb; color: #fff; border-style: solid; }
+.lk-foot { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+.lk-foot button { min-height: 0; padding: 5px 10px; font-size: 12px; }
+.lk-legend { position: absolute; z-index: 20; left: 10px; bottom: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 3px 10px; max-width: calc(100% - 90px);
+  padding: 5px 10px; border-radius: 10px; background: rgba(255,255,255,.94); color: #1f2937; box-shadow: 0 1px 6px rgba(0,0,0,.2); font: 600 11.5px/1.3 'Pretendard', system-ui, sans-serif; pointer-events: none; }
+.lk-legend b { font-weight: 800; }
+.lk-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.lk-legend .sub { color: #6b7280; font-weight: 500; }
+.lk-host[data-lkmap="start"] .lk-legend { left: 92px; bottom: 10px; }
+.lk-pop { position: fixed; z-index: 3000; width: 280px; padding: 10px 12px; border-radius: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  display: flex; flex-direction: column; gap: 8px; font: 13px/1.4 'Pretendard', system-ui, sans-serif; }
+.lk-pop .lk-pre button { font-size: 12px; }
+
+/* ── 입지 분석 · 인구이동: 크기·글자·글꼴만 ── */
+.lk-host[data-lkmap="infra"] .kdot span, .lk-host[data-lkmap="infra"] .klabel { font-family: var(--lkff); font-size: var(--lkf); border-radius: 6px; }
+.lk-host[data-lkmap="infra"] .kdot, .lk-host[data-lkmap="infra"] .klabel { scale: var(--lks, 1); transform-origin: 0 50%; }
+.lk-host[data-lkmap="migration"] .mgdot { font-family: var(--lkff); font-size: calc(var(--lkf) - .5px); scale: var(--lks, 1); }
+.lk-host[data-lkmap="migration"] .mgdot b { font-size: var(--lkf); }
+
+/* ── 시세지도 · 랜드마크 (js/maplabel.js): A 2단 태그 · D 시세 카드 ── */
+.mllabel.ds-lkp, .mllabel.ds-lkt { background: transparent !important; border: 0 !important; padding: 0; box-shadow: none; border-radius: 0; font-family: inherit; }
+.mllabel.ds-lkp .lk-b { background: #fff; color: #111; border-radius: 10px; padding: 4px 10px 5px; border-top: 4px solid var(--lkc); box-shadow: 0 1px 2px rgba(15,23,42,.14), 0 4px 12px rgba(15,23,42,.18); text-align: left; }
+.mllabel.ds-lkp .lk-n { font-size: .92em; font-weight: 600; color: #4b5563; letter-spacing: -.3px; }
+.mllabel.ds-lkp .lk-v { display: flex; align-items: center; gap: 4px; font-size: 1.14em; font-weight: 800; letter-spacing: -.2px; font-variant-numeric: tabular-nums; }
+.mllabel.ds-lkp .lk-v.sm { font-size: .9em; font-weight: 700; color: #374151; }
+.mllabel.ds-lkp .lk-v .mlk { font-size: .72em; font-weight: 600; opacity: .7; }
+.mllabel.ds-lkp .mlrate { font-size: .72em; }
+.mllabel.ds-lkp .mlsub { color: #1e3a8a; }
+.mllabel.ds-lkt .lk-b { display: flex; flex-direction: column; border-radius: 9px; box-shadow: 0 1px 2px rgba(15,23,42,.14), 0 4px 12px rgba(15,23,42,.18); }
+.mllabel.ds-lkt .lk-n { background: #fff; color: #1a1f2b; font-weight: 700; letter-spacing: -.3px; padding: 3px 10px 2px; border-radius: 9px 9px 0 0; text-align: center; border: 1px solid rgba(17,24,39,.13); border-bottom: 0; }
+.mllabel.ds-lkt .lk-i { background: var(--lkc); color: #fff; font-weight: 800; padding: 2px 10px 3px; border-radius: 0 0 9px 9px; text-align: center; font-variant-numeric: tabular-nums; }
+.mllabel.ds-lkt .lk-n:only-child { border-radius: 9px; border-bottom: 3px solid var(--lkc); }
+.mllabel.ds-lkt .mlrate { color: #fff; opacity: .95; }
+.mllabel.ds-lkp.compact .lk-b, .mllabel.ds-lkt.compact .lk-b { padding: 2px 8px; border-top-width: 3px; }
+.mllabel.ds-lkp.mlhot .lk-b, .mllabel.ds-lkt.mlhot .lk-b { box-shadow: 0 0 0 3px #ffd60a, 0 4px 12px rgba(15,23,42,.18); }
+.mllabel.ds-lkp.edit, .mllabel.ds-lkt.edit { outline: 0; } .mllabel.ds-lkp.edit .lk-b, .mllabel.ds-lkt.edit .lk-b { outline: 2px dashed #4f9cff; outline-offset: 2px; }
+.mllabel.ds-lkp.sel .lk-b, .mllabel.ds-lkt.sel .lk-b { outline: 2.5px solid #ff3b30; outline-offset: 2px; }
+.mllabel .lk-star { color: #f5b301; }
+
+/* 캡처 모드에서는 버튼 숨김 (범례는 남김) */
+body.cxm-cap .lk-btn, body.cxm-cap .lk-panel, body.map-capture .lk-btn, body.map-capture .lk-panel { display: none !important; }
+@media (max-width: 760px) {
+  .lk-panel { width: auto; left: 10px; }
+  .lk-host[data-lkmap="start"] .lk-legend { left: 10px; bottom: 84px; }
+  .lk-host[data-lkmap="start"] .lk-btn { top: 116px; }
+  .lk-host[data-lkmap="start"] .lk-panel { top: 158px; max-height: calc(100% - 270px); }
+  .lk-legend { font-size: 11px; }
+}
+
+/* 지도가 숨겨져 있으면 버튼·범례도 숨김 */
+.lk-host:has(> .lk-mapel[hidden]) > :is(.lk-btn, .lk-legend, .lk-panel) { display: none; }
+/* 랜드마크: 🏷 라벨 버튼을 누르면 라벨 조절 줄을 잠깐 반짝 */
+.lk-flash { animation: lkFlash 1.3s ease; border-radius: 8px; }
+@keyframes lkFlash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+.lk-pop .lk-inl { flex-direction: column; align-items: stretch; gap: 4px; font-size: 12px; color: var(--sub); }
+.lk-pop .lk-inl input { width: 100%; }
