@@ -1,0 +1,109 @@
+/* ─────────────────────────────────────────────────────────
+   start.css — [홈] 탭 전용 모양 (js/start.js). 다른 탭에는 쓰이지 않습니다.
+   ───────────────────────────────────────────────────────── */
+#tab-start { padding: 0 6px 6px; max-width: none; }
+.st-wrap { position: relative; height: calc(100vh - 120px); min-height: 420px; border-radius: 10px; overflow: hidden; background: var(--line); }
+.st-map { position: absolute; inset: 0; }
+
+/* 떠 있는 상자 공통 */
+.st-top, .st-side, .st-pop, .st-ol, .st-msg { position: absolute; z-index: 20; }
+.st-side, .st-pop, .st-ol, .st-layers, .st-msg { background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: 0 4px 16px rgba(0,0,0,.28); }
+
+/* 위쪽: 검색 + 레이어 버튼 */
+.st-top { z-index: 25; top: 10px; left: 10px; right: 60px; display: flex; gap: 8px; align-items: flex-start; pointer-events: none; }
+.st-top > * { pointer-events: auto; }
+.st-search { position: relative; width: 260px; flex: none; }
+.st-search input { width: 100%; height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.28); }
+.st-layers { display: flex; gap: 2px; padding: 4px; border-radius: 12px; overflow-x: auto; max-width: 100%; }
+.st-layers button { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 52px; padding: 3px 6px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--sub); font-size: 11px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.st-layers button span { font-size: 18px; line-height: 1.1; filter: grayscale(.6); opacity: .8; }
+.st-layers button:hover { background: var(--hover); }
+.st-layers button.on { color: var(--text); background: var(--panel2); border-color: var(--accent); }
+.st-layers button.on span { filter: none; opacity: 1; }
+.st-layers button.far { border-style: dashed; opacity: .7; }
+
+/* 왼쪽 세로 패널 */
+.st-side { top: 66px; left: 10px; width: 72px; padding: 6px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px; }
+.st-side > button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 2px; border: 1px solid transparent; border-radius: 10px; background: none; color: var(--sub); font-size: 12px; font-weight: 700; cursor: pointer; }
+.st-side > button span { font-size: 20px; line-height: 1.15; }
+.st-side > button small { font-size: 10px; font-weight: 600; color: var(--sub); }
+.st-side > button:hover { background: var(--hover); }
+.st-side > button.on { background: #e5322d; color: #fff; }
+.st-side > button.on small { color: rgba(255,255,255,.9); }
+.st-side > button.open { border-color: var(--accent); color: var(--text); }
+.st-py { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.st-py b { font-size: 11px; color: var(--sub); text-align: center; }
+.st-py label { display: flex; align-items: center; gap: 4px; padding-left: 4px; cursor: pointer; }
+
+/* 왼쪽 패널 옆 펼침 창 */
+.st-pop { top: 66px; left: 92px; width: 300px; max-height: calc(100% - 80px); overflow-y: auto; padding: 10px 12px; border-radius: 12px; font-size: 13px; }
+.st-ph { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.st-sub { margin: 10px 0 4px; font-size: 12px; color: var(--sub); font-weight: 700; }
+.st-row { display: flex; align-items: center; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+.st-row select { flex: 1; }
+.st-pop .seg { display: flex; flex-wrap: wrap; }
+.st-gus { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.st-gus button { padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); color: var(--text); font-size: 12px; cursor: pointer; }
+.st-gus button.on { border-color: #e5322d; color: #e5322d; font-weight: 700; }
+.st-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.st-bk { margin: 6px 0; padding-left: 20px; }
+.st-bk li { margin: 4px 0; }
+.st-bk li button { margin-left: 4px; }
+
+/* 단지 경계 조절 상자 (왼쪽 아래) */
+.st-ol { left: 10px; bottom: 10px; width: 300px; padding: 8px 10px; border-radius: 12px; font-size: 13px; }
+.st-ol .st-row { margin: 3px 0; }
+.st-ol button.on { background: #e5322d; color: #fff; border-color: #e5322d; }
+.st-ol .warn { color: var(--danger); }
+
+/* 진행 메시지 (아래 가운데) */
+.st-msg { left: 50%; bottom: 12px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; font-size: 12px; max-width: 70%; text-align: center; }
+
+/* ── 단지 라벨 (시세랩 스타일: 흰 카드 + 강조는 빨간 카드) ── */
+.stl { position: relative; margin-bottom: 7px; padding: 3px 8px 4px; background: #fff; color: #111827; border: 1px solid rgba(17,24,39,.2); border-radius: 7px; text-align: center; white-space: nowrap; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.15), 0 3px 8px rgba(0,0,0,.18); font-family: "Pretendard", "Noto Sans KR", system-ui, sans-serif; line-height: 1.25; }
+.stl::after { content: ''; position: absolute; left: 50%; bottom: -5px; width: 8px; height: 8px; margin-left: -4px; background: inherit; border-right: 1px solid rgba(17,24,39,.2); border-bottom: 1px solid rgba(17,24,39,.2); transform: rotate(45deg); }
+.stl-n { font-size: 13px; font-weight: 800; letter-spacing: -.3px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.stl-s { font-size: 11px; font-weight: 600; color: #6b7280; font-variant-numeric: tabular-nums; }
+.stl-t { font-style: normal; font-size: 9px; font-weight: 800; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.25); }
+.stl-c { font-style: normal; font-size: 9px; font-weight: 800; padding: 0 4px; border-radius: 4px; background: #2563eb; color: #fff; }
+.stl:hover { z-index: 999; box-shadow: 0 2px 4px rgba(0,0,0,.2), 0 8px 22px rgba(0,0,0,.3); }
+.stl.emph { background: #e5322d; color: #fff; border-color: #c81e1e; }
+.stl.emph::after { border-color: #c81e1e; }
+.stl.emph .stl-s { color: rgba(255,255,255,.92); }
+.stl.on { outline: 3px solid #2563eb; outline-offset: 1px; }
+.stl.mini { width: 11px; height: 11px; padding: 0; margin-bottom: 0; border-radius: 50%; border: 2px solid #fff; background: #6b7280; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.stl.mini.emph { background: #e5322d; }
+.stl.mini > *, .stl.mini::after { display: none; }
+
+/* 동 번호 */
+.st-dong { background: #fff; border: 1.5px solid #e5322d; color: #e5322d; font-weight: 800; font-size: 12px; padding: 1px 6px; border-radius: 10px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.st-dong.other { border-color: #9ca3af; color: #6b7280; font-weight: 600; font-size: 11px; }
+
+/* 레이어 아이콘 · 경계 이름 */
+.st-poi { display: flex; align-items: center; gap: 3px; padding: 1px 6px 1px 2px; background: #fff; color: #111827; border: 1px solid rgba(17,24,39,.2); border-radius: 999px; font-size: 11px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.st-poi span { font-size: 13px; }
+.st-poi b { font-weight: 700; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.st-poi small { color: #6b7280; }
+.st-poi.ly-supply { border-color: #f59e0b; background: #fffbeb; }
+.st-poi.ly-subway { border-color: #16a34a; }
+.st-wrap[data-lv="5"] .st-poi:not(.ly-subway):not(.ly-supply) b,
+.st-wrap[data-lv="6"] .st-poi:not(.ly-subway):not(.ly-supply) b,
+.st-wrap[data-lv="7"] .st-poi:not(.ly-subway):not(.ly-supply) b { display: none; }
+.st-bnd { font-size: 12px; font-weight: 800; color: #7c3aed; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; white-space: nowrap; pointer-events: none; }
+.st-bnd.ly-emd { color: #0369a1; font-size: 11px; }
+
+/* 휴대폰·좁은 화면 */
+@media (max-width: 760px) {
+  #tab-start { padding: 0; }
+  .st-wrap { border-radius: 0; }
+  .st-top { flex-direction: column; right: 10px; }
+  .st-search { width: 100%; }
+  .st-search input { height: 40px; }
+  .st-side { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; flex-direction: row; overflow-x: auto; }
+  .st-side > button { min-width: 56px; }
+  .st-py { flex-direction: row; border-top: 0; border-left: 1px solid var(--line); margin: 0; padding: 0 0 0 6px; align-items: center; }
+  .st-pop { top: 110px; left: 10px; right: 10px; width: auto; max-height: calc(100% - 200px); }
+  .st-ol { bottom: 84px; left: 10px; right: 10px; width: auto; }
+  .st-msg { bottom: 84px; }
+}
