@@ -12,38 +12,46 @@
   /* 저장해 둔 배경 테마를 화면이 그려지기 전에 적용 */
   try { var t = JSON.parse(localStorage.getItem('apt.theme') || '""'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
 </script>
+<!-- 글꼴: 프리텐다드 (화면 전체). 필요한 글자만 내려받는 가벼운 판 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/start.css">
+<link rel="stylesheet" href="css/labels.css">
 </head>
 <body>
 
 <header class="top">
   <h1>아파트 실거래가 대시보드</h1>
-  <nav class="tabs" id="tabs">
+  <nav class="tabs" id="tabs" aria-label="탭 메뉴">
+    <span class="tabgrp">지도</span>
     <button data-tab="start" class="on">홈</button>
     <button data-tab="cxmap">단지 지도</button>
+    <button data-tab="map">시세지도</button>
+    <button data-tab="supplymap">공급지도</button>
+    <button data-tab="v3d">3D</button>
+    <button data-tab="sat">위성지도</button>
+    <span class="tabgrp">조사</span>
+    <button data-tab="survey">전수조사</button>
+    <button data-tab="count">단지 수</button>
+    <button data-tab="yard">앞마당</button>
+    <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
+    <button data-tab="land">랜드마크</button>
+    <button data-tab="imjang">임장</button>
+    <span class="tabgrp">분석</span>
     <button data-tab="home">최근 거래</button>
     <button data-tab="search">실거래 조회</button>
     <button data-tab="compare">단지 비교</button>
     <button data-tab="eval">비교 평가</button>
     <button data-tab="infra">입지 분석</button>
-    <button data-tab="v3d">3D</button>
-    <button data-tab="sat">위성지도</button>
-    <button data-tab="survey">전수조사</button>
-    <button data-tab="count">단지 수</button>
-    <button data-tab="yard">앞마당</button>
-    <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
-    <button data-tab="map">시세지도</button>
     <button data-tab="grouping">시세그룹핑</button>
     <button data-tab="trends">지역 동향</button>
     <button data-tab="supply">공급</button>
-    <button data-tab="supplymap">공급지도</button>
     <button data-tab="migration">인구이동</button>
     <button data-tab="invest">투자금</button>
     <button data-tab="market">시장 신호</button>
     <button data-tab="my">내 분석</button>
-    <button data-tab="land">랜드마크</button>
-    <button data-tab="imjang">임장</button>
+    <span class="tabgrp">설정</span>
     <button data-tab="guide">가이드·설정</button>
   </nav>
   <button id="btnLock" class="lockbtn">🔓 잠금</button>
@@ -1475,7 +1483,7 @@
 <script>
 /* 저장소(Store)가 준비된 뒤에 나머지 파일을 순서대로 읽습니다. 새 js 파일을 만들면 이 목록에 추가하세요. (app.js 는 항상 맨 끝) */
 (function () {
-  var FILES = ['js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/view3d.js', 'js/satview.js', 'js/count.js', 'js/yard.js', 'js/start.js', 'js/autosync.js', 'js/app.js'];
+  var FILES = ['js/labelkit.js', 'js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/view3d.js', 'js/satview.js', 'js/count.js', 'js/yard.js', 'js/start.js', 'js/autosync.js', 'js/app.js'];
   Store.ready().then(function () {
     (function next(i) {
       if (i >= FILES.length) return;
