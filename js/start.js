@@ -113,12 +113,14 @@ const Start = (() => {
     try { lands = typeof Land !== 'undefined' ? new Set(Land.all().map(l => `${l.code}|${l.key}`)) : new Set(); } catch (e) { lands = new Set(); }
   }
 
-  /* ═════════ 라벨 ═════════ */
-  function labelHtml(cx) {
-    const sub = [cx.year ? `'${String(cx.year).slice(2)}` : '', cx.hh ? `${cx.hh.toLocaleString()}세대` : ''].filter(Boolean).join(' · ');
-    const tag = lands.has(cx.id) ? '<i class="stl-t">랜드마크</i>' : tracked.has(cx.id) ? '<i class="stl-t">★</i>' : '';
-    const cmp = basket.some(b => b.id === cx.id) ? '<i class="stl-c">비교</i>' : '';
-    return `<div class="stl-n">${U.esc(nameOf(cx))}${tag}${cmp}</div>${sub ? `<div class="stl-s">${sub}</div>` : ''}`;
+  /* ═════════ 라벨 (모양은 js/labelkit.js · css/labels.css — 오른쪽 위 [🏷 라벨] 에서 바꿈) ═════════ */
+  function labelData(cx) {
+    const pc = focusPc(cx), c = pc && cx.cls[pc], last = c && c.last;
+    const bd = (lands.has(cx.id) ? '<b class="lk-bd land">랜드마크</b>' : tracked.has(cx.id) ? '<b class="lk-bd mine" title="시세트래킹 단지">★</b>' : '')
+      + (basket.some(b => b.id === cx.id) ? '<b class="lk-bd cmp">비교</b>' : '');
+    return { id: cx.id, name: (cx.alias || '').split(',')[0].trim() || cx.name, year: cx.year, hh: cx.hh,
+      py: c && c.g ? `${Math.floor(+c.g)}㎡` : '', pr: last ? last.price : null, chg: last && c.peak ? (last.price / c.peak.price - 1) * 100 : null,
+      emph: isEmph(cx), on: !!(OL.cx && OL.cx.id === cx.id), badges: bd };
   }
   function place(cx) {
     const p = pos.get(cx.id); if (!p || !map) return;
@@ -128,13 +130,15 @@ const Start = (() => {
       el.addEventListener('mouseenter', () => { if (!isTouch()) showTip(cx, el, false); });
       el.addEventListener('mouseleave', () => { if (!isTouch() && !tipPin) hideSoon(); });
       el.addEventListener('click', (e) => { e.stopPropagation(); showTip(cx, el, true); outline(cx); });
+      LabelKit.bind(el, 'start', cx.id, () => map);
       const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(p), content: el, yAnchor: 1, xAnchor: 0.5, clickable: true, zIndex: 3 });
       o = { ov, el }; ovs.set(cx.id, o);
     }
-    o.el.className = 'stl' + (isEmph(cx) ? ' emph' : '') + (OL.cx && OL.cx.id === cx.id ? ' on' : '');
-    o.el.innerHTML = labelHtml(cx);
+    LabelKit.render(o.el, 'start', labelData(cx));
     if (!o.ov.getMap()) o.ov.setMap(map);
   }
+  /** 라벨 설정·짧은 이름이 바뀌면 보이는 라벨만 다시 그림 */
+  function relabel() { if (!map) return; for (const [id, o] of ovs) if (o.ov.getMap()) place(cxs.get(id)); declutterSoon(); }
   function redraw() {
     if (!map) return;
     refreshSets();
@@ -167,14 +171,17 @@ const Start = (() => {
     if (!map) return;
     const lv = map.getLevel(), box = $('stMap').getBoundingClientRect();
     $('stWrap').dataset.lv = lv;
+    const stg = LabelKit.stage('start', lv), ed = LabelKit.isEditing('start');   // 편집 중에는 늘 '가까이' 모양 (겹치면 점 — 확대해서 고치기)
     const items = [...ovs.entries()].filter(([, o]) => o.ov.getMap()).map(([id, o]) => ({ cx: cxs.get(id), o }))
       .sort((a, b) => (isEmph(b.cx) - isEmph(a.cx)) || ((b.cx.hh || 0) - (a.cx.hh || 0)));
     const placed = [];
     for (const { cx, o } of items) {
       o.el.classList.remove('mini');
-      const sel = OL.cx && OL.cx.id === cx.id;
-      const dotOnly = !sel && !isEmph(cx) && (st.mode === 'emph' || lv >= 8);
-      if (dotOnly) { o.el.classList.add('mini'); o.ov.setZIndex(1); continue; }
+      if (o.el.classList.contains('lk-hid')) { o.ov.setZIndex(ed ? 2 : 1); continue; }
+      const sel = OL.cx && OL.cx.id === cx.id, big = sel || isEmph(cx);
+      if (!big && st.mode === 'emph') { o.el.classList.add('mini'); o.ov.setZIndex(1); continue; }
+      // 멀리 볼 때(동그라미) · 중간 거리의 작은 단지(점)는 CSS 가 모양을 바꾸므로 겹침 계산을 하지 않음
+      if (!big && (stg === 'far' || (stg === 'mid' && o.el.classList.contains('lk-small')))) { o.ov.setZIndex(1); continue; }
       const r = o.el.getBoundingClientRect();
       if (r.right < box.left || r.left > box.right || r.bottom < box.top || r.top > box.bottom) continue;
       const hit = !sel && placed.some(q => !(r.right < q.left + 2 || r.left > q.right - 2 || r.bottom < q.top + 2 || r.top > q.bottom - 2));
@@ -919,6 +926,8 @@ const Start = (() => {
     names = await Data.names().catch(() => null);
     st.codes = (st.codes || []).filter(c => regs.has(c));
     build();
+    LabelKit.mount('start', { el: $('stMap'), host: $('stWrap') });
+    LabelKit.on('start', relabel);
     inited = true;
     sideState();
     document.addEventListener('keydown', (e) => {

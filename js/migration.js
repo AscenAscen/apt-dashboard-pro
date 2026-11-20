@@ -224,6 +224,7 @@ const Migration = (() => {
   }
 
   async function init() {
+    if (document.getElementById('mgMap')) LabelKit.mount('migration', { el: document.getElementById('mgMap') });     // 🏷 라벨: 크기·글자·글꼴
     if (!$('tab-migration')) return;
     K = Home.kit;
     await K.regReady();

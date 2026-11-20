@@ -167,12 +167,13 @@ const Land = (() => {
     if (!ok.length) return say('단지 위치를 찾지 못했습니다.');
     msg.hidden = true;
     if (!kmap) {
+      LabelKit.mount('land', { el: $('ldMap'), ext: () => { const c = $('ldCtl'); c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.classList.add('lk-flash'); setTimeout(() => c.classList.remove('lk-flash'), 1400); } });
       kmap = KMap.create($('ldMap'), ok[0].pos, 7);
       // 라벨(겹침 방지·끌어 옮기기·크기·캡처 모드)은 js/maplabel.js — 시세지도와 같은 도구
       ctrl = MapLabel.create({ key: 'land', map: kmap, panel: $('ldPanel'), ctl: $('ldCtl'), onPick: (it) => { const l = all().find(x => x.id === it.id); if (l) card(l); } });
     }
     ctrl.set(ok.map(l => { const p = price(l), x = info(l), col = grade(l.grade).color, v = p ? Kit.eok(p.v, 1) : '-';
-      return { id: l.id, pos: l.pos, text: `${l.name}${p ? ' ' + v : ''}`, color: col, rank: rank(l.grade),
+      return { id: l.id, ck: String(l.id).split('#')[0], pos: l.pos, text: `${l.name}${p ? ' ' + v : ''}`, color: col, rank: rank(l.grade),
         name: l.name, lines: [{ label: '', val: v, col, real: !!p && !p.quoted }], compact: [{ val: v, col }], drop: x.drop, rise: x.rise }; }));
     kmap.relayout();
     if (ok.length > 1) KMap.fit(kmap, ok.map(l => l.pos)); else { kmap.setCenter(KMap.LL(ok[0].pos)); kmap.setLevel(5); }

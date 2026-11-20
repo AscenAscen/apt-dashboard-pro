@@ -150,6 +150,13 @@ const CxMap = (() => {
   function labelCls(cx) {
     return ['cxl', 'ds-' + ls.ds, 'th-' + ls.th, cx.leader ? 'lead' : '', cx.isNew ? 'new' : '', tracked.has(cx.id) ? 'mine' : '', ls.em !== 'badge' ? 'em-' + ls.em : ''].filter(Boolean).join(' ');
   }
+  function lkData(cx) {
+    const pc = focusPc(cx), c = pc && cx.cls[pc], last = c && c.last, mine = tracked.has(cx.id);
+    const bd = (cx.leader ? '<b class="lk-bd lead">대장</b>' : '') + (cx.isNew ? '<b class="lk-bd new">NEW</b>' : '') + (mine ? '<b class="lk-bd mine" title="시세트래킹에 담은 단지">★</b>' : '');
+    return { id: cx.id, name: (cx.alias || '').split(',')[0].trim() || cx.name, year: cx.year, hh: cx.hh,
+      py: c && c.g ? `${Math.floor(+c.g)}㎡` : '', pr: last ? last.price : null, chg: last && c.peak ? (last.price / c.peak.price - 1) * 100 : null,
+      emph: !!cx.leader, badges: bd, cls: st.hide.includes(cx.id) ? 'hid' : '' };
+  }
   function place(cx) {
     const p = pos.get(cx.id); if (!p || !map) return;
     let o = ovs.get(cx.id);
@@ -158,13 +165,19 @@ const CxMap = (() => {
       el.addEventListener('mouseenter', () => { if (!isTouch()) showTip(cx, el, false); });
       el.addEventListener('mouseleave', () => { if (!isTouch() && !tipPin) hideSoon(); });
       el.addEventListener('click', (e) => { e.stopPropagation(); if (tipPin && tip && tip.cx === cx) { hideTip(); return; } showTip(cx, el, true); });
+      LabelKit.bind(el, 'cxmap', cx.id, () => map);
       const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(p), content: el, yAnchor: 1, xAnchor: 0.5, clickable: true, zIndex: cx.leader ? 5 : 2 });
       o = { ov, el }; ovs.set(cx.id, o);
     }
-    o.el.className = labelCls(cx) + (st.hide.includes(cx.id) ? ' hid' : ''); o.el.innerHTML = labelHtml(cx);
-    o.el.style.setProperty('--cxs', ls.s); o.el.style.setProperty('--cxf', ls.f + 'px');
+    if (LabelKit.isLK('cxmap')) LabelKit.render(o.el, 'cxmap', lkData(cx));       // 새 디자인 (🏷 라벨)
+    else {                                                                          // 예전 디자인 (🎨 라벨 꾸미기)
+      o.el.style.translate = '';
+      o.el.className = labelCls(cx) + (st.hide.includes(cx.id) ? ' hid' : ''); o.el.innerHTML = labelHtml(cx);
+      o.el.style.setProperty('--cxs', ls.s); o.el.style.setProperty('--cxf', ls.f + 'px');
+    }
     if (!o.ov.getMap()) o.ov.setMap(map);
   }
+  function relabel() { if (!map) return; for (const [id, o] of ovs) if (o.ov.getMap()) place(cxs.get(id)); declutterSoon(); }
   function redraw() {
     if (!map) return;
     tracked = new Set(Tracking.all().map(it => `${it.code}|${it.key}`));
@@ -198,12 +211,17 @@ const CxMap = (() => {
     const lv = map.getLevel(), box = $('cxmMap').getBoundingClientRect();
     const mode = lv >= 8 ? 'dot' : lv >= 6 ? 'name' : 'full';
     $('cxmMap').dataset.zoom = mode;
+    const lk = LabelKit.isLK('cxmap'), stg = LabelKit.stage('cxmap', lv), ed = lk && LabelKit.isEditing('cxmap');
     const items = [...ovs.entries()].filter(([, o]) => o.ov.getMap()).map(([id, o]) => ({ cx: cxs.get(id), o }))
       .sort((a, b) => (b.cx.leader - a.cx.leader) || (tracked.has(b.cx.id) - tracked.has(a.cx.id)) || ((b.cx.hh || 0) - (a.cx.hh || 0)) || (b.cx.n5 - a.cx.n5));
     const placed = [], z = (o, mini, cx) => { if (o.ov.setZIndex) o.ov.setZIndex(mini ? 1 : cx.leader ? 6 : 4); };   // 작은 점은 늘 라벨 아래
     for (const { cx, o } of items) {
       o.el.classList.remove('mini');
-      if (mode === 'dot' && !cx.leader && !tracked.has(cx.id)) { o.el.classList.add('mini'); z(o, true, cx); continue; }
+      const big = cx.leader || tracked.has(cx.id);
+      if (lk) {
+        if (o.el.classList.contains('lk-hid')) { z(o, !ed, cx); continue; }
+        if (!big && (stg === 'far' || (stg === 'mid' && o.el.classList.contains('lk-small')))) { z(o, true, cx); continue; }   // 모양은 CSS 가 바꿈
+      } else if (mode === 'dot' && !big) { o.el.classList.add('mini'); z(o, true, cx); continue; }
       const r = o.el.getBoundingClientRect();
       if (r.right < box.left || r.left > box.right || r.bottom < box.top || r.top > box.bottom) { z(o, false, cx); continue; }
       const hit = placed.some(q => !(r.right < q.left + 2 || r.left > q.right - 2 || r.bottom < q.top + 2 || r.top > q.bottom - 2));
@@ -450,7 +468,7 @@ const CxMap = (() => {
   }
   function applyStyle(rerender = true) {
     useFont(); saveL(); $('cxmMap').classList.toggle('muted', !!ls.mu);
-    for (const [id, o] of ovs) { const cx = cxs.get(id); o.el.className = labelCls(cx); o.el.innerHTML = labelHtml(cx); o.el.style.setProperty('--cxs', ls.s); o.el.style.setProperty('--cxf', ls.f + 'px'); }
+    for (const [id, o] of ovs) if (o.ov.getMap()) place(cxs.get(id));
     if (rerender) styleUi();
     declutterSoon(); if (tip) renderTip();
   }
@@ -509,6 +527,9 @@ const CxMap = (() => {
     names = await Data.names().catch(() => null);
     st.codes = st.codes.filter(c => regs.has(c));
     inited = true;
+    LabelKit.mount('cxmap', { el: $('cxmMap'), host: $('cxmMap').parentElement, moreLabel: '🎨 창 모양·예전 디자인 설정',
+      more: () => { const p = $('cxmStyle'); p.hidden = false; styleUi(); p.scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
+    LabelKit.on('cxmap', relabel);
     // 조건 줄
     $('cxmPy').onclick = (e) => {                               // 여러 개 고르기 · [직접] = ○평~○평
       const b = e.target.closest('button'); if (!b) return; const v = b.dataset.v;

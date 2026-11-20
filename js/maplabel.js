@@ -7,14 +7,14 @@
    ───────────────────────────────────────────────────────── */
 const MapLabel = (() => {
   const KEY = 'apt.mapLabel.v1';
-  const DEF = { s: 1, f: 12, ff: '', ds: 'card', ic: 0, bd: 0, dr: 0, ri: 0, zs: 1, mu: 1 };   // dr 하락률 · ri 상승률 · zs 축소하면 간단히 · mu 지도 바탕 흐리게
+  const DEF = { s: 1, f: 12, ff: '', ds: 'lkp', ic: 0, bd: 0, dr: 0, ri: 0, zs: 1, mu: 1 };   // dr 하락률 · ri 상승률 · zs 축소하면 간단히 · mu 지도 바탕 흐리게
   const ZLV = 7;                  // 카카오 지도 레벨이 이 값 이상(멀리 봄)이면 '간단히' 모양
   // 라벨 프리셋 — 크기·글자·모양·아이콘을 한 번에 바꿈
   const PRESETS = [{ k: '', name: '(프리셋 고르기)' }, { k: 'report', name: '보고서용 (깔끔·중간 크기)', v: { s: 1.1, f: 14, ds: '', ff: 'pretendard', ic: 0 } },
     { k: 'field', name: '임장용 (크게 · 말풍선 카드)', v: { s: 1.3, f: 17, ds: 'card', ff: '', ic: 0 } }, { k: 'simple', name: '간단히 (작은 글자만)', v: { s: 0.8, f: 11, ds: 'text', ff: '', ic: 0 } }];
   // 글씨체 (무료 글꼴. 고르는 순간에만 인터넷에서 내려받습니다) — 줄을 추가하면 목록에 나옵니다
   const FONTS = [
-    { k: '', name: '기본 글씨', fam: 'system-ui, sans-serif' },
+    { k: '', name: '기본 글씨 (프리텐다드)', fam: "'Pretendard', system-ui, sans-serif" },
     { k: 'pretendard', name: 'Pretendard (프리텐다드)', fam: "'Pretendard', system-ui, sans-serif", css: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css' },
     { k: 'noto', name: 'Noto Sans KR (노토산스)', fam: "'Noto Sans KR', sans-serif", css: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@500;700&display=swap' },
     { k: 'nanum', name: '나눔고딕', fam: "'Nanum Gothic', sans-serif", css: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@700;800&display=swap' },
@@ -22,9 +22,10 @@ const MapLabel = (() => {
     { k: 'dohyeon', name: '도현 (굵은 제목체)', fam: "'Do Hyeon', sans-serif", css: 'https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap' },
   ];
   // 라벨 모양 — 색·모서리는 css/style.css 의 .mllabel.ds-… 에서 바꿉니다
-  const DESIGNS = [{ k: 'card', name: '말풍선 카드 (추천)' }, { k: '', name: '기본 (흰 바탕 + 색 띠)' }, { k: 'dark', name: '진한 바탕' }, { k: 'fill', name: '색 채움' }, { k: 'pill', name: '둥근 알약' }, { k: 'line', name: '테두리만' }, { k: 'text', name: '글자만 (상자 없음)' }];
+  const DESIGNS = [{ k: 'lkp', name: 'D 시세 카드 (새·추천)' }, { k: 'lkt', name: 'A 2단 태그 (새)' }, { k: 'card', name: '말풍선 카드' }, { k: '', name: '기본 (흰 바탕 + 색 띠)' }, { k: 'dark', name: '진한 바탕' }, { k: 'fill', name: '색 채움' }, { k: 'pill', name: '둥근 알약' }, { k: 'line', name: '테두리만' }, { k: 'text', name: '글자만 (상자 없음)' }];
   const loaded = new Set();
   function useFont(k) {
+    if (typeof LabelKit !== 'undefined' && !FONTS.some(x => x.k === k && x.k)) { const lf = LabelKit.FONTS.find(x => x.k === k); if (lf) return LabelKit.font(k); }
     const f = FONTS.find(x => x.k === k) || FONTS[0];
     if (f.css && !loaded.has(f.k)) { loaded.add(f.k); const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = f.css; document.head.appendChild(l); }
     return f.fam;
@@ -103,6 +104,8 @@ const MapLabel = (() => {
       wr(a);
     }
     const eff = (id) => { const g = G(), i = I(id); return { s: i.s ?? g.s, f: i.f ?? g.f }; };
+    if (!(rd()[gKey] || {}).lk1) setG({ ds: 'lkp', lk1: 1 });          // 새 기본 디자인(D 시세 카드)으로 한 번만 바꿈 — 라벨 모양에서 예전 모양을 다시 고를 수 있음
+    if (typeof LabelKit !== 'undefined') LabelKit.on(key, () => { for (const r of rows.values()) style(r); queue(); });   // 짧은 이름·★ 강조가 바뀌면
 
     /* ── 조절 막대 ── */
     ctl.classList.add('mlctl');
@@ -184,9 +187,41 @@ const MapLabel = (() => {
       if (g.ri && it.rise != null && isFinite(it.rise)) out.push(mk('span', 'mlrate up', '▲' + Math.abs(it.rise).toFixed(0) + '%'));
       return out;
     }
+    /** 새 디자인 (A 2단 태그 · D 시세 카드) — 모양은 css/labels.css. 짧은 이름·★ 강조는 모든 지도 공통(LabelKit) */
+    function fillLK(row, g, i) {
+      const it = row.item, el = row.el, lkd = g.ds, LK = typeof LabelKit !== 'undefined' ? LabelKit : null;
+      const short = LK && it.ck ? LK.nameOf(it.ck, '') : '', star = LK && it.ck && LK.starred(it.ck);
+      const b = mk('div', 'lk-b'); el.appendChild(b);
+      const nameRow = (txt) => { const n = mk('div', 'lk-n'); if (star) n.appendChild(mk('b', 'lk-star', '★')); n.appendChild(document.createTextNode(txt)); return n; };
+      if (i.t || !it.lines) { b.appendChild(nameRow(i.t || (short && it.name ? it.text.replace(it.name, short) : it.text))); return; }
+      const nm = short || it.name || '';
+      const far = g.zs && map.getLevel() >= ZLV && !edit;
+      if (far) el.classList.add('compact');
+      if (lkd === 'lkt') {
+        if (nm && !far) b.appendChild(nameRow(nm));
+        const strip = mk('div', 'lk-i');
+        it.lines.forEach((l, n) => { if (n) strip.appendChild(document.createTextNode(' · ')); strip.appendChild(document.createTextNode((l.label ? l.label + ' ' : '') + l.val + (l.real ? '·실' : ''))); });
+        rates(it, g).forEach(x => strip.appendChild(x));
+        b.appendChild(strip);
+        return;
+      }
+      if (nm && !far) b.appendChild(nameRow(nm));
+      it.lines.forEach((l, n) => {
+        if (far && n) return;
+        const ln = mk('div', 'lk-v' + (l.big === false ? ' sm' : ''));
+        if (it.lines.length > 1) { const dot = mk('i', 'mlvd'); dot.style.background = l.col; ln.appendChild(dot); }
+        if (l.label) ln.appendChild(mk('span', 'mlk', l.label));
+        ln.appendChild(mk('b', '', l.val));
+        if (l.real) ln.appendChild(mk('span', 'mlsil', '실'));
+        if (n === 0) rates(it, g).forEach(x => ln.appendChild(x));
+        b.appendChild(ln);
+      });
+      if (it.sub && !far) b.appendChild(mk('span', 'mlsub', it.sub));
+    }
     function fill(row, g, i) {
       const it = row.item, el = row.el; el.textContent = '';
       el.classList.remove('multi', 'compact');
+      if (g.ds === 'lkp' || g.ds === 'lkt') return fillLK(row, g, i);
       if (i.t || !it.lines) { el.textContent = i.t || it.text; if (!i.t) rates(it, g).forEach(x => el.appendChild(x)); return; }
       const far = g.zs && map.getLevel() >= ZLV && !edit;
       if (far) {                                                    // 멀리 볼 때: 이름 없이 가격만 (두 값이면 반반 칩)
@@ -216,6 +251,7 @@ const MapLabel = (() => {
       row.el.style.fontSize = e.f + 'px'; row.el.style.transform = `scale(${e.s})`;
       row.el.style.fontFamily = useFont(g.ff || '');
       row.el.className = 'mllabel' + (g.ds ? ' ds-' + g.ds : '') + (row.item.cls ? ' ' + row.item.cls : '');
+      row.el.style.setProperty('--lkc', col);
       fill(row, g, i);
       row.el.style.borderLeftColor = row.el.style.borderColor = ''; row.el.style.background = row.el.style.color = '';
       if (g.ds === 'fill') { row.el.style.background = col; row.el.style.borderColor = col; }

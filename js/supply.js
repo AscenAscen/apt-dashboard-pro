@@ -9,7 +9,7 @@ const Supply = (() => {
   const SK = 'apt.supplyApi.v1';                          // ([공급지도] 탭의 apt.supply.v1 과 겹치지 않게)
   const DEMAND = 0.005;                                    // 적정 수요 = 인구 × 0.5% (1년)
   let st = {}, items = [], status = null, pop = null, K = null;
-  let chart = null, map = null, marks = [], f1 = null, rows1 = [], drawn = false;
+  let chart = null, map = null, marks = [], labs = [], f1 = null, rows1 = [], drawn = false;
   const geo = new Map();                                    // 이번 접속 동안만 기억 (카카오 정책)
   const eok = (v) => (v == null ? '-' : (v / 10000).toFixed(2) + '억');
   const nowYm = () => { const t = new Date(); return t.getFullYear() * 100 + t.getMonth() + 1; };
@@ -121,9 +121,12 @@ const Supply = (() => {
     const l = (Supply._l1 || rows1).slice(0, 150);
     try { await KMap.load(); } catch (e) { msg.textContent = e.message; return; }
     drawn = true;
-    if (!map) map = KMap.create($('spMap'), { lat: 37.55, lng: 126.98 }, 8);
-    else map.relayout();
-    marks.forEach(m => m.setMap(null)); marks = [];
+    if (!map) {
+      map = KMap.create($('spMap'), { lat: 37.55, lng: 126.98 }, 8);
+      const tidy = () => { LabelKit.stage('supply', map.getLevel()); LabelKit.declutter(labs); };
+      kakao.maps.event.addListener(map, 'idle', tidy); kakao.maps.event.addListener(map, 'zoom_changed', tidy);
+    } else map.relayout();
+    marks.forEach(m => m.setMap(null)); marks = []; labs = [];
     const S = kakao.maps.services, gc = new S.Geocoder(), now = nowYm();
     const find = (it) => new Promise(res => {
       if (geo.has(it.id)) return res(geo.get(it.id));
@@ -139,17 +142,17 @@ const Supply = (() => {
       if (i % 10 === 9) msg.textContent = `단지 위치 찾는 중… (${i + 1}/${l.length})`;
       if (!p) continue;
       pts.push(p);
-      const el = document.createElement('div');
-      const sz = Math.round(10 + Math.min(34, Math.sqrt(it.hh) * 0.9));
-      el.className = 'spdot ' + (it.mv < now ? 'past' : it.mv <= now + 100 ? 'soon' : 'later');
-      el.style.width = el.style.height = sz + 'px';
+      const el = document.createElement('div');                 // 단지 라벨 (모양은 오른쪽 위 🏷 라벨)
+      LabelKit.render(el, 'supply', { id: 'sp:' + it.id, name: it.nm, ym: it.mv, hh: it.hh });
+      LabelKit.bind(el, 'supply', 'sp:' + it.id, () => map);
       el.title = `${it.nm} · ${it.hh.toLocaleString()}세대 · 입주 ${ymTxt(it.mv)}`;
       el.onclick = () => { const tr = document.querySelector(`#spTable1 tr[data-id="${CSS.escape(it.id)}"]`); if (tr) { tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); tr.classList.add('flash'); setTimeout(() => tr.classList.remove('flash'), 1500); } U.toast(el.title); };
-      const ov = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(p.lat, p.lng), content: el, yAnchor: 0.5, xAnchor: 0.5 });
-      ov.setMap(map); marks.push(ov);
+      const ov = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(p.lat, p.lng), content: el, yAnchor: 1, xAnchor: 0.5, clickable: true, zIndex: 3 });
+      ov.setMap(map); marks.push(ov); labs.push({ el, ov, w: it.hh, it });
     }
     if (pts.length) KMap.fit(map, pts);
-    msg.textContent = l.length ? `${pts.length}곳 표시${l.length > pts.length ? ` (위치를 못 찾은 곳 ${l.length - pts.length})` : ''}${(Supply._l1 || rows1).length > 150 ? ' · 많아서 앞쪽 150곳만' : ''} · 점 크기 = 세대수` : '지도에 표시할 단지가 없습니다.';
+    setTimeout(() => { LabelKit.stage('supply', map.getLevel()); LabelKit.declutter(labs); }, 120);
+    msg.textContent = l.length ? `${pts.length}곳 표시${l.length > pts.length ? ` (위치를 못 찾은 곳 ${l.length - pts.length})` : ''}${(Supply._l1 || rows1).length > 150 ? ' · 많아서 앞쪽 150곳만' : ''} · 라벨 색 = 입주 시기 (🏷 라벨에서 바꿈)` : '지도에 표시할 단지가 없습니다.';
   }
 
   /* 휴대폰: 표 대신 카드 */
@@ -213,6 +216,10 @@ const Supply = (() => {
   }
 
   async function init() {
+    if ($('spMap')) {
+      LabelKit.mount('supply', { el: $('spMap') });
+      LabelKit.on('supply', () => { labs.forEach(x => LabelKit.render(x.el, 'supply', { id: 'sp:' + x.it.id, name: x.it.nm, ym: x.it.mv, hh: x.it.hh })); if (map) setTimeout(() => { LabelKit.stage('supply', map.getLevel()); LabelKit.declutter(labs); }, 30); });
+    }
     K = Home.kit;
     await K.regReady();
     let saved = Store.get(SK, null);

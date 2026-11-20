@@ -409,10 +409,17 @@ const SupplyMap = (() => {
         ov.setMap(map); overlays.push({ ov, el, w: Object.values(g.y).reduce((s, v) => s + v, 0), p: c, gu: 1 });
       }
     } else {
-      const sty = L().sty;
+      const lk = LabelKit.isLK('supplymap'), sty = lk ? '' : L().sty;
+      LabelKit.stage('supplymap', map.getLevel());
       mapRows().forEach(r => {
         const p = pos.get(r.id); if (!p) return;
-        const el = labelEl(r);
+        let el;
+        if (lk) {                                                   // 새 디자인 (🏷 라벨)
+          el = document.createElement('div');
+          LabelKit.render(el, 'supplymap', { id: 'sm:' + r.id, name: r.name, ym: +String(r.ym || '').replace('-', '') || null, hh: r.hh });
+          el.title = `${r.name} · ${fmtYm(r.ym)} 입주 · ${r.hh.toLocaleString()}세대`;
+          LabelKit.bind(el, 'supplymap', 'sm:' + r.id, () => map);
+        } else el = labelEl(r);
         el.onclick = (e) => { e.stopPropagation(); showCard(r); };
         const ya = sty === 'mini' ? 0.5 : 1, xa = sty === 'mini' ? 0 : 0.5;
         const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(p), content: el, yAnchor: ya, xAnchor: xa, zIndex: 4 + Math.round(r.hh / 100), clickable: true });
@@ -424,14 +431,16 @@ const SupplyMap = (() => {
   }
   /** 라벨이 겹치면 세대수가 작은 단지를 점으로 줄임 (라벨 크기는 처음 그릴 때 한 번 재 두고, 위치는 지도 좌표로 계산) */
   function measure() {
-    overlays.forEach(o => { if (o.p && o.fw == null) { const f = o.el.querySelector('.spfull'); o.fw = f ? f.offsetWidth : 0; o.fh = f ? f.offsetHeight : 0; } });
+    overlays.forEach(o => { if (o.p && o.fw == null) { const f = o.el.querySelector('.spfull') || o.el; o.fw = f ? f.offsetWidth : 0; o.fh = f ? f.offsetHeight : 0; } });
   }
   function avoid() {
     if (!overlays.length || !map) return;
     measure();
-    const lab = overlays.filter(o => o.p && !o.el.classList.contains('sp-fixed'));
-    const on = mode === 'gu' || (L().avoid && (L().n || L().y || L().h));
-    const proj = map.getProjection(), mini = mode === 'apt' && L().sty === 'mini', mid = mode === 'gu', placed = [], pad = 2;
+    const lk = mode === 'apt' && LabelKit.isLK('supplymap');
+    if (lk) LabelKit.stage('supplymap', map.getLevel());
+    const lab = overlays.filter(o => o.p && !o.el.classList.contains('sp-fixed') && !o.el.classList.contains('lk-hid'));
+    const on = (mode === 'gu' || lk || (L().avoid && (L().n || L().y || L().h)));
+    const proj = map.getProjection(), mini = mode === 'apt' && !lk && L().sty === 'mini', mid = mode === 'gu', placed = [], pad = 2;
     const want = new Map();
     [...lab].sort((a, b) => b.w - a.w).forEach(o => {
       if (!on || !o.fw) { want.set(o, false); return; }
@@ -454,6 +463,7 @@ const SupplyMap = (() => {
     }
   }
   function legend() {
+    if (mode === 'apt' && LabelKit.isLK('supplymap')) return LabelKit.legend('supplymap');
     const dk = darkMap(), single = L().col === 'single';
     const items = single ? [`<span><i style="background:${L().one}"></i>공급 단지</span>`] : KN.map((k, i) => `<span><i style="background:${PAL[dk ? 'dark' : 'light'][i].a}"></i>${k}</span>`);
     const n = mode === 'apt' ? overlays.length : rowsF().length;
@@ -584,6 +594,10 @@ const SupplyMap = (() => {
 
   async function init() {
     if (inited) return; inited = true;
+    LabelKit.mount('supplymap', { el: $('smMap'), host: $('smMap').parentElement, legendBox: $('smLegend'), moreLabel: '🎨 예전 디자인·지도 바탕 설정',
+      legendSub: () => (mode === 'gu' ? '구별 합계 (확대하면 단지별)' : `단지 ${overlays.length}개${opts.small ? '' : ` · ${SMALL}세대 미만 숨김`}`),
+      more: () => { const d = $('smDrawer'); d.hidden = false; renderDrawer(); $('btnSmDrawer').classList.add('on'); } });
+    LabelKit.on('supplymap', () => { if (map) drawOverlays(); });
     regions = await Data.regions();
     fetch(`${CONFIG.DATA_URL}/population.json`, { cache: 'no-cache' }).then(r => (r.ok ? r.json() : null)).then(d => { pop = d; if (data.rows.length && !$('tab-supplymap').hidden) { const rows = rowsF(); renderCards(rows); renderChart(rows); } }).catch(() => {});
     $('smFile').onchange = onFiles;

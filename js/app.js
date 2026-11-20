@@ -8,6 +8,9 @@ const App = (() => {
     document.querySelectorAll('.tab').forEach(el => { el.hidden = el.id !== 'tab-' + name; });
     TabTools.open(name);
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+    try { sessionStorage.setItem('apt.curTab', name); } catch (e) { /* 무시 */ }      // 새로고침하면 이 탭으로 돌아옴
+    const nav = $('tabs'), on = nav && nav.querySelector('button.on');               // 휴대폰처럼 메뉴가 옆으로 넘칠 때: 누른 탭을 가운데로
+    if (on && nav.scrollWidth > nav.clientWidth + 4) nav.scrollTo({ left: on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2, behavior: 'smooth' });
     if (name === 'tracking') Tracking.open();
     if (name === 'map') PriceMap.open();
     if (name === 'eval') Eval.open();
@@ -154,7 +157,10 @@ const App = (() => {
     if (typeof CmdK !== 'undefined') CmdK.init();
     if (typeof Health !== 'undefined') Health.init();
     const back = sessionStorage.getItem('apt.openTab');       // 저장함에서 불러온 뒤 다시 열린 경우 그 탭으로
-    if (back) { sessionStorage.removeItem('apt.openTab'); if (document.querySelector(`#tabs button[data-tab="${back}"]`)) showTab(back); }
+    const again = (() => { try { return sessionStorage.getItem('apt.curTab'); } catch (e) { return null; } })();
+    const okTab = (t) => { const b = t && document.querySelector(`#tabs button[data-tab="${t}"]`); return !!b && !b.hidden; };
+    if (back) { sessionStorage.removeItem('apt.openTab'); if (okTab(back)) showTab(back); }
+    else if (again && again !== document.querySelector('#tabs button.on')?.dataset.tab && okTab(again)) showTab(again);   // 새로고침 전에 보던 탭
     else { const cur = document.querySelector('#tabs button.on')?.dataset.tab; if (cur) TabTools.open(cur); }
   }
 

@@ -239,6 +239,7 @@ const PriceMap = (() => {
     if (!map) {
       applySize();
       map = KMap.create($('pmMap'), first, 7);
+      LabelKit.mount('map', { el: $('pmMap'), host: $('pmMap').parentElement, ext: () => { drawer(true); setTimeout(() => $('pmCtl').scrollIntoView({ behavior: 'smooth', block: 'center' }), 60); } });
       ctrl = MapLabel.create({ key: 'map', map, panel: $('pmPanel'), ctl: $('pmCtl'),
         onPreset: (k) => { if (k === 'field') { $('pmShow').value = 'sr'; $('pmSubWrap').hidden = true; saveOpts(); setTimeout(draw, 50); } },   // 임장용 = 매매 + 전세
         onPick: (it) => { if (!it.user) popup(it); },
@@ -255,7 +256,7 @@ const PriceMap = (() => {
     const cnt = new Map(); ok.forEach(r => cnt.set(`${r.code}|${r.key}`, (cnt.get(`${r.code}|${r.key}`) || 0) + 1));
     const items = ok.map(r => {
       const t = labelOf(r, cnt.get(`${r.code}|${r.key}`) > 1), rt = rates(r);
-      return { id: r.id, pos: r.pos, text: t.text, name: t.name, lines: t.lines, sub: t.sub, compact: t.compact, drop: rt.drop, rise: rt.rise,
+      return { id: r.id, ck: `${r.code}|${r.key}`, pos: r.pos, text: t.text, name: t.name, lines: t.lines, sub: t.sub, compact: t.compact, drop: rt.drop, rise: rt.rise,
         color: t.real ? '#f5a742' : '#4f9cff', rank: hot.has(r.id) ? 1 : 0, cls: hot.has(r.id) ? 'mlhot' : '' };
     }).concat(okL.map(L => ({ id: 'lm:' + L.id, lm: L.id, pos: L.pos, text: `★ ${L.name}`, color: '#8e8e93', rank: -1, cls: 'mllm' })));
     map.relayout();

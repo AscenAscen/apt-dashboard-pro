@@ -13,6 +13,27 @@ const Settings = (() => {
   let hidden = new Set();
 
   const nav = () => $('tabs');
+  // 탭 묶음 — 메뉴에서 이 순서로 묶어 보여 줍니다. 목록에 없는 새 탭은 '분석' 묶음에 들어갑니다.
+  const GROUPS = [
+    { k: 'map', name: '지도', tabs: ['start', 'cxmap', 'map', 'supplymap', 'v3d', 'sat'] },
+    { k: 'survey', name: '조사', tabs: ['survey', 'count', 'yard', 'tracking', 'land', 'imjang'] },
+    { k: 'ana', name: '분석', tabs: ['home', 'search', 'compare', 'eval', 'infra', 'grouping', 'trends', 'supply', 'migration', 'invest', 'market', 'my'] },
+    { k: 'set', name: '설정', tabs: ['guide'] },
+  ];
+  const grpOf = (id) => { const i = GROUPS.findIndex(g => g.tabs.includes(id)); return i < 0 ? 2 : i; };
+  /** 같은 묶음끼리 모으기 (묶음 안에서는 내가 정한 순서 그대로) */
+  const byGroup = (ids) => ids.map((id, i) => ({ id, i })).sort((a, b) => grpOf(a.id) - grpOf(b.id) || a.i - b.i).map(x => x.id);
+  /** 메뉴에 묶음 이름표 붙이기 */
+  function groupLabels() {
+    const n = nav(); if (!n) return;
+    n.querySelectorAll('.tabgrp').forEach(x => x.remove());
+    let last = -1;
+    [...n.querySelectorAll('button[data-tab]')].forEach(b => {
+      if (b.hidden) return;
+      const g = grpOf(b.dataset.tab);
+      if (g !== last) { const sp = document.createElement('span'); sp.className = 'tabgrp'; sp.textContent = GROUPS[g].name; n.insertBefore(sp, b); last = g; }
+    });
+  }
   const nameOf = (btn) => { const t = [...btn.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim(); return t || btn.dataset.tab; };
 
   /* ── 탭 보이기·순서 ── */
@@ -20,7 +41,7 @@ const Settings = (() => {
     defaults = [...nav().querySelectorAll('button')].map(b => ({ id: b.dataset.tab, name: nameOf(b) }));
     const prefs = Store.get(TKEY, {});
     const key = (d, i) => (prefs[d.id] && prefs[d.id].o != null ? prefs[d.id].o : i);
-    order = defaults.map((d, i) => ({ id: d.id, k: key(d, i), i })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.id);
+    order = byGroup(defaults.map((d, i) => ({ id: d.id, k: key(d, i), i })).sort((a, b) => a.k - b.k || a.i - b.i).map(x => x.id));
     hidden = new Set(defaults.filter(d => prefs[d.id]?.h && d.id !== 'guide').map(d => d.id));     // 설정 탭은 숨길 수 없음
   }
   function save() {
@@ -31,17 +52,19 @@ const Settings = (() => {
   function apply() {
     const btns = new Map([...nav().querySelectorAll('button')].map(b => [b.dataset.tab, b]));
     order.forEach(id => { const b = btns.get(id); if (b) { nav().appendChild(b); b.hidden = hidden.has(id); } });
+    groupLabels();
     const on = nav().querySelector('button.on');
     if (on && on.hidden) { const first = order.find(id => !hidden.has(id)); if (first) App.showTab(first); }
   }
   function renderTabs() {
     const box = $('tabSettings'); if (!box) return;
     const nm = new Map(defaults.map(d => [d.id, d.name]));
-    box.innerHTML = order.map((id, i) => `<div class="tabrow" data-id="${id}">
+    const first = (i) => i === 0 || grpOf(order[i - 1]) !== grpOf(order[i]), lastIn = (i) => i === order.length - 1 || grpOf(order[i + 1]) !== grpOf(order[i]);
+    box.innerHTML = order.map((id, i) => `${first(i) ? `<div class="tabgrph">${GROUPS[grpOf(id)].name}</div>` : ''}<div class="tabrow" data-id="${id}">
       <label class="inline"><input type="checkbox" data-vis ${hidden.has(id) ? '' : 'checked'} ${id === 'guide' ? 'disabled title="설정 탭은 항상 보입니다"' : ''}> ${U.esc(nm.get(id) || id)}</label>
       <span class="grow"></span>
-      <button class="mini" data-up ${i === 0 ? 'disabled' : ''} title="위(앞)로">▲</button>
-      <button class="mini" data-down ${i === order.length - 1 ? 'disabled' : ''} title="아래(뒤)로">▼</button></div>`).join('');
+      <button class="mini" data-up ${first(i) ? 'disabled' : ''} title="위(앞)로 — 같은 묶음 안에서">▲</button>
+      <button class="mini" data-down ${lastIn(i) ? 'disabled' : ''} title="아래(뒤)로 — 같은 묶음 안에서">▼</button></div>`).join('');
   }
   function initTabs() {
     load(); apply(); renderTabs();
@@ -49,8 +72,9 @@ const Settings = (() => {
     box.onclick = (e) => {
       const row = e.target.closest('.tabrow'); if (!row) return;
       const id = row.dataset.id, i = order.indexOf(id);
-      if (e.target.matches('[data-up]') && i > 0) [order[i - 1], order[i]] = [order[i], order[i - 1]];
-      else if (e.target.matches('[data-down]') && i < order.length - 1) [order[i + 1], order[i]] = [order[i], order[i + 1]];
+      const same = (j) => j >= 0 && j < order.length && grpOf(order[j]) === grpOf(id);   // 묶음을 넘어가지 않게
+      if (e.target.matches('[data-up]') && same(i - 1)) [order[i - 1], order[i]] = [order[i], order[i - 1]];
+      else if (e.target.matches('[data-down]') && same(i + 1)) [order[i + 1], order[i]] = [order[i], order[i + 1]];
       else return;
       save(); apply(); renderTabs();
     };

@@ -11,6 +11,7 @@ const Infra = (() => {
   let map = null, rv = null, rvClient = null, shapes = [], cur = null, hybrid = false, rvLayer = false, seq = 0;
 
   async function init() {
+    if (document.getElementById('inMap')) LabelKit.mount('infra', { el: document.getElementById('inMap') });     // 🏷 라벨: 크기·글자·글꼴
     regions = await Data.regions();
     const sidos = [...new Set(regions.map(r => r[1]))];
     $('inSido').innerHTML = sidos.map(x => `<option>${U.esc(x)}</option>`).join('');
