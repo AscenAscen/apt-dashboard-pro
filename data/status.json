@@ -1,15 +1,15 @@
 {
- "updatedAt": "2026-11-20 10:43",
+ "updatedAt": "2026-11-20 12:19",
  "lastUpdate": "2026-11-20",
  "progress": {
   "sale": {
-   "done": 26322,
+   "done": 26753,
    "total": 64005,
    "priorityDone": 11537,
    "priorityTotal": 11537
   },
   "rent": {
-   "done": 24646,
+   "done": 25071,
    "total": 48705,
    "priorityDone": 11537,
    "priorityTotal": 11537
@@ -20,27 +20,25 @@
    "sale": 450,
    "rent": 450
   },
-  "savedMonths": 834,
-  "failed": 1,
+  "savedMonths": 856,
+  "failed": 0,
   "stop": "",
   "closed": {
    "rent": "이번 실행 호출 한도(450) 도달",
    "sale": "이번 실행 호출 한도(450) 도달"
   },
   "months": {
-   "sale": 416,
-   "rent": 418
+   "sale": 431,
+   "rent": 425
   },
   "cooldowns": 0,
-  "minutes": 32,
+  "minutes": 24,
   "usedToday": {
    "date": "2026-11-20",
-   "sale": 2700,
-   "rent": 2700
+   "sale": 3150,
+   "rent": 3150
   },
-  "warnings": [
-   "sale 11305 201611 실패: URLError: <urlopen error _ssl.c:994: The handshake operation timed out>"
-  ]
+  "warnings": []
  },
  "emptyRegions": [
   "인천광역시 옹진군(28720)"
