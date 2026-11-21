@@ -1,15 +1,15 @@
 {
- "updatedAt": "2026-11-22 06:14",
+ "updatedAt": "2026-11-22 08:04",
  "lastUpdate": "2026-11-22",
  "progress": {
   "sale": {
-   "done": 35405,
+   "done": 35851,
    "total": 64005,
    "priorityDone": 11537,
    "priorityTotal": 11537
   },
   "rent": {
-   "done": 33452,
+   "done": 33895,
    "total": 48705,
    "priorityDone": 11537,
    "priorityTotal": 11537
@@ -20,7 +20,7 @@
    "sale": 450,
    "rent": 450
   },
-  "savedMonths": 864,
+  "savedMonths": 889,
   "failed": 0,
   "stop": "",
   "closed": {
@@ -28,15 +28,15 @@
    "sale": "이번 실행 호출 한도(450) 도달"
   },
   "months": {
-   "sale": 436,
-   "rent": 428
+   "sale": 446,
+   "rent": 443
   },
   "cooldowns": 0,
-  "minutes": 25,
+  "minutes": 16,
   "usedToday": {
    "date": "2026-11-22",
-   "sale": 1350,
-   "rent": 1350
+   "sale": 1800,
+   "rent": 1800
   },
   "warnings": []
  },
