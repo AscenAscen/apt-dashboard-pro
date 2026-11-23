@@ -1,0 +1,71 @@
+name: 건축물대장 세대수·용적률 수집
+
+# 매일 새벽에 건축물대장을 조금씩 받아 data/bldg/*.json 에 적고 사이트를 다시 배포합니다.
+# 처음 한 번 전국을 채우는 데 약 1주일 걸리고, 그 뒤로는 새로 생긴 단지만 받습니다.
+on:
+  schedule:
+    - cron: '23 16 * * *'      # 매일 한국시간 01:23 (공공데이터포털 하루 한도가 자정에 다시 채워진 뒤)
+  workflow_dispatch:           # Actions 화면에서 [Run workflow] 로 직접 실행
+    inputs:
+      max_calls:
+        description: '이번에 쓸 최대 호출 수 (하루 한도 안쪽)'
+        required: false
+        default: '9000'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: apt-bldg
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    name: 건축물대장 받기
+    runs-on: ubuntu-latest
+    timeout-minutes: 170
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 건축물대장 조회 → data/bldg/*.json
+        env:
+          MOLIT_API_KEY: ${{ secrets.MOLIT_API_KEY }}
+          BLDG_MAX_CALLS: ${{ github.event.inputs.max_calls || '9000' }}
+        run: python scripts/bldg.py
+      - name: 바뀐 파일 저장(커밋)
+        if: always()
+        run: |
+          git config user.name "apt-dashboard-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A data/bldg data/bldg_state.json data/bldg_status.json
+          if git diff --cached --quiet; then echo "바뀐 것 없음"; exit 0; fi
+          git commit -q -m "건축물대장 갱신 $(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M')"
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0
+            sleep 15
+          done
+          exit 1
+
+  deploy:
+    name: 사이트 배포
+    needs: collect
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
