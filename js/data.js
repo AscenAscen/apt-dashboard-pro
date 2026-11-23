@@ -117,18 +117,39 @@ const Data = (() => {
   }
 
   /** 작은 상태 파일만 잊고 다시 받게 함 (큰 자료·실거래는 그대로 둠) — 수집 상태 확인용 */
-  const STATUS_FILES = ['status.json', 'extra_status.json', 'kapt_file_status.json', 'population_status.json', 'supply_status.json', 'migration_status.json'];
+  const STATUS_FILES = ['status.json', 'extra_status.json', 'kapt_file_status.json', 'population_status.json', 'supply_status.json', 'migration_status.json', 'bldg_status.json'];
   function refreshStatus() { STATUS_FILES.forEach(f => cache.delete(f)); }
 
   /** 저장해 둔 파일을 잊고 다음에 다시 받게 함 (code 를 주면 그 지역만) */
   function refresh(code) {
     for (const k of [...cache.keys()]) if (!code || k.includes(`/${code}/`) || k === `index/${code}.json`) cache.delete(k);
+    if (code) kaptCache.delete(code); else kaptCache.clear();
   }
 
   const summary = () => getJson('summary.json', null);
   const names = () => getJson('names.json', null);          // 전국 단지 이름 목록 (전국 검색용)
   /** 단지 정보(세대수 등): { m: {단지키: [세대수, 동수, 단지코드]} } — 아직 못 받은 지역은 빈 값 */
-  const kapt = (code) => getJson(`kapt/${code}.json`, { m: {} }).then(k => (k && k.m ? k : { m: {} }));
+  /** 단지 세대수 등: K-apt(data/kapt) + 건축물대장(data/bldg) 합본.  m[단지키] = [세대수, 동수, 단지코드, 복도유형, 표시]
+      · K-apt 값이 먼저. 단, K-apt 가 여러 단지를 한데 묶은 값('g')이면 지번별로 정확한 건축물대장 값으로 바꿈
+      · K-apt 에 없으면 건축물대장 값으로 채움(표시 'b').  b[단지키] = [세대수, 용적률, 건폐율, 동수, 출처]  (용적률 0 = 대장에 없음) */
+  const kaptCache = new Map();
+  const kapt = (code) => {
+    if (!kaptCache.has(code)) kaptCache.set(code, Promise.all([
+      getJson(`kapt/${code}.json`, { m: {} }), getJson(`bldg/${code}.json`, { m: {} }),
+    ]).then(([k, b]) => {
+      const m = Object.assign({}, (k && k.m) || {}), bm = (b && b.m) || {};
+      for (const key in bm) {
+        const v = bm[key], cur = m[key];
+        if (!v || !v[0]) continue;
+        if (!cur || !cur[0] || cur[4] === 'g') m[key] = [v[0], v[3] || (cur && cur[1]) || 0, (cur && cur[2]) || '', (cur && cur[3]) || '', 'b'];
+      }
+      return { m, b: bm };
+    }));
+    return kaptCache.get(code);
+  };
+  /** 용적률(%) — 건축물대장에 있을 때만, 없으면 null */
+  const vlRat = (kp, key) => { const v = kp && kp.b && kp.b[key]; return v && v[1] > 0 ? v[1] : null; };
+  const bldgStatus = () => getJson('bldg_status.json', null);
   const signals = () => getJson('signals.json', null);      // 시장 신호 (신고가·급락·월별 거래량)
   const rone = () => getJson('rone.json', null);
   const monthly = () => getJson('monthly_summary.json', null);   // 월간 요약 (scripts/monthly_summary.py)
@@ -137,7 +158,7 @@ const Data = (() => {
   const cx = (sd) => getJson(`cx/${sd}.json`, null);   // 단지 요약 (비슷한 단지 찾기용, scripts/cx_summary.py)
   const kaptFile = () => getJson('kapt_file_status.json', null);   // K-apt 엑셀 → 세대수 변환 결과 (scripts/kapt_file.py)
 
-  return { json: getJson, refreshStatus, regions, status, index, loadYears, parseKey, eachTrade, stats, peakTrough, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
+  return { json: getJson, refreshStatus, regions, status, index, loadYears, parseKey, eachTrade, stats, peakTrough, complexTrades, refresh, summary, kapt, vlRat, bldgStatus, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
 })();
 
 /* ───────────── 공통 도구 ───────────── */

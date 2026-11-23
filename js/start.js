@@ -59,7 +59,7 @@ const Start = (() => {
         if (!by.has(key)) {
           const p = Data.parseKey(key);
           by.set(key, { id: `${code}|${key}`, code, key, sido: r[1], sgg: r[2], dong: p.dong, jibun: p.jibun, name: p.name,
-            year: idx.c[key] || null, hh: (kp.m[key] && kp.m[key][0]) || null, n5: 0, gs: new Map() });
+            year: idx.c[key] || null, hh: (kp.m[key] && kp.m[key][0]) || null, vl: Data.vlRat(kp, key), n5: 0, gs: new Map() });
         }
         return by.get(key);
       };
@@ -216,7 +216,7 @@ const Start = (() => {
     const t = tipBox(); if (!tip) { t.hidden = true; return; }
     const { cx } = tip, sheet = isTouch();
     const head = `<div class="cxt-h"><b>${U.esc(nameOf(cx))}</b>${cx.alias ? `<small>${U.esc(cx.name)}</small>` : ''}<span class="grow"></span>${tipPin ? '<button class="cxt-x" data-a="close" title="닫기 (Esc)">✕</button>' : ''}</div>
-      <div class="cxt-s">${[cx.year ? `${cx.year}년` : '', cx.hh ? `${cx.hh.toLocaleString()}세대` : '세대수 모름', cx.year ? `${NOW_Y - cx.year}년차` : '', lands.has(cx.id) ? '🏛 랜드마크' : '', tracked.has(cx.id) ? '⭐ 시세트래킹' : ''].filter(Boolean).join(' · ')}<br><small>${U.esc(cx.sgg)} ${U.esc(cx.dong)} ${U.esc(cx.jibun)}</small></div>`;
+      <div class="cxt-s">${[cx.year ? `${cx.year}년` : '', cx.hh ? `${cx.hh.toLocaleString()}세대` : '세대수 모름', cx.year ? `${NOW_Y - cx.year}년차` : '', cx.vl ? `용적률 ${Math.round(cx.vl)}%` : '', lands.has(cx.id) ? '🏛 랜드마크' : '', tracked.has(cx.id) ? '⭐ 시세트래킹' : ''].filter(Boolean).join(' · ')}<br><small>${U.esc(cx.sgg)} ${U.esc(cx.dong)} ${U.esc(cx.jibun)}</small></div>`;
     let body = '';
     if (!cx.pcs.length) body = '<p class="cxt-none">2020년 이후 거래가 없습니다.</p>';
     else if (st.tip === 'B') body = tableB(cx);

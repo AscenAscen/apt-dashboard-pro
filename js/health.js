@@ -116,6 +116,17 @@ const Health = (() => {
     add(kf ? { id: 'kaptf', name: '세대수 (K-apt 엑셀)', every: '엑셀 올릴 때', wf: wf('kapt.yml'), when: kf.updated, lv: kf.matched ? 'ok' : 'warn',
       sum: `${kf.file} · 세대수 연결 ${(kf.matched || 0).toLocaleString()}단지`, notes: kf.unmatched ? [`짝을 못 지은 엑셀 ${kf.unmatched.toLocaleString()}행 (빌라·임대 등이 많음)`] : [] }
       : { id: 'kaptf', name: '세대수 (K-apt 엑셀)', every: '엑셀 올릴 때', wf: wf('kapt.yml'), lv: 'warn', sum: '아직 없음', fix: ['공공데이터포털에서 K-apt 단지 기본정보 엑셀을 받아 저장소 kapt 폴더에 올리기'] });
+    /* 6-2. 건축물대장 (매일 새벽, scripts/bldg.py) */
+    const bs = await Data.bldgStatus().catch(() => null);
+    if (bs) {
+      const h = hoursAgo(bs.updatedAt), bad = /인증키|오류/.test(bs.stop || '') && !/한도/.test(bs.stop || '');
+      add({ id: 'bldg', name: '세대수·용적률 (건축물대장)', every: '매일 새벽', wf: wf('bldg.yml'), when: bs.updatedAt,
+        lv: bad ? 'bad' : byAge(h, 30, 72),
+        sum: `${ago(bs.updatedAt)} · ${(bs.complexes || 0).toLocaleString()}단지${bs.left ? ` · 남은 지번 ${bs.left.toLocaleString()}곳 (매일 조금씩 받는 중)` : ' · 전체 완료'}`,
+        issues: bad ? [bs.stop] : (h != null && h > 30 ? [`마지막 수집이 ${ago(bs.updatedAt)}입니다 (보통 매일).`] : []),
+        fix: bad ? ['공공데이터포털에서 "건축HUB_건축물대장정보 서비스" 활용신청이 승인 상태인지 확인', 'GitHub → Actions → 「건축물대장 세대수·용적률 수집」 실행 기록 확인'] : [],
+        notes: bs.stop && !bad ? [bs.stop] : [] });
+    } else add({ id: 'bldg', name: '세대수·용적률 (건축물대장)', every: '매일 새벽', wf: wf('bldg.yml'), lv: 'info', sum: '아직 첫 수집 전', notes: ['GitHub → Actions → 「건축물대장 세대수·용적률 수집」 → Run workflow 로 바로 시작할 수 있습니다.'] });
     if (ex) {
       const k = ex.kapt || {}, r = ex.rone || {};
       if (k.stop && /폐기|NO_OPENAPI/.test(k.stop)) add({ id: 'kapt', name: '단지 정보 API (K-apt)', every: '실거래 수집 때', wf: wf('update.yml'), when: ex.updatedAt, lv: kf && kf.matched ? 'info' : 'warn',

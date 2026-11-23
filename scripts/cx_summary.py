@@ -4,7 +4,7 @@
   · 최근 매매·전고점은 직거래를 뺀 값, 전고점은 2020년 이후 최고가
   · 최근 전세는 1년 안의 가장 최근 전세 거래 (없으면 null)
   · 1년 동안 매매가 한 건도 없고 2년 안에도 없는 평형은 뺌 (거래가 끊긴 평형)
-  · 세대수는 data/kapt/{지역}.json (K-apt 엑셀·API) 에서
+  · 세대수는 data/kapt/{지역}.json (K-apt 엑셀) + data/bldg/{지역}.json (건축물대장) 에서
 사용법: python scripts/cx_summary.py   (자동 수집 때 함께 실행됩니다)"""
 import json, os, datetime as dt
 from collections import defaultdict
@@ -42,6 +42,11 @@ def main():
         except Exception: years = {}
         try: hh = json.load(open(os.path.join(DATA, 'kapt', code + '.json'), encoding='utf-8')).get('m', {})
         except Exception: hh = {}
+        try: bm = json.load(open(os.path.join(DATA, 'bldg', code + '.json'), encoding='utf-8')).get('m', {})   # 건축물대장 (scripts/bldg.py)
+        except Exception: bm = {}
+        for k, v in bm.items():                              # K-apt 에 없거나 여러 단지를 묶은 값('g')이면 건축물대장 세대수로
+            cur = hh.get(k)
+            if v and v[0] and (not cur or not cur[0] or (len(cur) > 4 and cur[4] == 'g')): hh[k] = [v[0], v[3], '', '', 'b']
         s = {}                                               # (키, 평형) → [최근일, 최근가, 전고점, 1년건수]
         for key, g, direct, d, p in each(sale):
             if direct: continue

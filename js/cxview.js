@@ -54,7 +54,7 @@ const CxView = (() => {
     const qS = ms.find(m => qs[m] && qs[m].s != null), qR = ms.find(m => qs[m] && qs[m].r != null);
     const nowS = qS ? qs[qS].s : last ? last.price : null, nowR = qR ? qs[qR].r : (lastR && lastR.d >= d12 ? lastR.price : null);
     const land = Store.get('apt.land.v1', {});
-    return { ...q, id: gid, g, sido: reg[1] || '', sgg: reg[2] || '', year: idx.c[q.key] || null, hh, hhAuto: !hhMan && !!hh, rec, areas,
+    return { ...q, id: gid, g, sido: reg[1] || '', sgg: reg[2] || '', year: idx.c[q.key] || null, hh, hhAuto: !hhMan && !!hh, vl: Data.vlRat(kp, q.key), rec, areas,
       S, R, last, lastR, peak, trough, n12, qs, ms, qS, qR, nowS, nowR, land: !!land[gid] || Object.keys(land).some(k => k.startsWith(`${q.code}|${q.key}#`)),
       ratio: nowS && nowR ? nowR / nowS * 100 : null, gap: nowS && nowR ? nowS - nowR : null, drop: peak && nowS ? (nowS / peak.price - 1) * 100 : null };
   }
@@ -72,7 +72,7 @@ const CxView = (() => {
     const hist = c.ms.filter(m => c.qs[m] && (c.qs[m].s != null || c.qs[m].r != null)).slice(0, 12);
     $('cxBody').innerHTML = `
       <div class="cxhead"><div><h3>${c.land ? '<span title="랜드마크">★</span> ' : ''}${U.esc(c.name)}</h3>
-        <p class="hint" style="margin:2px 0 0">${U.esc(c.sido)} ${U.esc(c.sgg)} ${U.esc(c.dong)} ${U.esc(c.jibun || '')} · ${c.year ? `${c.year}년 (${age}년차)` : '연식 모름'} · ${c.hh ? `${c.hh.toLocaleString()}세대${c.hhAuto ? ' <small>(자동)</small>' : ''}` : '세대수 모름'}${c.rec ? ` · 폴더: ${U.esc((c.rec.folders || []).join(', '))}` : ''}</p></div>
+        <p class="hint" style="margin:2px 0 0">${U.esc(c.sido)} ${U.esc(c.sgg)} ${U.esc(c.dong)} ${U.esc(c.jibun || '')} · ${c.year ? `${c.year}년 (${age}년차)` : '연식 모름'} · ${c.hh ? `${c.hh.toLocaleString()}세대${c.hhAuto ? ' <small>(자동)</small>' : ''}` : '세대수 모름'}${c.vl ? ` · 용적률 ${Math.round(c.vl)}%` : ''}${c.rec ? ` · 폴더: ${U.esc((c.rec.folders || []).join(', '))}` : ''}</p></div>
         <div class="cxbtns">${c.rec ? `<button data-cxa="table">시세트래킹 표에서 보기</button>` : `<button class="primary" data-cxa="add">시세트래킹에 담기</button>`}
           <a class="btn" href="${link}" target="_blank" rel="noopener">네이버 부동산</a><a class="btn" href="${kakao}" target="_blank" rel="noopener">카카오맵</a></div></div>
       <div class="chips cxareas">${chips || '<span class="hint">2020년 이후 거래가 없습니다.</span>'}</div>
