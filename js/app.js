@@ -4,7 +4,20 @@
 const App = (() => {
   const $ = (id) => document.getElementById(id);
 
+  /* 큰 자료를 받는 탭은 처음 열 때 준비합니다 (공급 2MB · 인구이동 0.5MB 를 접속할 때마다 받지 않도록) */
+  const LAZY = {
+    supply: () => { if (typeof Supply !== 'undefined') Supply.init(); },
+    migration: () => { if (typeof Migration !== 'undefined') Migration.init(); },
+  };
+  const lazyDone = new Set();
+  function lazyOpen(name) {
+    if (!LAZY[name] || lazyDone.has(name)) return;
+    lazyDone.add(name);
+    try { const p = LAZY[name](); if (p && p.catch) p.catch(e => console.error(e)); } catch (e) { console.error(e); }
+  }
+
   function showTab(name) {
+    lazyOpen(name);
     document.querySelectorAll('.tab').forEach(el => { el.hidden = el.id !== 'tab-' + name; });
     TabTools.open(name);
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
@@ -140,10 +153,8 @@ const App = (() => {
     Home.init();
     if (typeof Start !== 'undefined') Start.init();     // 홈 탭 (js/start.js)
     if (typeof CxMap !== 'undefined') CxMap.init();
-    if (typeof Supply !== 'undefined') Supply.init();
     if (typeof SupplyMap !== 'undefined') SupplyMap.init();
     if (typeof SupplyCmp !== 'undefined') SupplyCmp.init();
-    if (typeof Migration !== 'undefined') Migration.init();
     Market.init(); Imjang.init(); PriceMap.init(); if (typeof PmArea !== "undefined") PmArea.init(); Eval.init();
     await Search.init();
     await Promise.all([My.init(), Land.init()]);
@@ -161,7 +172,7 @@ const App = (() => {
     const okTab = (t) => { const b = t && document.querySelector(`#tabs button[data-tab="${t}"]`); return !!b && !b.hidden; };
     if (back) { sessionStorage.removeItem('apt.openTab'); if (okTab(back)) showTab(back); }
     else if (again && again !== document.querySelector('#tabs button.on')?.dataset.tab && okTab(again)) showTab(again);   // 새로고침 전에 보던 탭
-    else { const cur = document.querySelector('#tabs button.on')?.dataset.tab; if (cur) TabTools.open(cur); }
+    else { const cur = document.querySelector('#tabs button.on')?.dataset.tab; if (cur) { lazyOpen(cur); TabTools.open(cur); } }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();

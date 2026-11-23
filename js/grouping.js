@@ -255,7 +255,8 @@ const Grouping = (() => {
     U.toast(`${x.name} → ${z.name} · ${label(band)} 칸에 넣었습니다.`);
   }
 
-  function excel() {
+  async function excel() {
+    try { await needXLSX(); } catch (e) { return U.toast(e.message); }
     const b = board();
     if (!b.zones.length) return U.toast('생활권을 먼저 추가하세요.');
     const rows = [['가격대', ...b.zones.map(z => z.name)]]

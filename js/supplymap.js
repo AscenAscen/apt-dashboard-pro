@@ -103,6 +103,7 @@ const SupplyMap = (() => {
     return out;
   }
   async function readFile(file) {
+    await needXLSX();
     const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
     let last = null;
     for (const nm of wb.SheetNames) {

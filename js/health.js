@@ -42,8 +42,8 @@ const Health = (() => {
   const byAge = (h, okH, warnH) => (h == null ? 'warn' : h <= okH ? 'ok' : h <= warnH ? 'warn' : 'bad');
 
   /* ── 수집기마다 상태 만들기 ── */
-  async function collect() {
-    Data.refresh();
+  async function collect(fresh) {
+    if (fresh) Data.refreshStatus();                 // 상태 파일만 새로 받음 (예전에는 받아 둔 자료를 전부 지워 names.json 등을 두 번 받았음)
     const j = (f) => Data.json(f, null).catch(() => null);
     const [st, ex, kf, kb, pop, sup, mig, sig, nm] = await Promise.all([Data.status(), Data.extraStatus(), Data.kaptFile(), Data.kbWeekly(),
       j('population_status.json'), j('supply_status.json'), j('migration_status.json'), Data.signals(), Data.names()]);
@@ -184,7 +184,7 @@ const Health = (() => {
   }
   async function open(force) {
     const m = modal(); m.hidden = false;
-    if (!last || force) { $('hList').innerHTML = '<p class="hint">확인 중…</p>'; await collect(); badge(last); }
+    if (!last || force) { $('hList').innerHTML = '<p class="hint">확인 중…</p>'; await collect(true); badge(last); }
     render(last);
   }
 
@@ -198,6 +198,9 @@ const Health = (() => {
   async function init() {
     const b = $('btnHealth'); if (!b) return;
     b.onclick = () => open(false);
+    b.textContent = '수집 상태';
+    /* 첫 화면이 다 뜬 뒤(약 5초 후, 브라우저가 한가할 때) 조용히 확인 → 접속 직후의 다운로드 경쟁을 피함 */
+    await new Promise(res => setTimeout(() => (window.requestIdleCallback ? requestIdleCallback(res, { timeout: 5000 }) : res()), 5000));
     try { badge(await collect()); } catch (e) { console.error(e); b.textContent = '수집 상태'; }
   }
   return { init, open, collect, guideRows };

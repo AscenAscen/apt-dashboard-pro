@@ -29,7 +29,7 @@ const Start = (() => {
     { k: 'emd', name: '법정경계', icon: '📐', type: 'vw', data: 'LT_C_ADEMD_INFO', nm: ['emd_kor_nm'], maxLv: 6, color: '#0284c7', tip: '법정동 경계 (브이월드)' },
   ];
 
-  let st = {}, inited = false, map = null, regs = null, regList = [], names = null, geocoder = null, places = null;
+  let st = {}, inited = false, map = null, regs = null, regList = [], names = null, namesP = Promise.resolve(null), geocoder = null, places = null;
   const loaded = new Map();                            // 지역 코드 → { state, list, p }
   const cxs = new Map();                               // 단지 id(code|key) → cx
   const ovs = new Map();                               // 단지 id → { ov, el }
@@ -53,7 +53,7 @@ const Start = (() => {
     const rec = { state: 'loading', list: [] };
     rec.p = (async () => {
       const r = regs.get(code); if (!r) { rec.state = 'none'; return; }
-      const [idx, kp, data] = await Promise.all([Data.index(code), Data.kapt(code), Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), NOW_Y)]);
+      const [idx, kp, , data] = await Promise.all([Data.index(code), Data.kapt(code), namesP, Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), NOW_Y)]);
       const by = new Map();
       const get = (key) => {
         if (!by.has(key)) {
@@ -923,7 +923,7 @@ const Start = (() => {
     st = Object.assign({ ...DEF, codes: [], pys: [], layers: {} }, Store.get(SK, {}) || {});
     st.layers = st.layers || {};
     const R = await Data.regions(); regList = R; regs = new Map(R.map(r => [r[0], r]));
-    names = await Data.names().catch(() => null);
+    namesP = Data.names().catch(() => null); namesP.then(n => { names = n; });   // 전국 이름 목록(1.7MB)은 기다리지 않고 뒤에서 받음 → 지도가 먼저 뜸
     st.codes = (st.codes || []).filter(c => regs.has(c));
     build();
     LabelKit.mount('start', { el: $('stMap'), host: $('stWrap') });

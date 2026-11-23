@@ -199,7 +199,23 @@ const Real = (() => {
    ───────────────────────────────────────────────────────── */
 const Finder = (() => {
   let list = null, state = '', loading = null;   // state: '' | 'loading' | 'none' | 'ok'
-  const norm = (t) => String(t || '').replace(/\s+/g, '').toLowerCase();
+  /* 이름 맞추기: 국토부 자료는 같은 브랜드도 표기가 제각각(e편한세상·e-편한세상·이편한세상, IPARK·아이파크, SKVIEW·SK뷰·에스케이뷰 …)
+     → 검색어와 단지 이름을 모두 한 가지 표기로 바꾼 뒤 비교합니다. 새 표기를 더하려면 아래 BRAND 에 [찾을 모양, 바꿀 글자] 를 추가하세요. */
+  const BRAND = [
+    [/e-?편한/g, '이편한'], [/이-편한/g, '이편한'],
+    [/i-?park/g, '아이파크'], [/아이-파크/g, '아이파크'],
+    [/sk-?view/g, 'sk뷰'], [/에스케이/g, 'sk'], [/sk-뷰/g, 'sk뷰'],
+    [/the-?sharp|더#/g, '더샵'],
+    [/hill-?state/g, '힐스테이트'], [/raemian/g, '래미안'], [/prugio/g, '푸르지오'],
+    [/lotte-?castle/g, '롯데캐슬'], [/we'?ve/g, '위브'],
+    [/(^|[^a-z])xi(?![a-z])/g, '$1자이'],
+    [/맨숀/g, '맨션'], [/ⅰ/g, '1'], [/ⅱ/g, '2'], [/ⅲ/g, '3'],
+  ];
+  const norm = (t) => {
+    let s = String(t || '').toLowerCase().replace(/\s+/g, '');
+    for (const [re, to] of BRAND) s = s.replace(re, to);
+    return s.replace(/아파트|apt|[·.,()\[\]_]/g, '');
+  };
   function load() { return loading || (loading = load0()); }    // 여러 곳에서 동시에 불러도 한 번만, 모두 끝날 때까지 기다림
   async function load0() {
     state = 'loading';
@@ -214,7 +230,7 @@ const Finder = (() => {
   }
   /** 검색: 띄어 쓴 낱말이 모두 들어 있는 단지. 예) "평촌 래미안", "송파 헬리오" */
   function find(q, max = 40) {
-    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const words = q.trim().split(/\s+/).map(norm).filter(Boolean);
     if (!list || !words.length) return [];
     const whole = norm(q), out = [], seen = new Set();
     const push = (x, score) => { const id = x.code + '|' + x.key; if (!seen.has(id)) { seen.add(id); out.push({ x, score }); } };

@@ -224,7 +224,7 @@ const Trends = (() => {
       { name: '신고가 거래', rows: rows(last.highs) },
       { name: '전고대비 하락 거래', rows: rows(last.lows) },
       { name: '월별 거래량', rows: [['연월', '매매 건수', '전세 건수']].concat(yms.map(ym => [ym, ...last.vol.get(ym)])) },
-    ]);
+    ]).catch(e => U.toast(e.message || String(e)));
   }
 
   return { init };

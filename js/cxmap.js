@@ -41,7 +41,7 @@ const CxMap = (() => {
   const D12 = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return U.ymd(d); })();
   const MIN_N5 = 5;                                 // 기본으로 숨기는 기준: 최근 5년 매매 5건 미만
 
-  let st = {}, ls = {}, inited = false, opened = false, map = null, regs = null, regList = [], names = null, geocoder = null;
+  let st = {}, ls = {}, inited = false, opened = false, map = null, regs = null, regList = [], names = null, namesP = Promise.resolve(null), geocoder = null;
   const loaded = new Map();                         // 지역 코드 → { state, list:[cx] }
   const cxs = new Map();                            // 단지 id(code|key) → cx
   const ovs = new Map();                            // 단지 id → { ov, el }
@@ -61,7 +61,7 @@ const CxMap = (() => {
     const rec = { state: 'loading', list: [] };
     rec.p = (async () => {
       const r = regs.get(code); if (!r) { rec.state = 'none'; return; }
-      const [idx, kp, data] = await Promise.all([Data.index(code), Data.kapt(code), Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), NOW_Y)]);
+      const [idx, kp, , data] = await Promise.all([Data.index(code), Data.kapt(code), namesP, Data.loadYears(code, Math.floor(CONFIG.PEAK_FROM / 10000), NOW_Y)]);
       const by = new Map();
       const get = (key) => {
         if (!by.has(key)) {
@@ -524,7 +524,7 @@ const CxMap = (() => {
     ls = sl.v === 2 ? Object.assign({ ...LDEF }, sl) : Object.assign({ ...LDEF }, { tip: sl.tip || 'A', bDate: sl.bDate ?? 1, bAmt: sl.bAmt ?? 1, bPct: sl.bPct ?? 1, bRent: sl.bRent ?? 1, mu: sl.mu || 0 });   // 예전 노란 라벨 → 새 고급 디자인
     ls.cap = 0;
     const R = await Data.regions(); regList = R; regs = new Map(R.map(r => [r[0], r]));
-    names = await Data.names().catch(() => null);
+    namesP = Data.names().catch(() => null); namesP.then(n => { names = n; });   // 전국 이름 목록(1.7MB)은 기다리지 않고 뒤에서 받음 → 지도가 먼저 뜸
     st.codes = st.codes.filter(c => regs.has(c));
     inited = true;
     LabelKit.mount('cxmap', { el: $('cxmMap'), host: $('cxmMap').parentElement, moreLabel: '🎨 창 모양·예전 디자인 설정',

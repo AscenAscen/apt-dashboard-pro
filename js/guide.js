@@ -10,7 +10,7 @@ const Guide = (() => {
 
   /* ── 점검 ── */
   async function health() {
-    Data.refresh();                                  // 상태 파일을 새로 받음
+    Data.refreshStatus();                            // 상태 파일만 새로 받음 (받아 둔 큰 자료는 그대로)
     const [st, sig, ex, regs] = await Promise.all([Data.status(), Data.signals(), Data.extraStatus(), Data.regions()]);
     const rows = [], add = (ok, name, text) => rows.push([ok, name, text]);
     const days = (text) => { const d = new Date(String(text).replace(' ', 'T')); return isNaN(d) ? null : Math.floor((Date.now() - d.getTime()) / 864e5); };

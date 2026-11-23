@@ -9,6 +9,18 @@
      data/rent/…                    (전세, 구조 동일)
      단지키 = "동|지번|단지명",  면적키 = 전용면적(끝에 d 가 붙으면 직거래),  금액 단위 = 만원
    ───────────────────────────────────────────────────────── */
+/** 엑셀 라이브러리(약 880KB)는 처음부터 읽지 않고, 엑셀을 저장·읽을 때 한 번만 불러옵니다. */
+let _xlsxP = null;
+function needXLSX() {
+  if (typeof XLSX !== 'undefined') return Promise.resolve();
+  if (!_xlsxP) _xlsxP = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'lib/xlsx.full.min.js';
+    s.onload = () => res(); s.onerror = () => { _xlsxP = null; rej(new Error('엑셀 기능(lib/xlsx.full.min.js)을 불러오지 못했습니다.')); };
+    document.head.appendChild(s);
+  });
+  return _xlsxP;
+}
+
 const Data = (() => {
   const cache = new Map();
 
@@ -104,6 +116,10 @@ const Data = (() => {
     return out;
   }
 
+  /** 작은 상태 파일만 잊고 다시 받게 함 (큰 자료·실거래는 그대로 둠) — 수집 상태 확인용 */
+  const STATUS_FILES = ['status.json', 'extra_status.json', 'kapt_file_status.json', 'population_status.json', 'supply_status.json', 'migration_status.json'];
+  function refreshStatus() { STATUS_FILES.forEach(f => cache.delete(f)); }
+
   /** 저장해 둔 파일을 잊고 다음에 다시 받게 함 (code 를 주면 그 지역만) */
   function refresh(code) {
     for (const k of [...cache.keys()]) if (!code || k.includes(`/${code}/`) || k === `index/${code}.json`) cache.delete(k);
@@ -121,7 +137,7 @@ const Data = (() => {
   const cx = (sd) => getJson(`cx/${sd}.json`, null);   // 단지 요약 (비슷한 단지 찾기용, scripts/cx_summary.py)
   const kaptFile = () => getJson('kapt_file_status.json', null);   // K-apt 엑셀 → 세대수 변환 결과 (scripts/kapt_file.py)
 
-  return { json: getJson, regions, status, index, loadYears, parseKey, eachTrade, stats, peakTrough, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
+  return { json: getJson, refreshStatus, regions, status, index, loadYears, parseKey, eachTrade, stats, peakTrough, complexTrades, refresh, summary, kapt, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
 })();
 
 /* ───────────── 공통 도구 ───────────── */
@@ -153,7 +169,8 @@ const U = {
     clearTimeout(U._t); U._t = setTimeout(() => { el.hidden = true; }, 2600);
   },
   /** 엑셀 저장. sheets = [{ name, rows: [[…], …] }] */
-  xlsx(filename, sheets) {
+  async xlsx(filename, sheets) {
+    await needXLSX();                                // 처음 한 번만 엑셀 라이브러리를 받음
     const wb = XLSX.utils.book_new();
     for (const s of sheets) {
       const ws = XLSX.utils.aoa_to_sheet(s.rows);
@@ -177,8 +194,10 @@ const U = {
   /** 파일 내려받기 공통: format 이 'csv' 이거나 엑셀 만들기에 실패하면 CSV 로 저장 */
   download(name, sheets, format) {
     if (format !== 'csv') {
-      try { U.xlsx(name + '.xlsx', sheets); return; }
-      catch (e) { console.error(e); U.toast('엑셀 파일을 만들지 못해 CSV 로 저장합니다. (' + (e.message || e) + ')'); }
+      return U.xlsx(name + '.xlsx', sheets).catch((e) => {
+        console.error(e); U.toast('엑셀 파일을 만들지 못해 CSV 로 저장합니다. (' + (e.message || e) + ')');
+        for (const s of sheets) U.csv(sheets.length > 1 ? `${name}_${s.name}.csv` : `${name}.csv`, s.rows);
+      });
     }
     for (const s of sheets) U.csv(sheets.length > 1 ? `${name}_${s.name}.csv` : `${name}.csv`, s.rows);
   },

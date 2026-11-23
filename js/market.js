@@ -248,7 +248,8 @@ const Market = (() => {
     const file = e.target.files[0];
     if (!file) return;
     const fr = new FileReader();
-    fr.onload = () => {
+    fr.onload = async () => {
+      try { await needXLSX(); } catch (err) { return U.toast(err.message); }
       try {
         kbBook = { file: file.name, wb: XLSX.read(fr.result, { type: 'array', cellDates: true }) };
         const names = kbBook.wb.SheetNames;
@@ -359,7 +360,8 @@ const Market = (() => {
   function kbwRead(e) {
     const file = e.target.files[0]; if (!file) return;
     const fr = new FileReader();
-    fr.onload = () => {
+    fr.onload = async () => {
+      try { await needXLSX(); } catch (err) { return U.toast(err.message); }
       try {
         const wb = XLSX.read(fr.result, { type: 'array', cellDates: true }), kb = kbwParse(wb, file.name);
         if (!kb) return U.toast('"3.매매지수" / "4.전세지수" 시트를 찾지 못했습니다. KB 주간 시계열 파일이 맞는지 확인해 주세요.');
