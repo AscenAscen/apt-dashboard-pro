@@ -242,7 +242,7 @@ def main():
     for code, keys in names.items():
         for k in keys: bydong[code][k.split('|')[0]].append(k)
     hits = defaultdict(dict); seen = defaultdict(lambda: defaultdict(set)); rows = 0; nocode = 0; nomatch = []
-    lv = defaultdict(dict); stat = defaultdict(int); ycache = {}
+    lv = defaultdict(dict); stat = defaultdict(int); ycache = {}; part = defaultdict(lambda: defaultdict(list))
     def yearsOf(kc):
         """단지키 → 건축년도 (data/index/{지역}.json)"""
         out = {}
@@ -288,12 +288,13 @@ def main():
         stat[lvl] += 1
         for k in pick:
             code = kc[k]
+            if len(pick) == 1: part[code][k].append((lvl, r['name'], r['hh'], r['code']))   # 같은 키에 붙은 K-apt 줄 전부 (본단지 + 2단지 합치기용)
             cur = lv[code].get(k)
             if cur is not None and cur < lvl: continue                 # 더 확실한 짝이 이미 있음
             if cur is None or lvl < cur: seen[code][k] = set(); lv[code][k] = lvl
             seen[code][k].add(r['hh'])
             hits[code][k] = [r['hh'], r['dongs'] or 0, r['code'] or '', r['corr'] or ''] + (['g'] if lvl == 5 else [])
-    matched = 0
+    matched = 0; summed = []
     os.makedirs(OUTDIR, exist_ok=True)
     # 예전 엑셀로 만든 짝은 버리고 새로 만듦 (짝짓기 규칙이 바뀌면 틀린 짝이 남지 않도록). K-apt API 로 받은 자료(raw 가 있는 파일)는 그대로 합침
     for f in glob.glob(os.path.join(OUTDIR, '*.json')):
@@ -304,6 +305,18 @@ def main():
         if 'file' in old and 'raw' not in old:
             old['m'] = {}; json.dump(old, open(f, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     for code, m in hits.items():
+        # 본단지 + 'n단지/n차' 가 실거래에서 한 이름으로 묶인 경우 (예: 'DMC SK VIEW' 644 + 'DMC SK VIEW 2단지' 109 → 실거래 'DMCSKVIEW' 753)
+        for k in list(m.keys()):
+            prs = part[code].get(k) or []
+            best = [x for x in prs if x[0] == lv[code][k]]
+            if len(best) != 1 or len(prs) < 2: continue
+            head = re.sub(r'\d', '', norm(best[0][1]))
+            extra = [x for x in prs if x is not best[0] and x[3] != best[0][3] and digits(x[1]) and not digits(best[0][1])
+                     and re.sub(r'\d+(단지|차)?$', '', norm(x[1])).rstrip('제') == head]
+            if extra:
+                seen[code][k] = {best[0][2]}
+                m[k] = [best[0][2] + sum(x[2] for x in extra)] + m[k][1:]
+                summed.append((code, k, best[0][1], [x[1] for x in extra], m[k][0]))
         m = {k: v for k, v in m.items() if len(seen[code][k]) == 1}          # 서로 다른 세대수로 겹치면 버림
         f = os.path.join(OUTDIR, f'{code}.json'); old = {}
         if os.path.exists(f):
@@ -316,7 +329,7 @@ def main():
         matched += len(m)
     st = {'updated': dt.datetime.now().strftime('%Y-%m-%d %H:%M'), 'file': os.path.basename(path), 'rows': rows, 'matched': matched,
           'regions': len(hits), 'noRegion': nocode, 'unmatched': len(nomatch), 'sample': nomatch[:30],
-          'byStep': {str(k): v for k, v in sorted(stat.items())}}
+          'byStep': {str(k): v for k, v in sorted(stat.items())}, 'summed': len(summed)}
     json.dump(st, open(os.path.join(DATA, 'kapt_file_status.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     print(f"엑셀 {rows}행 → 세대수 연결 {matched}개 단지 ({len(hits)}개 지역) · 지역 못 찾음 {nocode} · 짝 못 지음 {len(nomatch)}")
     if '--keep-latest' in sys.argv:
