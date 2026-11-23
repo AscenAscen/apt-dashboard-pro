@@ -45,6 +45,9 @@ jobs:
 
   deploy:
     name: 사이트 배포
+    concurrency:
+      group: pages-deploy      # 수집·변환 작업들이 동시에 배포하면 서로 부딪힘 → 한 번에 하나씩
+      cancel-in-progress: false
     needs: collect
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -59,5 +62,20 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+      # GitHub 쪽이 잠깐 불안정하면 "No artifacts named github-pages" 오류가 날 수 있어 → 1분 쉬고 한 번, 3분 쉬고 한 번 더 시도
       - id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: 배포 실패 → 1분 뒤 다시 시도
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - id: deployment2
+        if: steps.deployment.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: 또 실패 → 3분 뒤 마지막 시도
+        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
+        run: sleep 180
+      - id: deployment3
+        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         uses: actions/deploy-pages@v4
