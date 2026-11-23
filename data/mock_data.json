@@ -1,0 +1,7 @@
+[
+    { "sido": "경기도", "sigungu": "안양시 동안구", "dong": "비산동", "type": "아파트", "name": "관악성원", "date": "1992-12-14", "totalGen": 654, "typeGen": 320, "area": 84.87, "structure": "계단식", "rooms": 3, "baths": 2 },
+    { "sido": "경기도", "sigungu": "안양시 동안구", "dong": "비산동", "type": "아파트", "name": "비산삼성래미안", "date": "2003-12-29", "totalGen": 3806, "typeGen": 1200, "area": 84.92, "structure": "계단식", "rooms": 3, "baths": 2 },
+    { "sido": "경기도", "sigungu": "안양시 동안구", "dong": "비산동", "type": "아파트", "name": "은하수청구", "date": "1992-11-20", "totalGen": 822, "typeGen": 411, "area": 59.99, "structure": "복도식", "rooms": 2, "baths": 1 },
+    { "sido": "경기도", "sigungu": "안양시 동안구", "dong": "평촌동", "type": "아파트", "name": "향촌롯데", "date": "1993-03-25", "totalGen": 530, "typeGen": 530, "area": 84.96, "structure": "계단식", "rooms": 3, "baths": 2 },
+    { "sido": "대구광역시", "sigungu": "중구", "dong": "남산동", "type": "아파트", "name": "남산역화성파크드림", "date": "2018-09-27", "totalGen": 415, "typeGen": 205, "area": 84.89, "structure": "계단식", "rooms": 3, "baths": 2 }
+]
