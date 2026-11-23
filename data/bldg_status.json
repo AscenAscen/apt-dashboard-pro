@@ -1,0 +1,12 @@
+{
+ "updatedAt": "2026-11-23 13:11",
+ "calls": 1748,
+ "errors": 152,
+ "found": 761,
+ "noRecord": 70,
+ "noCode": 1,
+ "left": 45559,
+ "complexes": 772,
+ "jibunsDone": 832,
+ "stop": "일시 오류로 중단: HTTP Error 503: Service Unavailable"
+}
