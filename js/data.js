@@ -127,7 +127,25 @@ const Data = (() => {
   }
 
   const summary = () => getJson('summary.json', null);
-  const names = () => getJson('names.json', null);          // 전국 단지 이름 목록 (전국 검색용)
+  /* 전국 단지 이름 목록 = 실거래 단지(names.json) + 실거래가 아직 없는 단지(names_extra.json: K-apt·청약홈, scripts/names_extra.py)
+     보충 단지 정보: extraOf(지역코드, 단지키) → { hh, year, ym, src, addr, approx }  (실거래 단지면 null) */
+  let EX = {}, namesP = null;
+  const names = () => namesP || (namesP = Promise.all([getJson('names.json', null), getJson('names_extra.json', null)]).then(([a, x]) => {
+    if (!a || !a.r) return a;
+    EX = (x && x.r) || {};
+    const r = {}; let n = a.n || 0;
+    for (const c of Object.keys(a.r)) r[c] = a.r[c];
+    for (const c of Object.keys(EX)) {
+      const have = new Set(r[c] || []), add = Object.keys(EX[c]).filter(k => !have.has(k));
+      if (add.length) { r[c] = (r[c] || []).concat(add); n += add.length; }
+    }
+    return { ...a, n, r };
+  }));
+  function extraOf(code, key) {
+    const v = EX[code] && EX[code][key]; if (!v) return null;
+    const ym = v[2] === 'k' ? null : v[1];
+    return { hh: v[0] || null, year: v[2] === 'k' ? (v[1] || null) : Math.floor(v[1] / 100), ym, src: v[2], addr: v[3] || '', approx: v[2] === 's1' };
+  }
   /** 단지 정보(세대수 등): { m: {단지키: [세대수, 동수, 단지코드]} } — 아직 못 받은 지역은 빈 값 */
   /** 단지 세대수 등: K-apt(data/kapt) + 건축물대장(data/bldg) 합본.  m[단지키] = [세대수, 동수, 단지코드, 복도유형, 표시]
       · K-apt 값이 먼저. 단, K-apt 가 여러 단지를 한데 묶은 값('g')이면 지번별로 정확한 건축물대장 값으로 바꿈
@@ -135,13 +153,16 @@ const Data = (() => {
   const kaptCache = new Map();
   const kapt = (code) => {
     if (!kaptCache.has(code)) kaptCache.set(code, Promise.all([
-      getJson(`kapt/${code}.json`, { m: {} }), getJson(`bldg/${code}.json`, { m: {} }),
+      getJson(`kapt/${code}.json`, { m: {} }), getJson(`bldg/${code}.json`, { m: {} }), names().catch(() => null),
     ]).then(([k, b]) => {
       const m = Object.assign({}, (k && k.m) || {}), bm = (b && b.m) || {};
       for (const key in bm) {
         const v = bm[key], cur = m[key];
         if (!v || !v[0]) continue;
         if (!cur || !cur[0] || cur[4] === 'g') m[key] = [v[0], v[3] || (cur && cur[1]) || 0, (cur && cur[2]) || '', (cur && cur[3]) || '', 'b'];
+      }
+      for (const key of Object.keys(EX[code] || {})) {             // 실거래 없는 단지 (K-apt·청약홈)
+        const e = extraOf(code, key); if (e && e.hh && !(m[key] && m[key][0])) m[key] = [e.hh, 0, '', '', e.approx ? 'x' : 'e'];
       }
       return { m, b: bm };
     }));
@@ -158,7 +179,7 @@ const Data = (() => {
   const cx = (sd) => getJson(`cx/${sd}.json`, null);   // 단지 요약 (비슷한 단지 찾기용, scripts/cx_summary.py)
   const kaptFile = () => getJson('kapt_file_status.json', null);   // K-apt 엑셀 → 세대수 변환 결과 (scripts/kapt_file.py)
 
-  return { json: getJson, refreshStatus, regions, status, index, loadYears, parseKey, eachTrade, stats, peakTrough, complexTrades, refresh, summary, kapt, vlRat, bldgStatus, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
+  return { json: getJson, refreshStatus, regions, status, index, loadYears, parseKey, eachTrade, stats, peakTrough, complexTrades, refresh, summary, kapt, vlRat, extraOf, bldgStatus, signals, rone, monthly, kbWeekly, extraStatus, kaptFile, cx, names };
 })();
 
 /* ───────────── 공통 도구 ───────────── */

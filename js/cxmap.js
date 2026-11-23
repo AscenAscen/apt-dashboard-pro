@@ -36,7 +36,7 @@ const CxMap = (() => {
     report: { name: '보고서용', v: { ds: 'bar', th: 'navy', s: 1, f: 14, ff: 'suit', em: 'badge' } },
     simple: { name: '간단히 (작게)', v: { ds: 'pill', th: 'navy', s: 0.9, f: 12, ff: '', em: 'badge' } },
   };
-  const NOW_Y = new Date().getFullYear();
+  const NOW_Y = new Date().getFullYear(), NOW_YM = NOW_Y * 100 + new Date().getMonth() + 1;
   const D5 = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); return U.ymd(d); })();
   const D12 = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return U.ymd(d); })();
   const MIN_N5 = 5;                                 // 기본으로 숨기는 기준: 최근 5년 매매 5건 미만
@@ -68,6 +68,8 @@ const CxMap = (() => {
           const p = Data.parseKey(key);
           by.set(key, { id: `${code}|${key}`, code, key, sido: r[1], sgg: r[2], dong: p.dong, jibun: p.jibun, name: p.name,
             year: idx.c[key] || null, hh: (kp.m[key] && kp.m[key][0]) || null, vl: Data.vlRat(kp, key), n5: 0, gs: new Map(), ppa: [0, 0] });
+          const ex = Data.extraOf(code, key), cx = by.get(key);
+          if (ex) { cx.ex = ex; cx.addr = ex.addr; cx.year = cx.year || ex.year; }
         }
         return by.get(key);
       };
@@ -128,7 +130,7 @@ const CxMap = (() => {
     if (st.hide.includes(cx.id) && !st.showHidden) return false;
     const mine = tracked.has(cx.id);
     if (st.mine && !mine) return false;
-    if (!st.showAll && !mine && cx.n5 < MIN_N5) return false;
+    if (!st.showAll && !mine && !cx.ex && cx.n5 < MIN_N5) return false;     // 실거래 없는 신축(cx.ex)은 거래 수와 상관없이 보임
     if (pyFilterOn() && !matchPcs(cx).length) return false;
     const hmin = st.hh === -1 ? +st.hhMin || 0 : st.hh, hmax = st.hh === -1 ? +st.hhMax || 0 : 0;
     if (hmin && (cx.hh || 0) < hmin) return false;
@@ -263,9 +265,9 @@ const CxMap = (() => {
     const t = tipBox(); if (!tip) { t.hidden = true; return; }
     const { cx } = tip, sheet = isTouch();
     const head = `<div class="cxt-h"><b>${U.esc(nameOf(cx))}</b>${cx.alias ? `<small>${U.esc(cx.name)}</small>` : ''}<span class="grow"></span>${tipPin ? '<button class="cxt-x" data-a="close" title="닫기 (Esc)">✕</button>' : ''}</div>
-      <div class="cxt-s">${[cx.year ? `${cx.year}년` : '', cx.hh ? `${cx.hh.toLocaleString()}세대` : '세대수 모름', cx.year ? `${NOW_Y - cx.year}년차` : '', cx.vl ? `용적률 ${Math.round(cx.vl)}%` : '', cx.leader ? '👑 동 대장' : '', cx.isNew ? '🆕 신축' : '', tracked.has(cx.id) ? '⭐ 내 단지' : ''].filter(Boolean).join(' · ')}<br><small>${U.esc(cx.sgg)} ${U.esc(cx.dong)} ${U.esc(cx.jibun)}</small></div>`;
+      <div class="cxt-s">${[cx.year ? `${cx.year}년` : '', cx.hh ? `${cx.hh.toLocaleString()}세대${cx.ex && cx.ex.approx ? '(일반분양)' : ''}` : '세대수 모름', cx.year ? `${NOW_Y - cx.year}년차` : '', cx.ex ? (cx.ex.ym ? `🆕 ${String(cx.ex.ym).slice(2, 4)}.${String(cx.ex.ym).slice(4)} 입주${cx.ex.ym > NOW_YM ? ' 예정' : ''}` : '실거래 없음') : '', cx.vl ? `용적률 ${Math.round(cx.vl)}%` : '', cx.leader ? '👑 동 대장' : '', cx.isNew ? '🆕 신축' : '', tracked.has(cx.id) ? '⭐ 내 단지' : ''].filter(Boolean).join(' · ')}<br><small>${U.esc(cx.sgg)} ${U.esc(cx.dong)} ${U.esc(cx.jibun)}</small></div>`;
     let body = '';
-    if (!cx.pcs.length) body = '<p class="cxt-none">2020년 이후 거래가 없습니다.</p>';
+    if (!cx.pcs.length) body = `<p class="cxt-none">${cx.ex ? '아직 실거래가 없는 단지입니다 (K-apt·청약홈 목록에서 보충).' : '2020년 이후 거래가 없습니다.'}</p>`;
     else if (ls.tip === 'B') body = tableB(cx);
     else body = viewA(cx, tip.pc);
     const btns = `<div class="cxt-b"><button data-a="cx">단지 요약</button><button data-a="search">실거래</button><button data-a="trk">${tracked.has(cx.id) ? '⭐ 담김' : '☆ 시세트래킹'}</button><button data-a="naver">네이버 부동산</button>${typeof View3D !== 'undefined' ? '<button data-a="v3d" title="이 단지를 3D 탭에서 보기">3D</button>' : ''}<button data-a="hide" title="이 단지를 지도에서 숨김 (조건 줄에서 다시 보기)">${st.hide.includes(cx.id) ? '다시 보이기' : '숨기기'}</button></div>`;

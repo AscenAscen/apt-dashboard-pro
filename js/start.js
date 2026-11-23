@@ -14,8 +14,8 @@ const Start = (() => {
   const PYC = [['s', '소형'], ['59', '59'], ['74', '74'], ['84', '84'], ['L', '대형']];
   const PYN = Object.fromEntries(PYC);
   const PY_PICK = ['59', '74', '84'];
-  const DEF = { codes: [], view: null, mode: 'basic', trk: 0, pys: [], hh: 300, age: 0, tip: 'A', layers: {}, other: 0, autoLv: 3 };
-  const NOW_Y = new Date().getFullYear();
+  const DEF = { codes: [], view: null, mode: 'basic', trk: 0, pys: [], hh: 300, unk: 1, age: 0, tip: 'A', layers: {}, other: 0, autoLv: 3 };
+  const NOW_Y = new Date().getFullYear(), NOW_YM = NOW_Y * 100 + new Date().getMonth() + 1;
   const D5 = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); return U.ymd(d); })();
   const MAX_REG = 6;                                   // 한 번에 불러 두는 시군구 수 (넘으면 오래된 것부터 내림)
   const TRK_FOLDER = '지도 추가';                       // 지도에서 담은 단지는 이 시세트래킹 폴더로
@@ -60,6 +60,8 @@ const Start = (() => {
           const p = Data.parseKey(key);
           by.set(key, { id: `${code}|${key}`, code, key, sido: r[1], sgg: r[2], dong: p.dong, jibun: p.jibun, name: p.name,
             year: idx.c[key] || null, hh: (kp.m[key] && kp.m[key][0]) || null, vl: Data.vlRat(kp, key), n5: 0, gs: new Map() });
+          const ex = Data.extraOf(code, key), cx = by.get(key);
+          if (ex) { cx.ex = ex; cx.addr = ex.addr; cx.year = cx.year || ex.year; }
         }
         return by.get(key);
       };
@@ -99,7 +101,8 @@ const Start = (() => {
     if (forced.has(cx.id)) return true;
     if (st.trk && !isEmph(cx)) return false;
     if (st.pys.length && !cx.pcs.some(pc => st.pys.includes(pc))) return false;
-    if (st.hh && (cx.hh || 0) < st.hh) return false;
+    if (st.hh && !cx.hh) { if (!st.unk) return false; }          // 세대수 모르는 단지: 숨기지 않고 흐리게 (필터 → 체크 해제하면 숨김)
+    else if (st.hh && cx.hh < st.hh) return false;
     if (st.age && (!cx.year || NOW_Y - cx.year > st.age)) return false;
     return true;
   }
@@ -135,6 +138,8 @@ const Start = (() => {
       o = { ov, el }; ovs.set(cx.id, o);
     }
     LabelKit.render(o.el, 'start', labelData(cx));
+    o.el.style.opacity = st.hh && !cx.hh ? '0.5' : '';                 // 세대수 모름 → 흐리게
+    o.el.title = st.hh && !cx.hh ? '세대수 모름 (필터에서 숨길 수 있음)' : '';
     if (!o.ov.getMap()) o.ov.setMap(map);
   }
   /** 라벨 설정·짧은 이름이 바뀌면 보이는 라벨만 다시 그림 */
@@ -216,9 +221,9 @@ const Start = (() => {
     const t = tipBox(); if (!tip) { t.hidden = true; return; }
     const { cx } = tip, sheet = isTouch();
     const head = `<div class="cxt-h"><b>${U.esc(nameOf(cx))}</b>${cx.alias ? `<small>${U.esc(cx.name)}</small>` : ''}<span class="grow"></span>${tipPin ? '<button class="cxt-x" data-a="close" title="닫기 (Esc)">✕</button>' : ''}</div>
-      <div class="cxt-s">${[cx.year ? `${cx.year}년` : '', cx.hh ? `${cx.hh.toLocaleString()}세대` : '세대수 모름', cx.year ? `${NOW_Y - cx.year}년차` : '', cx.vl ? `용적률 ${Math.round(cx.vl)}%` : '', lands.has(cx.id) ? '🏛 랜드마크' : '', tracked.has(cx.id) ? '⭐ 시세트래킹' : ''].filter(Boolean).join(' · ')}<br><small>${U.esc(cx.sgg)} ${U.esc(cx.dong)} ${U.esc(cx.jibun)}</small></div>`;
+      <div class="cxt-s">${[cx.year ? `${cx.year}년` : '', cx.hh ? `${cx.hh.toLocaleString()}세대${cx.ex && cx.ex.approx ? '(일반분양)' : ''}` : '세대수 모름', cx.year ? `${NOW_Y - cx.year}년차` : '', cx.ex ? (cx.ex.ym ? `🆕 ${String(cx.ex.ym).slice(2, 4)}.${String(cx.ex.ym).slice(4)} 입주${cx.ex.ym > NOW_YM ? ' 예정' : ''}` : '실거래 없음') : '', cx.vl ? `용적률 ${Math.round(cx.vl)}%` : '', lands.has(cx.id) ? '🏛 랜드마크' : '', tracked.has(cx.id) ? '⭐ 시세트래킹' : ''].filter(Boolean).join(' · ')}<br><small>${U.esc(cx.sgg)} ${U.esc(cx.dong)} ${U.esc(cx.jibun)}</small></div>`;
     let body = '';
-    if (!cx.pcs.length) body = '<p class="cxt-none">2020년 이후 거래가 없습니다.</p>';
+    if (!cx.pcs.length) body = `<p class="cxt-none">${cx.ex ? '아직 실거래가 없는 단지입니다 (K-apt·청약홈 목록에서 보충).' : '2020년 이후 거래가 없습니다.'}</p>`;
     else if (st.tip === 'B') body = tableB(cx);
     else body = viewA(cx, tip.pc);
     const inB = basket.some(b => b.id === cx.id);
@@ -810,6 +815,7 @@ const Start = (() => {
     } else if (pop === 'filter') {
       h = `<div class="st-ph"><b>필터</b><span class="grow"></span><button class="mini" data-close>✕</button></div>
         <div class="st-sub">세대수</div>${seg('hh', [[0, '전체'], [200, '200↑'], [300, '300↑'], [500, '500↑'], [1000, '1,000↑']], st.hh)}
+        <label class="inline"><input type="checkbox" id="stUnk" ${st.unk ? 'checked' : ''}> 세대수 모르는 단지도 흐리게 보기</label>
         <div class="st-sub">연식</div>${seg('age', [[0, '전체'], [5, '5년↓'], [10, '10년↓'], [20, '20년↓'], [30, '30년↓']], st.age)}
         <div class="st-sub">마우스 올렸을 때 창</div>${seg('tip', [['A', 'A 한 평형씩'], ['B', 'B 평형별 표']], st.tip)}
         <div class="st-sub">단지 경계 자동 표시 <small>(지도를 이만큼 확대하면 화면 안 단지 경계가 저절로)</small></div>${seg('aol', [[0, '끄기'], [2, '많이 확대'], [3, '확대 (기본)'], [4, '조금 확대']], st.autoLv)}
@@ -836,6 +842,7 @@ const Start = (() => {
   }
   function onPopChange(e) {
     if (e.target.id === 'stSido') { $('stPop').dataset.sido = e.target.value; return renderPop(); }
+    if (e.target.id === 'stUnk') { st.unk = e.target.checked ? 1 : 0; save(); redraw(); return; }
     if (e.target.id === 'stOther2') { st.other = e.target.checked ? 1 : 0; save(); olBox(); olRestyle(); }
   }
 

@@ -36,6 +36,8 @@ const KMap = (() => {
     const addr = (q) => new Promise(res => new S.Geocoder().addressSearch(q, (list, st) => res(st === S.Status.OK && list.length ? { lat: +list[0].y, lng: +list[0].x } : null)));
     const word = (q) => new Promise(res => new S.Places().keywordSearch(q, (list, st) => res(st === S.Status.OK && list.length ? { lat: +list[0].y, lng: +list[0].x } : null)));
     let p = r.jibun ? await addr(`${r.sido} ${r.sgg} ${r.dong} ${r.jibun}`) : null, exact = true;
+    const ea = r.addr || (typeof Data !== 'undefined' && Data.extraOf ? (Data.extraOf(r.code, r.key) || {}).addr : '');
+    if (!p && ea) p = await addr(String(ea).replace(/번지.*$/, '').replace(/\s*(일원|일대|외\s*\d+필지).*$/, '').trim());   // 실거래 없는 단지: K-apt·청약홈 주소
     if (!p) p = await word(`${r.sgg} ${r.dong} ${r.name}`);
     if (!p) { p = await addr(`${r.sido} ${r.sgg} ${r.dong}`); exact = false; }
     if (p) { p.exact = exact; geoMemo.set(id, p); }
