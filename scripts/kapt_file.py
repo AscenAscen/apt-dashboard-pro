@@ -136,7 +136,7 @@ def rel(a, b):
        번호는 빼고 비교합니다 (번호가 맞는지는 num_ok 가 따로 봄: '두산2.3차' ↔ '두산3')"""
     a, b = re.sub(r'\d+', '', a or ''), re.sub(r'\d+', '', b or '')
     if len(a) < 2 or len(b) < 2: return 0
-    if a == b: return 3
+    if a == b: return 3 if len(a) >= 3 else 2                    # '한신'·'현대'처럼 짧은 이름은 같아도 '같은 단지'로 확신하지 않음
     if min(len(a), len(b)) >= 3 and (a in b or b in a): return 2
     return 0
 
@@ -202,9 +202,10 @@ def choose(r, cands, years, jibs, st):
     a = [k for k in pj if R(k) >= 2]
     if a:
         best = max(R(k) for k in a); a = one([k for k in a if R(k) == best])
-        if a: return 1, a
+        # K-apt 이름에만 번호가 있으면('DMC SK VIEW 2단지' ↔ 실거래 'DMCSKVIEW') 단지 일부일 수 있음 → 이름이 똑같은 K-apt 줄이 있으면 그쪽이 이기도록 낮은 단계로
+        if a: return (3 if best < 3 and kd and not any(tdigits(nm_of(k)) for k in a) else 1), a
     # 2단계: 같은 동에서 이름이 똑같음
-    b = [k for k in cands if R(k) == 3 and yok(k)]
+    b = [k for k in cands if R(k) == 3 and yok(k, 3)]              # 이름이 똑같으면 연식은 3년 차이까지 (신축은 실거래 연식과 K-apt 사용승인일이 2~3년 다를 때가 많음)
     b = one(b) if b else None
     if b: return 2, b
     # 3단계: 같은 지번에 단지가 하나뿐 (이름이 달라도 — 예: 이름이 바뀐 단지)
