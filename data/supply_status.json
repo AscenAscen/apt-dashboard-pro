@@ -1,9 +1,8 @@
 {
- "asOf": "2026-11-23 05:02",
+ "asOf": "2026-11-24 17:25",
  "ok": true,
  "errors": [],
  "notes": [
-  "예전에 지역을 못 찾은 공고 377건을 다시 맞췄습니다.",
   "지역을 찾지 못한 주소 1건 (예: 세종특별자치시 다솜동 5204-1번지 일원(행정중심복합도시 5-2생활권 S1BL))"
  ],
  "fields": {
@@ -57,37 +56,6 @@
    "SUBSCRPT_AREA_CODE",
    "SUBSCRPT_AREA_CODE_NM",
    "TOT_SUPLY_HSHLDCO"
-  ],
-  "model": [
-   "ETC_HSHLDCO",
-   "HOUSE_MANAGE_NO",
-   "HOUSE_TY",
-   "INSTT_RECOMEND_HSHLDCO",
-   "LFE_FRST_HSHLDCO",
-   "LTTOT_TOP_AMOUNT",
-   "MNYCH_HSHLDCO",
-   "MODEL_NO",
-   "NWBB_HSHLDCO",
-   "NWWDS_HSHLDCO",
-   "OLD_PARNTS_SUPORT_HSHLDCO",
-   "PBLANC_NO",
-   "SPSPLY_HSHLDCO",
-   "SUPLY_AR",
-   "SUPLY_HSHLDCO",
-   "TRANSR_INSTT_ENFSN_HSHLDCO",
-   "YGMN_HSHLDCO"
-  ],
-  "cmp": [
-   "CMPET_RATE",
-   "HOUSE_MANAGE_NO",
-   "HOUSE_TY",
-   "MODEL_NO",
-   "PBLANC_NO",
-   "REQ_CNT",
-   "RESIDE_SECD",
-   "RESIDE_SENM",
-   "SUBSCRPT_RANK_CODE",
-   "SUPLY_HSHLDCO"
   ]
  },
  "sample": {
@@ -132,44 +100,12 @@
    "PUBLIC_HOUSE_SPCLW_APPLC_AT": "Y",
    "RCEPT_BGNDE": "2026-11-30",
    "RCEPT_ENDDE": "2026-12-02"
-  },
-  "model": {
-   "ETC_HSHLDCO": 0,
-   "HOUSE_MANAGE_NO": "2026000510",
-   "HOUSE_TY": "059.9795A",
-   "INSTT_RECOMEND_HSHLDCO": 2,
-   "LFE_FRST_HSHLDCO": 2,
-   "LTTOT_TOP_AMOUNT": "65357",
-   "MNYCH_HSHLDCO": 13,
-   "MODEL_NO": "01",
-   "NWBB_HSHLDCO": 1,
-   "NWWDS_HSHLDCO": 20,
-   "OLD_PARNTS_SUPORT_HSHLDCO": 1,
-   "PBLANC_NO": "2026000510",
-   "SPSPLY_HSHLDCO": 39,
-   "SUPLY_AR": "80.9874",
-   "SUPLY_HSHLDCO": 5,
-   "TRANSR_INSTT_ENFSN_HSHLDCO": 0,
-   "YGMN_HSHLDCO": 0
-  },
-  "cmp": {
-   "CMPET_RATE": "4.50",
-   "HOUSE_MANAGE_NO": "2026000434",
-   "HOUSE_TY": "049.5837A",
-   "MODEL_NO": "01",
-   "PBLANC_NO": "2026000434",
-   "REQ_CNT": "9",
-   "RESIDE_SECD": "01",
-   "RESIDE_SENM": "해당지역",
-   "SUBSCRPT_RANK_CODE": 1,
-   "SUPLY_HSHLDCO": 2
   }
  },
- "since": "2026-07-16",
- "newItems": 11,
+ "since": "2026-07-23",
+ "newItems": 0,
  "unmatched": 1,
- "models": 47,
- "cmp": 5,
- "calls": 56,
+ "cmp": 0,
+ "calls": 39,
  "items": 2954
 }
