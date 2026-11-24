@@ -1,12 +1,12 @@
 {
- "updatedAt": "2026-11-24 04:50",
- "calls": 7129,
- "errors": 219,
- "found": 3382,
- "noRecord": 203,
+ "updatedAt": "2026-11-24 18:30",
+ "calls": 3322,
+ "errors": 152,
+ "found": 1522,
+ "noRecord": 137,
  "noCode": 3,
- "left": 41968,
- "complexes": 4194,
- "jibunsDone": 4426,
- "stop": "시간 한도(150분) 도달"
+ "left": 40387,
+ "complexes": 5737,
+ "jibunsDone": 6088,
+ "stop": "일시 오류로 중단: HTTP Error 503: Service Unavailable"
 }
