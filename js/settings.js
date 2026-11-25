@@ -25,7 +25,7 @@ const Settings = (() => {
   function closePop() { if (popEl) popEl.hidden = true; if (moreEl) moreEl.classList.remove('open'); }
   function fillPop() {
     const nm = names(), c = curTab();
-    popEl.innerHTML = order.filter(id => hidden.has(id)).map(id => `<button data-go="${id}" class="${id === c ? 'on' : ''}">${U.esc(nm.get(id) || id)}</button>`).join('');
+    popEl.innerHTML = order.filter(id => hidden.has(id)).map(id => `<span class="mp"><button data-go="${id}" class="${id === c ? 'on' : ''}">${U.esc(nm.get(id) || id)}</button><button data-pin="${id}" class="pin" title="위쪽 메뉴로 꺼내기" aria-label="${U.esc(nm.get(id) || id)} 위쪽 메뉴로 꺼내기">📌</button></span>`).join('') + '<p class="hint mphint">📌 를 누르면 위쪽 메뉴로 나갑니다</p>';
   }
   function togglePop() {
     if (!popEl.hidden) return closePop();
@@ -43,7 +43,11 @@ const Settings = (() => {
     nav().appendChild(moreEl);
     popEl = document.createElement('div'); popEl.id = 'tabMorePop'; popEl.className = 'tabmorepop'; popEl.hidden = true;
     document.body.appendChild(popEl);
-    popEl.onclick = (e) => { const b = e.target.closest('[data-go]'); if (!b) return; closePop(); App.showTab(b.dataset.go); };
+    popEl.onclick = (e) => {
+      const pin = e.target.closest('[data-pin]');
+      if (pin) { move(pin.dataset.pin, false); fillPop(); U.toast('위쪽 메뉴로 꺼냈습니다.'); if (!order.some(id => hidden.has(id))) closePop(); return; }
+      const b = e.target.closest('[data-go]'); if (!b) return; closePop(); App.showTab(b.dataset.go);
+    };
     document.addEventListener('click', (e) => { if (!popEl.hidden && !popEl.contains(e.target) && !moreEl.contains(e.target)) closePop(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); });
     window.addEventListener('resize', closePop);
@@ -89,8 +93,43 @@ const Settings = (() => {
     box.innerHTML = `<div class="tabgrph">위쪽 메뉴 (${top.length}개) — 체크 켜짐</div>${top.map(id => row(id, top)).join('')}` +
       `<div class="tabgrph">더보기 (${more.length}개) — 체크 꺼짐</div>${more.length ? more.map(id => row(id, more)).join('') : '<p class="hint" style="margin:4px">없음</p>'}`;
   }
+  /** 탭을 더보기(toMore=true)로 보내거나 위쪽 메뉴로 꺼냄 — 옮겨 간 목록의 맨 끝에 놓음 (설정 탭은 항상 위쪽) */
+  function move(id, toMore) {
+    if (id === 'guide') return;
+    if (toMore) hidden.add(id); else hidden.delete(id);
+    order = order.filter(x => x !== id);
+    const dest = order.filter(x => hidden.has(x) === hidden.has(id));
+    order.splice(dest.length ? order.indexOf(dest[dest.length - 1]) + 1 : order.length, 0, id);
+    save(); apply(); renderTabs();
+  }
+  /** 위쪽 메뉴의 탭을 오른쪽 클릭(PC) 하거나 길게 누르면(휴대폰) [더보기로 보내기] 작은 창 */
+  function initCtx() {
+    const n = nav(); let menu = null, timer = 0, swallow = 0;
+    const close = () => { if (menu) { menu.remove(); menu = null; } };
+    const open = (btn, x, y) => {
+      const id = btn.dataset.tab; if (id === 'guide' || hidden.has(id)) return;
+      close();
+      menu = document.createElement('div'); menu.className = 'tabctx';
+      menu.innerHTML = `<button type="button">📥 [${U.esc(names().get(id) || id)}] 더보기로 보내기</button>`;
+      menu.firstChild.onclick = () => { close(); move(id, true); U.toast('더보기로 보냈습니다. 되돌리려면 더보기에서 📌 를 누르세요.'); };
+      document.body.appendChild(menu);
+      menu.style.left = Math.max(8, Math.min(x, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+      menu.style.top = Math.min(y + 8, window.innerHeight - menu.offsetHeight - 8) + 'px';
+    };
+    n.addEventListener('contextmenu', (e) => { const b = e.target.closest('button[data-tab]'); if (!b || b.dataset.tab === 'guide') return; e.preventDefault(); open(b, e.clientX, e.clientY); });
+    n.addEventListener('touchstart', (e) => {
+      const b = e.target.closest('button[data-tab]'); if (!b || b.dataset.tab === 'guide') return;
+      const t = e.touches[0]; clearTimeout(timer);
+      timer = setTimeout(() => { swallow = Date.now(); open(b, t.clientX, t.clientY); }, 550);
+    }, { passive: true });
+    ['touchend', 'touchmove', 'touchcancel'].forEach(ev => n.addEventListener(ev, () => clearTimeout(timer), { passive: true }));
+    n.addEventListener('click', (e) => { if (Date.now() - swallow < 700) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // 길게 누른 뒤 따라오는 탭 전환 막기
+    document.addEventListener('click', (e) => { if (menu && !menu.contains(e.target)) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+    window.addEventListener('resize', close);
+  }
   function initTabs() {
-    load(); apply(); renderTabs();
+    load(); apply(); renderTabs(); initCtx();
     const box = $('tabSettings'); if (!box) return;
     box.onclick = (e) => {
       const row = e.target.closest('.tabrow'); if (!row) return;
@@ -104,11 +143,7 @@ const Settings = (() => {
     box.onchange = (e) => {
       if (!e.target.matches('[data-vis]')) return;
       const id = e.target.closest('.tabrow').dataset.id;
-      if (e.target.checked) hidden.delete(id); else hidden.add(id);
-      order = order.filter(x => x !== id);                                      // 옮겨 간 목록의 맨 끝에 놓음
-      const dest = order.filter(x => hidden.has(x) === hidden.has(id));
-      order.splice(dest.length ? order.indexOf(dest[dest.length - 1]) + 1 : order.length, 0, id);
-      save(); apply(); renderTabs();
+      move(id, !e.target.checked);
     };
     $('btnTabsReset').onclick = () => { Store.set(TKEY, {}); load(); apply(); renderTabs(); U.toast('메뉴를 처음 상태로 되돌렸습니다.'); };
   }

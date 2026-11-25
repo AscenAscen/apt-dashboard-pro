@@ -15,15 +15,19 @@ const YardMap = (() => {
   const KEY = 'apt.yardmap.v1', UKEY = 'apt.yardmapUi.v1';
   const DBL = 280, LONG = 550;                       // 두 번 누르기 간격 · 길게 누르기 시간 (ms)
   const SIDO = { 서울: '서울특별시', 경기: '경기도', 인천: '인천광역시', 부산: '부산광역시', 대구: '대구광역시', 광주: '광주광역시', 대전: '대전광역시', 울산: '울산광역시',
-    경남: '경상남도', 충북: '충청북도', 충남: '충청남도', 전북: '전북특별자치도', 경북: '경상북도', 강원: '강원특별자치도', 세종: '세종특별자치시', 전남: '전라남도' };
+    경남: '경상남도', 충북: '충청북도', 충남: '충청남도', 전북: '전북특별자치도', 경북: '경상북도', 강원: '강원특별자치도', 세종: '세종특별자치시', 전남: '전라남도', 제주: '제주특별자치도' };
   // 급지 색 (박스 테두리·켜졌을 때 색) — 이미지의 빨강·노랑·초록·파랑·보라
-  const TIERS = [{ k: '', name: '색 없음', c: '' }, { k: 'r', name: '빨강', c: '#e02020' }, { k: 'y', name: '노랑', c: '#f5b400' }, { k: 'g', name: '초록', c: '#16a34a' },
-    { k: 'b', name: '파랑', c: '#2563eb' }, { k: 'p', name: '보라', c: '#7c3aed' }];
+  const TIERS = [{ k: '', name: '색 없음', c: '' }, { k: 'r', name: '빨강', c: '#e5484d' }, { k: 'y', name: '노랑', c: '#f5a524' }, { k: 'g', name: '초록', c: '#30a46c' },
+    { k: 'b', name: '파랑', c: '#3e63dd' }, { k: 'p', name: '보라', c: '#8e4ec6' }];
+  const GC = { '#c00000': '#d6453d', '#ffc000': '#e0a21a', '#00b050': '#2f9e6b', '#0070c0': '#3b72d9', '#7030a0': '#8453b8' };   // 권역 제목 막대: 채도 낮춘 색
   const tierC = (k) => (TIERS.find(t => t.k === k) || TIERS[0]).c;
 
   /* ═════════ 처음 구성 (보내 주신 판 그대로 — 행정구역 기준) ═════════ */
   const bid = (sido, sgg) => `${sido}|${sgg}`;
   const B = (s, g, o = {}) => ({ id: bid(SIDO[s], g), sido: SIDO[s], sgg: g, name: o.n || g, t: o.t || '', on: o.on ? 1 : 0, city: o.city || '', pop: o.pop || 0 });
+  /** 50만 미만에 새로 넣은 후보 (꺼진 상태로 시작) */
+  const EXTRA_SMALL = () => [['제주', '제주시', 48], ['경북', '경산시', 26], ['경북', '경주시', 24], ['경남', '거제시', 23], ['강원', '강릉시', 21], ['충북', '충주시', 21],
+    ['제주', '서귀포시', 18], ['충남', '당진시', 17], ['충남', '서산시', 17], ['경북', '안동시', 15]].map(x => B(x[0], x[1], { pop: x[2] }));
   function seed() {
     const seoul = [['강남구', 'r', 1], ['서초구', 'r', 1], ['용산구', 'r', 1], ['송파구', 'r'], ['성동구', 'y'], ['양천구', 'y'], ['광진구', 'y'], ['마포구', 'y'],
       ['종로구', 'g'], ['영등포구', 'g'], ['강동구', 'g'], ['동작구', 'g'], ['중구', 'g'], ['서대문구', 'b'], ['강서구', 'b'], ['동대문구', 'b'], ['은평구', 'b'], ['성북구', 'b'], ['관악구', 'b'],
@@ -55,7 +59,7 @@ const YardMap = (() => {
       { id: 'small', name: '50만 미만', color: '#7030a0', col: 7, boxes: [
         ...cb('경북', '포항', '포항시', ['남구', '북구']),
         B('경북', '구미시', { pop: 40 }), B('세종', '세종시', { pop: 38 }), B('강원', '원주시', { pop: 36 }), B('경남', '양산시', { pop: 35 }), B('충남', '아산시', { pop: 35 }),
-        B('경남', '진주시', { pop: 34 }), B('강원', '춘천시', { pop: 28 }), B('전남', '순천시', { pop: 27 }), B('전남', '여수시', { pop: 27 }), B('전북', '익산시', { pop: 26 }), B('전북', '군산시', { pop: 25 })],
+        B('경남', '진주시', { pop: 34 }), B('강원', '춘천시', { pop: 28 }), B('전남', '순천시', { pop: 27 }), B('전남', '여수시', { pop: 27 }), B('전북', '익산시', { pop: 26 }), B('전북', '군산시', { pop: 25 }), ...EXTRA_SMALL()],
       cities: { 포항: { pop: 49 } } },
     ];
   }
@@ -63,7 +67,16 @@ const YardMap = (() => {
   /* ═════════ 상태 ═════════ */
   let st = null, ui = {}, regsAll = [], regs = new Map(), popData = null;
   let inited = false, edit = false;
-  const load = () => { const s = Store.get(KEY, null); return s && Array.isArray(s.groups) && s.groups.length ? s : { v: 1, groups: seed() }; };
+  const load = () => {
+    const s = Store.get(KEY, null);
+    if (!(s && Array.isArray(s.groups) && s.groups.length)) return { v: 2, groups: seed() };
+    if ((s.v || 1) < 2) {                                   // 예전에 저장한 판에도 새 후보(50만 미만)를 꺼진 상태로 덧붙임
+      const g = s.groups.find(x => x.id === 'small');
+      if (g) EXTRA_SMALL().forEach(b => { if (!g.boxes.some(x => x.id === b.id)) g.boxes.push(b); });
+      s.v = 2; Store.set(KEY, s);
+    }
+    return s;
+  };
   const save = () => Store.set(KEY, st);
   const saveUi = () => Store.set(UKEY, ui);
   const locked = () => { if (typeof Vault !== 'undefined' && Vault.isLocked()) { U.toast('잠금 상태입니다. 오른쪽 위 [잠금]을 풀면 고칠 수 있습니다.'); return true; } return false; };
@@ -110,7 +123,7 @@ const YardMap = (() => {
   }
   function groupHtml(g) {
     const on = g.boxes.filter(b => b.on).length, p = popOf(g), open = isOpen(g);
-    return `<section class="ym-grp${open ? ' open' : ''}" data-g="${esc(g.id)}" style="--gc:${g.color}">
+    return `<section class="ym-grp${open ? ' open' : ''}" data-g="${esc(g.id)}" style="--gc:${GC[g.color] || g.color}">
       <header class="ym-gh" data-gh><span class="ym-gt"><b>${esc(g.name)}</b>${p ? ` <span>(${p.toLocaleString()})</span>` : ''}</span><span class="ym-gc">(${on} / ${g.boxes.length})</span><i class="ym-chev">▾</i></header>
       <div class="ym-gb${g.rows ? ' multi' : ''}" ${g.rows ? `style="--rows:${g.rows}"` : ''}>${boxesHtml(g)}</div></section>`;
   }
