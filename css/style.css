@@ -57,6 +57,18 @@ html, body { margin: 0; background: var(--bg); color: var(--text);
 .tab:not([hidden]) { animation: tabIn .2s ease-out; }
 @keyframes tabIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .tab:not([hidden]) { animation: none; } .tabs button { transition: none; } }
+.tabs button[data-more] { display: none; }
+/* [더보기] 단추(버튼이 아닌 a 태그)와 목록 */
+.tabs .tabmore { cursor: pointer; border: 1px solid var(--line); color: var(--sub); padding: 6px 13px; border-radius: 999px; font-size: 14px; font-weight: 600; white-space: nowrap; user-select: none; -webkit-tap-highlight-color: transparent; }
+.tabs .tabmore:hover, .tabs .tabmore.open { color: var(--text); background: var(--hover); }
+.tabs .tabmore.on { color: var(--on-accent); background: var(--accent); border-color: var(--accent); font-weight: 700; }
+.tabs .tabmore small { font-size: 10px; }
+.tabmorepop { position: fixed; z-index: 40; max-width: min(92vw, 520px); max-height: 70vh; overflow: auto; display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.tabmorepop[hidden] { display: none; }
+.tabmorepop button { background: none; border: 1px solid var(--line); color: var(--text); padding: 7px 13px; border-radius: 999px; font-size: 14px; font-weight: 600; min-height: 36px; }
+.tabmorepop button:hover { background: var(--hover); }
+.tabmorepop button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+@media (max-width: 760px) { .tabs .tabmore { flex: none; position: sticky; right: 0; background: var(--bg); box-shadow: -10px 0 8px var(--bg); } .tabmorepop { left: 8px !important; right: 8px; max-width: none; } }
 .tabgrph { margin: 12px 0 2px; font-size: 12px; font-weight: 800; color: var(--accent); }
 .tabgrph:first-child { margin-top: 0; }
 .badge { background: var(--accent); color: var(--on-accent); border-radius: 10px; padding: 0 7px; font-size: 12px; font-weight: 700; }
