@@ -1226,9 +1226,11 @@ td.yd-rc a { font-weight: 600; }
 .warn-hint { color: var(--rent); }
 #tab-yard .modalbox { max-height: 92vh; overflow: auto; }
 /* 앞마당: 픽(후보)·회색·입력칸 */
-#ydTable tr.yd-grey td, #ydETable tr.yd-grey td { opacity: .45; }
-#ydTable tr.yd-grey td:first-child, #ydTable tr.yd-grey td:nth-child(2), #ydTable tr.yd-grey:hover td { opacity: 1; }
-#ydTable tr.yd-grey:hover td { opacity: .85; }
+/* 픽한 단지는 옅은 배경으로 강조 (1등은 기존 주황색 유지). 흐리게 보기는 [픽 안 한 단지 흐리게]를 켰을 때만 — 시세 입력 창은 흐리게 하지 않음 */
+#ydTable tr.yd-pk:not(.yd-picked) td, #ydETable tr.yd-pk td { background: rgba(79, 156, 255, .10); }
+#ydTable.yd-dim tr.yd-grey td { opacity: .45; }
+#ydTable.yd-dim tr.yd-grey td:first-child, #ydTable.yd-dim tr.yd-grey td:nth-child(2), #ydTable.yd-dim tr.yd-grey:hover td { opacity: 1; }
+#ydTable.yd-dim tr.yd-grey:hover td { opacity: .85; }
 #ydTable tr.yd-pk td.yd-nm a, #ydETable tr.yd-pk td a { font-weight: 700; }
 .yd-ck { color: var(--accent); margin-right: 4px; }
 button.yd-tick { border: 1px solid var(--line); background: none; border-radius: 6px; font-size: 14px; line-height: 1; padding: 3px 7px; cursor: pointer; color: var(--sub); }
