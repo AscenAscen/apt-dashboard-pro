@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────
-   autosync.js — 자동 동기화 (PC ↔ 휴대폰): 시세트래킹 + 앞마당 기록 + 지도 라벨(설정·짧은 이름·숨김·강조)
+   autosync.js — 자동 동기화 (PC ↔ 휴대폰): 시세트래킹 + 1등뽑기 기록 + 앞마당 지역 판 + 지도 라벨(설정·짧은 이름·숨김·강조)
    · 저장소·토큰은 기존 [올리기/내려받기] 동기화(js/sync.js)와 같은 값을 씀 (나만 보는 비공개 GitHub 저장소)
    · 파일: 그 저장소의 sync/apt-autosync.json  (기존 전체 백업 파일 sync/apt-backup.json 과 따로)
    · 열 때 · 다른 앱 보다가 돌아올 때 · 5분마다 → 받아서 합침 / 고치면 30초 뒤 → 받아서 합친 뒤 올림
@@ -13,9 +13,10 @@ const AutoSync = (() => {
   const CFG = 'autosync.cfg', BASE = 'autosync.base', PATH = 'sync/apt-autosync.json', GH = 'apt.sync.v1';
   const TRK = ['apt.tracking.v1', 'apt.folders.v1', 'apt.trkMonths.v1', 'apt.survey.v1'];     // 시세트래킹이 한꺼번에 저장하는 값
   const TRK_ETC = ['apt.trkPins.v1'];                                                          // 고정한 폴더
-  const YARD = ['apt.yard.v1', 'apt.yardSurveys.v1', 'apt.yardPicks.v1', 'apt.yardOpts.v1'];   // 앞마당
+  const YARD = ['apt.yard.v1', 'apt.yardSurveys.v1', 'apt.yardPicks.v1', 'apt.yardOpts.v1'];   // 1등뽑기
+  const YM = ['apt.yardmap.v1'];                                                                 // 앞마당 지역 판 (켜짐 상태·급지 색·추가한 지역)
   const LBL = ['apt.labels.v1', 'apt.labelEdits.v1', 'apt.labelPresets.v1', 'apt.olFix.v1'];   // + 홈 단지 경계에서 손으로 고친 필지                  // 지도 라벨 설정·짧은 이름·숨김·강조 (js/labelkit.js)
-  const KEYS = [...TRK, ...TRK_ETC, ...YARD, ...LBL];
+  const KEYS = [...TRK, ...TRK_ETC, ...YARD, ...YM, ...LBL];
   const DELAY = 30000, POLL = 10000, REMOTE_EVERY = 5 * 60000, MIN_GAP = 15000;
   let cfg = { on: 1, last: 0 }, busy = false, again = false, lastTry = 0, err = '', dirtyTimer = null, retryTimer = null, localHash = '', inited = false;
 
@@ -91,8 +92,9 @@ const AutoSync = (() => {
     }
     if (chg(TRK_ETC)) { TRK_ETC.forEach(put); n++; }
     if (chg(YARD)) { YARD.forEach(put); if (typeof Yard !== 'undefined' && Yard.reload) Yard.reload(); n++; }
+    if (chg(YM)) { YM.forEach(put); if (typeof YardMap !== 'undefined' && YardMap.reload) YardMap.reload(); n++; }
     if (chg(LBL)) { LBL.forEach(put); if (typeof LabelKit !== 'undefined') LabelKit.reload(); n++; }
-    if (n) U.toast('☁ 다른 기기에서 고친 시세트래킹·앞마당·지도 라벨 기록을 받아 왔습니다.');
+    if (n) U.toast('☁ 다른 기기에서 고친 시세트래킹·1등뽑기·앞마당·지도 라벨 기록을 받아 왔습니다.');
   }
 
   /* ── GitHub ── */
@@ -174,7 +176,7 @@ const AutoSync = (() => {
     else if (dirtyTimer) t = '☁ 고친 내용 곧 올림';
     else t = `☁ 동기화됨 · ${ago(cfg.last) || '아직'}`;
     b.textContent = t; b.className = 'hbtn' + (cls ? ' ' + cls : '');
-    b.title = err ? `실패 이유: ${err} (눌러서 확인)` : '시세트래킹·앞마당 자동 동기화 (눌러서 설정)';
+    b.title = err ? `실패 이유: ${err} (눌러서 확인)` : '시세트래킹·1등뽑기·앞마당 자동 동기화 (눌러서 설정)';
     if ($('asModal') && !$('asModal').hidden) renderModal();
   }
 
@@ -184,7 +186,7 @@ const AutoSync = (() => {
     if (m) return m;
     m = document.createElement('div'); m.className = 'modal'; m.id = 'asModal'; m.hidden = true;
     m.innerHTML = `<div class="modalbox" style="width:min(560px,100%);max-height:90vh;overflow:auto">
-      <div class="bar"><strong>☁ 자동 동기화 · 시세트래킹 + 앞마당</strong><span class="grow"></span><button id="asClose">닫기</button></div>
+      <div class="bar"><strong>☁ 자동 동기화 · 시세트래킹 + 1등뽑기 + 앞마당</strong><span class="grow"></span><button id="asClose">닫기</button></div>
       <p id="asState" class="hint" style="margin:6px 0"></p>
       <div class="bar"><label class="inline"><input type="checkbox" id="asOn"> 자동 동기화 켜기</label><span class="grow"></span><button id="asNow" class="primary">지금 동기화</button></div>
       <details id="asSetup" style="margin:10px 0"><summary><b>저장소 · 토큰</b> <span class="hint" style="margin:0">(처음 한 번)</span></summary>
@@ -264,7 +266,7 @@ const AutoSync = (() => {
     try {
       const o = JSON.parse(unb64url(m[1]));
       if (!o || !o.r || !o.t) throw new Error();
-      if (!confirm(`이 기기를 동기화 저장소 ${o.r} 에 연결할까요?\n시세트래킹·앞마당 기록이 다른 기기와 자동으로 맞춰집니다.\n(이 기기의 기록은 지워지지 않고 합쳐집니다)`)) return;
+      if (!confirm(`이 기기를 동기화 저장소 ${o.r} 에 연결할까요?\n시세트래킹·1등뽑기·앞마당 기록이 다른 기기와 자동으로 맞춰집니다.\n(이 기기의 기록은 지워지지 않고 합쳐집니다)`)) return;
       Store.set(GH, { ...gh(), repo: o.r, token: o.t, path: 'sync/apt-backup.json' });
       cfg.on = 1; saveCfg();
       U.toast('동기화를 연결했습니다. 기록을 맞추는 중…');

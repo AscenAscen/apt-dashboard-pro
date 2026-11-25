@@ -35,7 +35,7 @@ const Yard = (() => {
   function mark(ok) {
     savedAt = new Date();
     const el = document.getElementById('ydSaved'); if (!el) return;
-    el.textContent = ok === false ? '⚠ 저장 실패 — 앞마당 파일로 저장해 두세요' : `✓ 저장됨 ${String(savedAt.getHours()).padStart(2, '0')}:${String(savedAt.getMinutes()).padStart(2, '0')}`;
+    el.textContent = ok === false ? '⚠ 저장 실패 — 1등뽑기 파일로 저장해 두세요' : `✓ 저장됨 ${String(savedAt.getHours()).padStart(2, '0')}:${String(savedAt.getMinutes()).padStart(2, '0')}`;
     el.classList.toggle('bad', ok === false);
   }
   const put = (k, v) => { const ok = Store.set(k, v); mark(ok !== false); return ok; };
@@ -68,7 +68,7 @@ const Yard = (() => {
   const groupOf = (g) => opts.groups.find(x => g >= x.min && g <= x.max) || null;
   const grpName = (k) => `${k}`;
 
-  /** 앞마당의 평형 줄들 (단지 × 평형) */
+  /** 1등뽑기의 평형 줄들 (단지 × 평형) */
   function allRows() {
     const out = [];
     for (const cid of Object.keys(cx)) {
@@ -99,8 +99,8 @@ const Yard = (() => {
         <span class="yd-remind" id="ydRemind" hidden></span>
         <span class="yd-saved" id="ydSaved" title="호가·픽·1등·메모는 입력하는 순간 이 브라우저에 자동 저장됩니다">✓ 자동 저장 중</span>
         <button id="ydSave" title="지금 상태를 이 브라우저에 저장 (입력할 때마다 자동으로도 저장됩니다)">💾 저장</button>
-        <button id="ydExport" title="앞마당 단지·호가 기록·픽·1등 기록·설정을 파일 하나로 내려받기">📤 앞마당 파일 저장</button>
-        <button id="ydImport" title="다른 기기에서 저장한 앞마당 파일 불러오기">📥 앞마당 파일 불러오기</button><input type="file" id="ydImportFile" accept=".json,application/json" hidden>
+        <button id="ydExport" title="1등뽑기 단지·호가 기록·픽·1등 기록·설정을 파일 하나로 내려받기">📤 1등뽑기 파일 저장</button>
+        <button id="ydImport" title="다른 기기에서 저장한 1등뽑기 파일 불러오기">📥 1등뽑기 파일 불러오기</button><input type="file" id="ydImportFile" accept=".json,application/json" hidden>
         <button id="ydOpts">⚙ 평형·가격대 설정</button></div>
       <div class="filters">
         <label class="findlab">🔎 전국 단지 검색 <input type="search" id="ydFind" placeholder="단지 이름 (예: 평촌 꿈마을)" autocomplete="off" style="min-width:260px"></label>
@@ -136,7 +136,7 @@ const Yard = (() => {
     document.querySelectorAll('#ydSubs button').forEach(b => b.classList.toggle('on', b.dataset.s === ui.sub));
     const empty = !Object.keys(cx).length;
     $('ydEmpty').hidden = !empty;
-    if (empty) $('ydEmpty').innerHTML = '아직 앞마당 단지가 없습니다.<br>위에서 단지를 검색해 고르거나, 지역을 골라 <b>[📍 지역 단지 한꺼번에 추가]</b>를 누르세요.';
+    if (empty) $('ydEmpty').innerHTML = '아직 1등뽑기 단지가 없습니다.<br>위에서 단지를 검색해 고르거나, 지역을 골라 <b>[📍 지역 단지 한꺼번에 추가]</b>를 누르세요.';
     ['pick', 'survey', 'record'].forEach(s => { $('yd' + s[0].toUpperCase() + s.slice(1)).hidden = empty || ui.sub !== s; });
     hideMenu();
     if (!empty) { if (ui.sub === 'pick') renderPick(); else if (ui.sub === 'survey') renderSurvey(); else renderRecord(); }
@@ -149,7 +149,7 @@ const Yard = (() => {
   function addOne(x, gsAll, chosen) {
     if (locked()) return;
     const cid = cidOf(x);
-    if (cx[cid]) return U.toast(`${x.name} 은(는) 이미 앞마당에 있습니다.`);
+    if (cx[cid]) return U.toast(`${x.name} 은(는) 이미 1등뽑기에 있습니다.`);
     if (!chosen?.length) return U.toast('추가할 평형을 하나 이상 고르세요.');
     const gs = [...new Set([...(gsAll || []), ...chosen])].sort((a, b) => a - b);
     const hide = gs.filter(g => !chosen.includes(g));
@@ -157,7 +157,7 @@ const Yard = (() => {
     saveCx();
     const inGrp = chosen.filter(g => groupOf(g));
     const back = surveysAsc().some(s => Object.keys(s.q || {}).some(id => id.startsWith(cid + '#')));
-    U.toast(`${x.name} ${chosen.join('·')}㎡ 를 앞마당에 추가했습니다.${back ? ' 예전에 적은 호가 기록도 그대로 살아났습니다.' : ''}${inGrp.length < chosen.length ? ' (평형 그룹 밖 평형은 표에 안 보입니다 — ⚙ 설정에서 그룹을 늘릴 수 있습니다)' : ''}`);
+    U.toast(`${x.name} ${chosen.join('·')}㎡ 를 1등뽑기에 추가했습니다.${back ? ' 예전에 적은 호가 기록도 그대로 살아났습니다.' : ''}${inGrp.length < chosen.length ? ' (평형 그룹 밖 평형은 표에 안 보입니다 — ⚙ 설정에서 그룹을 늘릴 수 있습니다)' : ''}`);
     if (inGrp.length && !inGrp.some(g => groupOf(g).k === ui.grp)) { ui.grp = groupOf(inGrp[inGrp.length - 1]).k; saveUi(); }
     show(); foundBox();
   }
@@ -190,7 +190,7 @@ const Yard = (() => {
   }
   const chosenOf = (host) => [...host.querySelectorAll('.yd-gs input:checked')].map(i => +i.value);
 
-  /* ── 검색 결과 줄: [＋ 앞마당에 추가] / ✓ 앞마당에 있음 [표에서 보기] [목록에서 지우기] ── */
+  /* ── 검색 결과 줄: [＋ 1등뽑기에 추가] / ✓ 1등뽑기에 있음 [표에서 보기] [목록에서 지우기] ── */
   let found = null;
   async function foundBox(x) {
     if (x) found = { x, list: null };
@@ -200,7 +200,7 @@ const Yard = (() => {
     el.hidden = false;
     const where = `${esc(f.x.sido)} ${esc(f.x.sgg)} ${esc(f.x.dong)}`;
     el.className = 'yd-found' + (c ? ' in' : '');
-    el.innerHTML = `<div class="bar" style="margin:0"><span>${c ? '✓ ' : ''}<b>${esc(f.x.name)}</b> <small>${where}</small>${c ? ' · <b class="yd-inmk">앞마당에 있음</b>' : ''}</span><span class="grow"></span>` +
+    el.innerHTML = `<div class="bar" style="margin:0"><span>${c ? '✓ ' : ''}<b>${esc(f.x.name)}</b> <small>${where}</small>${c ? ' · <b class="yd-inmk">1등뽑기에 있음</b>' : ''}</span><span class="grow"></span>` +
       (c ? '<button data-fd="go">표에서 보기</button><button data-fd="del" class="danger">목록에서 지우기</button>' : '') + '<button data-fd="x" class="mini" title="닫기">✕</button></div><div id="ydFoundPick"><p class="hint" style="margin:6px 0 0">평형을 확인하는 중…</p></div>';
     el.onclick = (e) => {
       const k = e.target.closest('[data-fd]')?.dataset.fd; if (!k) return;
@@ -215,10 +215,10 @@ const Yard = (() => {
     const list = [...f.list]; (c?.gs || []).forEach(g => { if (!list.some(a => a.g === g)) list.push({ g, n: null }); }); list.sort((a, b) => a.g - b.g);
     const on = new Set(c ? (c.gs || []).filter(g => !(c.hide || []).includes(g)) : []);       // 새 단지는 아무것도 체크하지 않음
     const pick = $('ydFoundPick');
-    pick.innerHTML = list.length ? gsPicker(list, on, `<span class="grow"></span>${c ? '<button data-fd="save" class="primary" id="ydFoundBtn">평형 저장</button>' : '<button data-fd="add" class="primary" id="ydFoundBtn" disabled>＋ 앞마당에 추가</button>'}`)
+    pick.innerHTML = list.length ? gsPicker(list, on, `<span class="grow"></span>${c ? '<button data-fd="save" class="primary" id="ydFoundBtn">평형 저장</button>' : '<button data-fd="add" class="primary" id="ydFoundBtn" disabled>＋ 1등뽑기에 추가</button>'}`)
       : '<p class="hint" style="margin:6px 0 0">이 단지는 거래 자료가 없어 평형을 알 수 없습니다. [✏ 직접 추가]로 평형을 적어 추가하세요.</p>';
     const sync = () => { const b = $('ydFoundBtn'); if (!b) return; const n = chosenOf(pick).length;
-      if (c) b.textContent = `평형 저장 (${n}개)`; else { b.disabled = !n; b.textContent = n ? `＋ 고른 평형 ${n}개 앞마당에 추가` : '＋ 평형을 고르세요'; } };
+      if (c) b.textContent = `평형 저장 (${n}개)`; else { b.disabled = !n; b.textContent = n ? `＋ 고른 평형 ${n}개 1등뽑기에 추가` : '＋ 평형을 고르세요'; } };
     gsPickerEvents(pick, sync); sync();
   }
   /** 표에서 그 단지 줄로 이동해 잠깐 강조 */
@@ -253,7 +253,7 @@ const Yard = (() => {
       box.querySelectorAll('button[data-i]').forEach(b => {
         if (b.querySelector('.yd-in-mark')) return;
         const name = b.querySelector('b')?.textContent || '', where = (b.querySelector('small')?.textContent || '').split(' · ')[0].trim();
-        if (have.has(keyOf(name, where))) b.querySelector('b').insertAdjacentHTML('afterend', ' <span class="yd-in-mark">✓ 앞마당</span>');
+        if (have.has(keyOf(name, where))) b.querySelector('b').insertAdjacentHTML('afterend', ' <span class="yd-in-mark">✓ 1등뽑기</span>');
       });
     }).observe(box, { childList: true });
   }
@@ -295,13 +295,13 @@ const Yard = (() => {
       });
       const fresh = cand.filter(key => !cx[`${code}|${key}`]);
       const where = `${reg[1]} ${reg[2]}${dong ? ' ' + dong : ''}`;
-      if (!fresh.length) return U.toast(cand.length ? `${where}의 조건에 맞는 ${cand.length}개 단지는 이미 모두 앞마당에 있습니다.` : `${where}에 조건(세대수 ${min} 이상, 평형 ${grs.map(g => g.k).join('·')})에 맞는 단지가 없습니다.`);
-      if (!confirm(`${where}에서 세대수 ${min}세대 이상${unk ? '(모르는 단지 포함)' : ''} 단지 ${fresh.length}개를 앞마당에 추가할까요? (평형 ${grs.map(g => g.k).join('·')})` + (cand.length > fresh.length ? `\n(${cand.length - fresh.length}개는 이미 있어서 건너뜁니다)` : ''))) return;
+      if (!fresh.length) return U.toast(cand.length ? `${where}의 조건에 맞는 ${cand.length}개 단지는 이미 모두 1등뽑기에 있습니다.` : `${where}에 조건(세대수 ${min} 이상, 평형 ${grs.map(g => g.k).join('·')})에 맞는 단지가 없습니다.`);
+      if (!confirm(`${where}에서 세대수 ${min}세대 이상${unk ? '(모르는 단지 포함)' : ''} 단지 ${fresh.length}개를 1등뽑기에 추가할까요? (평형 ${grs.map(g => g.k).join('·')})` + (cand.length > fresh.length ? `\n(${cand.length - fresh.length}개는 이미 있어서 건너뜁니다)` : ''))) return;
       const now = Date.now();
       fresh.forEach(key => { const p = Data.parseKey(key), all = [...gs.get(key)].sort((a, b) => a - b), hide = all.filter(g => !inSel(g));
         cx[`${code}|${key}`] = { code, key, sido: reg[1], sgg: reg[2], dong: p.dong, jibun: p.jibun, name: p.name, gs: all, ...(hide.length ? { hide } : {}), t: now, memo: '' }; });
       saveCx(); Store.set('apt.lastRegion', { sido: reg[1], code });
-      U.toast(`${where} 단지 ${fresh.length}개를 앞마당에 추가했습니다.`);
+      U.toast(`${where} 단지 ${fresh.length}개를 1등뽑기에 추가했습니다.`);
       show();
     } finally { btn.disabled = false; btn.textContent = '📍 지역 단지 한꺼번에 추가'; }
   }
@@ -310,7 +310,7 @@ const Yard = (() => {
   function removeCx(cids, ask = true) {
     if (locked() || !cids.length) return;
     const names = cids.map(c => cx[c]?.name).filter(Boolean);
-    if (ask && !Vault.sure(`${names.length}개 단지를 앞마당 목록에서 지웁니다: ${names.slice(0, 5).join(', ')}${names.length > 5 ? ' …' : ''}\n(적어 둔 호가 기록은 남아서, 다시 추가하면 그대로 살아납니다)`, names.length >= 5)) return;
+    if (ask && !Vault.sure(`${names.length}개 단지를 1등뽑기 목록에서 지웁니다: ${names.slice(0, 5).join(', ')}${names.length > 5 ? ' …' : ''}\n(적어 둔 호가 기록은 남아서, 다시 추가하면 그대로 살아납니다)`, names.length >= 5)) return;
     cids.forEach(c => delete cx[c]);
     checked.forEach(id => { if (cids.includes(id.split('#')[0])) checked.delete(id); });
     saveCx(); show(); foundBox();
@@ -324,7 +324,7 @@ const Yard = (() => {
     const box = modal(`<div class="bar"><strong>${esc(c.name)} — 목록에서 지우기</strong><span class="grow"></span><button data-close>✕</button></div>
       ${hasG && shownGs.length > 1 ? `<label class="row" style="gap:8px"><input type="radio" name="ydRm" value="g" checked> ${g}㎡ 평형만 지우기</label>` : ''}
       <label class="row" style="gap:8px"><input type="radio" name="ydRm" value="all" ${hasG && shownGs.length > 1 ? '' : 'checked'}> 단지 통째로 지우기 <small class="hint" style="margin:0">(모든 평형 ${(c.gs || []).join('·')}㎡)</small></label>
-      <p class="hint" style="margin:0">앞마당 목록에서만 지워집니다. 적어 둔 호가 기록은 남아서, 다시 추가하면 그대로 살아납니다. 다른 탭에는 영향이 없습니다.</p>
+      <p class="hint" style="margin:0">1등뽑기 목록에서만 지워집니다. 적어 둔 호가 기록은 남아서, 다시 추가하면 그대로 살아납니다. 다른 탭에는 영향이 없습니다.</p>
       <div class="bar"><span class="grow"></span><button data-close>취소</button><button class="primary danger-fill" id="ydRmOk">목록에서 지우기</button></div>`);
     box.querySelector('#ydRmOk').onclick = () => {
       const all = box.querySelector('input[name="ydRm"]:checked').value === 'all';
@@ -355,7 +355,7 @@ const Yard = (() => {
     await Real.load(rows);
     Tracking.add(rows.map(r => { const rl = Real.get(r.id) || {}; return { ...r, buildYear: rl.buildYear, st: { last: rl.sale } }; }));
     const d = today();
-    ids.forEach(id => { const [cid, g] = id.split('#'), c = cx[cid]; if (c) { c.sent = c.sent || {}; c.sent[g] = d; } });   // 앞마당에만 남기는 "보냄" 표시
+    ids.forEach(id => { const [cid, g] = id.split('#'), c = cx[cid]; if (c) { c.sent = c.sent || {}; c.sent[g] = d; } });   // 1등뽑기에만 남기는 "보냄" 표시
     saveCx(); show();
   }
 
@@ -462,7 +462,7 @@ const Yard = (() => {
       los.map(bandHtml).join('') +
       (none.length ? section('none', `<b>미입력</b> · 호가를 아직 안 적은 ${none.length}개`, none.sort((a, b) => a.name.localeCompare(b.name, 'ko')), 'yd-none') : '') +
       '</table></div>'
-      : `<p class="empty">${total ? (ui.onlyPick ? '픽한 단지가 없습니다. ○ 를 눌러 후보를 픽하거나 "픽한 단지만 보기"를 끄세요.' : '필터에 맞는 단지가 없습니다. 위의 [모두 풀기]를 눌러 보세요.') : `앞마당 단지 중 ${esc(ui.grp)}㎡ 그룹(전용 ${groupOf0(ui.grp)})에 맞는 평형이 없습니다. 다른 평형 버튼을 눌러 보세요.`}</p>`;
+      : `<p class="empty">${total ? (ui.onlyPick ? '픽한 단지가 없습니다. ○ 를 눌러 후보를 픽하거나 "픽한 단지만 보기"를 끄세요.' : '필터에 맞는 단지가 없습니다. 위의 [모두 풀기]를 눌러 보세요.') : `1등뽑기 단지 중 ${esc(ui.grp)}㎡ 그룹(전용 ${groupOf0(ui.grp)})에 맞는 평형이 없습니다. 다른 평형 버튼을 눌러 보세요.`}</p>`;
     el.innerHTML = head + table +
       `<div class="bar yd-bulk" id="ydBulk" ${checked.size ? '' : 'hidden'}><b id="ydBulkN">체크한 ${checked.size}개</b><button id="ydBulkPk">✔ 픽 켜기</button><button id="ydBulkUnpk">픽 끄기</button><button id="ydBulkTrk">트래킹 담기</button><button id="ydBulkCmp">단지 비교로 보내기</button><button id="ydBulkEval">비교 평가로 보내기</button><button id="ydBulkDel" class="danger">목록에서 지우기</button><button id="ydBulkClr">선택 해제</button></div>` +
       `<p class="hint">매매·전세 칸에 억 단위로 적으면 <b>오늘 날짜로 자동 기록</b>되고, 칸을 벗어나면 가격대 칸으로 옮겨집니다. 옆의 작은 날짜는 그날 적은 값이라는 뜻입니다.<br>픽(○/✔) = 후보 표시, 픽 안 한 줄은 회색입니다. 🥇 1등은 가격대마다 하나이고, 1등을 고르면 픽도 켜집니다. 머리글 ▾ 로 엑셀처럼 거르고 정렬할 수 있습니다.</p>`;
@@ -563,7 +563,7 @@ const Yard = (() => {
       r.s ?? '', r.v?.date || '', r.rr ?? '', r.gap ?? '', r.chg ?? '', r.by || '', r.hh || '', r.rl.sale?.price ?? '', r.rl.sale ? U.date(r.rl.sale.d) : '', r.rl.rent?.price ?? '', r.rl.rent ? U.date(r.rl.rent.d) : '', r.drop == null ? '' : +r.drop.toFixed(1), r.rise == null ? '' : +r.rise.toFixed(1), sent(r.id) ? '트래킹에 보냄' : '', cx[r.cid]?.memo || '']));
     const sheet2 = [['달', '평형 그룹', '가격대', '1등 단지', '전용㎡', '지역']];
     Object.entries(picks[ui.ym] || {}).forEach(([gk, g]) => Object.keys(g).map(Number).sort((a, b) => a - b).forEach(lo => { const p = g[lo], c = cx[p.id.split('#')[0]] || {}; sheet2.push([ymLabel(ui.ym), gk, bandLabel(lo, p.hi), c.name || p.name || '', +p.id.split('#')[1], `${c.sgg || ''} ${c.dong || ''}`.trim()]); }));
-    U.download(`앞마당_${ui.grp}_1등뽑기_${U.stamp()}`, [{ name: `${ui.grp} 가격대별`, rows: sheet1 }, { name: `${ymLabel(ui.ym)} 1등`, rows: sheet2 }]);
+    U.download(`1등뽑기_${ui.grp}_1등뽑기_${U.stamp()}`, [{ name: `${ui.grp} 가격대별`, rows: sheet1 }, { name: `${ymLabel(ui.ym)} 1등`, rows: sheet2 }]);
   }
 
   /* ── ⋯ 메뉴 ── */
@@ -853,12 +853,12 @@ const Yard = (() => {
     const list = surveysAsc(), rows = allRows().sort((a, b) => a.sgg.localeCompare(b.sgg, 'ko') || a.name.localeCompare(b.name, 'ko') || a.g - b.g);
     const head = ['시도', '시군구', '동', '단지', '전용㎡', '평형 그룹', ...list.flatMap(s => [`${s.date} 매매(만원)`, `${s.date} 전세(만원)`, `${s.date} 매물`])];
     const body = rows.filter(r => list.some(s => s.q?.[r.id])).map(r => [r.sido, r.sgg, r.dong, r.name, r.g, r.grp, ...list.flatMap(s => { const q = s.q?.[r.id] || {}; return [q.s ?? '', q.r ?? '', q.n ?? '']; })]);
-    U.download(`앞마당_조사기록_${U.stamp()}`, [{ name: '조사 기록', rows: [head, ...body] },
+    U.download(`1등뽑기_조사기록_${U.stamp()}`, [{ name: '조사 기록', rows: [head, ...body] },
       { name: '조사 회차', rows: [['조사 날짜', '메모', '적은 평형 수'], ...list.map(s => [s.date, s.memo || '', Object.keys(s.q || {}).length])] }]);
   }
   function compareExcel() {
     const st = stepMan(), A = sv[ui.ca], B = sv[ui.cb]; if (!A || !B) return;
-    U.download(`앞마당_조사비교_${B.date}_${A.date}`, [{ name: '두 조사 비교', rows: [['시군구', '동', '단지', '전용㎡', `${B.date} 매매(만원)`, '값 적은 날', `${A.date} 매매(만원)`, '값 적은 날', '변동(만원)', '변동률(%)', `${B.date} 가격대`, `${A.date} 가격대`],
+    U.download(`1등뽑기_조사비교_${B.date}_${A.date}`, [{ name: '두 조사 비교', rows: [['시군구', '동', '단지', '전용㎡', `${B.date} 매매(만원)`, '값 적은 날', `${A.date} 매매(만원)`, '값 적은 날', '변동(만원)', '변동률(%)', `${B.date} 가격대`, `${A.date} 가격대`],
       ...cmpRows.map(x => [x.r.sgg, x.r.dong, x.r.name, x.r.g, x.b?.s ?? '', x.b?.date || '', x.a?.s ?? '', x.a?.date || '', x.d ?? '', x.pct == null ? '' : +x.pct.toFixed(1), x.lb == null ? '' : bandLabel(x.lb, x.lb + st), x.la == null ? '' : bandLabel(x.la, x.la + st)])] }]);
   }
 
@@ -895,7 +895,7 @@ const Yard = (() => {
         const p = g[lo], c = cx[p.id.split('#')[0]] || {}, pp = i > 0 ? picks[allMonths[i - 1]]?.[gk]?.[lo] : null;
         rows.push([ymShort(m), gk, bandLabel(lo, p.hi), c.name || p.name || '', +p.id.split('#')[1], c.sgg || '', c.dong || '', i > 0 && (!pp || pp.id !== p.id) ? '바뀜' : '']);
       })));
-      U.download(`앞마당_1등기록_${U.stamp()}`, [{ name: '달별 1등', rows }]);
+      U.download(`1등뽑기_1등기록_${U.stamp()}`, [{ name: '달별 1등', rows }]);
     };
     const t = $('ydRTable'); if (t) t.onclick = (e) => { const td = e.target.closest('td[data-id]'); if (td) { e.preventDefault(); openHist(td.dataset.id); } };
   }
@@ -1052,12 +1052,12 @@ const Yard = (() => {
     };
   }
 
-  /* ═════════ 저장 · 앞마당 파일 ═════════ */
+  /* ═════════ 저장 · 1등뽑기 파일 ═════════ */
   const FKEY = 'apt.yardFile.v1', REMIND_DAYS = 14;
   function saveAll() {
     const ok = [Store.set(KEY, cx), Store.set(SKEY, sv), Store.set(PKEY, picks), Store.set(OKEY, opts), Store.set(UKEY, ui)].every(v => v !== false);
     mark(ok);
-    U.toast(ok ? '앞마당을 저장했습니다. (입력할 때마다 자동으로도 저장됩니다)' : '브라우저 저장에 실패했습니다. [📤 앞마당 파일 저장]으로 파일을 받아 두세요.');
+    U.toast(ok ? '1등뽑기를 저장했습니다. (입력할 때마다 자동으로도 저장됩니다)' : '브라우저 저장에 실패했습니다. [📤 1등뽑기 파일 저장]으로 파일을 받아 두세요.');
   }
   function remind() {
     const el = $('ydRemind'); if (!el) return;
@@ -1065,25 +1065,25 @@ const Yard = (() => {
     const days = last ? Math.floor((Date.now() - last) / 864e5) : null;
     el.hidden = !n || (days != null && days < REMIND_DAYS);
     el.textContent = days == null ? '💡 파일 저장 권장' : `💡 파일 저장 ${days}일 전`;
-    el.title = days == null ? '앞마당 파일을 아직 저장한 적이 없습니다. 브라우저 기록을 지우면 사라질 수 있으니 [📤 앞마당 파일 저장]으로 받아 두세요.' : `앞마당 파일을 저장한 지 ${days}일 지났습니다. [📤 앞마당 파일 저장]을 권장합니다.`;
+    el.title = days == null ? '1등뽑기 파일을 아직 저장한 적이 없습니다. 브라우저 기록을 지우면 사라질 수 있으니 [📤 1등뽑기 파일 저장]으로 받아 두세요.' : `1등뽑기 파일을 저장한 지 ${days}일 지났습니다. [📤 1등뽑기 파일 저장]을 권장합니다.`;
   }
   function exportFile() {
     const data = { type: 'apt-yard', v: 1, savedAt: new Date().toISOString(), cx, sv, picks, opts };
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = `앞마당_${U.stamp()}.json`;
+    a.href = URL.createObjectURL(blob); a.download = `1등뽑기_${U.stamp()}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     Store.set(FKEY, Date.now()); remind();
-    U.toast(`앞마당 파일을 저장했습니다. (단지 ${Object.keys(cx).length}개 · 조사 ${Object.keys(sv).length}회)`);
+    U.toast(`1등뽑기 파일을 저장했습니다. (단지 ${Object.keys(cx).length}개 · 조사 ${Object.keys(sv).length}회)`);
   }
   async function importFile(file) {
     let d;
-    try { d = JSON.parse(await file.text()); } catch (e) { return U.toast('파일을 읽지 못했습니다. 앞마당 파일(.json)이 맞는지 확인하세요.'); }
-    if (!d || d.type !== 'apt-yard' || typeof d.cx !== 'object') return U.toast('앞마당 파일이 아닙니다. [📤 앞마당 파일 저장]으로 만든 파일을 골라 주세요.');
+    try { d = JSON.parse(await file.text()); } catch (e) { return U.toast('파일을 읽지 못했습니다. 1등뽑기 파일(.json)이 맞는지 확인하세요.'); }
+    if (!d || d.type !== 'apt-yard' || typeof d.cx !== 'object') return U.toast('1등뽑기 파일이 아닙니다. [📤 1등뽑기 파일 저장]으로 만든 파일을 골라 주세요.');
     const info = `단지 ${Object.keys(d.cx || {}).length}개 · 조사 ${Object.keys(d.sv || {}).length}회 · ${String(d.savedAt || '').slice(0, 10)} 저장`;
-    const merge = Object.keys(cx).length ? confirm(`앞마당 파일을 불러옵니다 (${info}).\n\n[확인] 합치기 — 지금 기록과 파일 기록을 모두 살립니다. 같은 칸이 겹치면 파일 값을 씁니다.\n[취소] 바꾸기 — 지금 앞마당을 지우고 파일 내용으로 바꿉니다.`) : false;
-    if (!merge && Object.keys(cx).length && !confirm('지금 앞마당 기록을 지우고 파일 내용으로 바꿀까요? 되돌릴 수 없습니다.')) return;
+    const merge = Object.keys(cx).length ? confirm(`1등뽑기 파일을 불러옵니다 (${info}).\n\n[확인] 합치기 — 지금 기록과 파일 기록을 모두 살립니다. 같은 칸이 겹치면 파일 값을 씁니다.\n[취소] 바꾸기 — 지금 1등뽑기을 지우고 파일 내용으로 바꿉니다.`) : false;
+    if (!merge && Object.keys(cx).length && !confirm('지금 1등뽑기 기록을 지우고 파일 내용으로 바꿀까요? 되돌릴 수 없습니다.')) return;
     if (merge) {
       for (const [k, v] of Object.entries(d.cx || {})) { const o = cx[k] || {}; cx[k] = { ...o, ...v, pick: { ...(o.pick || {}), ...(v.pick || {}) }, sent: { ...(o.sent || {}), ...(v.sent || {}) } };
         if (!Object.keys(cx[k].pick).length) delete cx[k].pick; if (!Object.keys(cx[k].sent).length) delete cx[k].sent; }
@@ -1094,7 +1094,7 @@ const Yard = (() => {
       if (d.opts && Array.isArray(d.opts.groups) && d.opts.groups.length) opts = d.opts;
     }
     saveAll(); loadState(); checked.clear(); show(); foundBox();
-    U.toast(`앞마당 파일을 ${merge ? '합쳤습니다' : '불러왔습니다'}. (${info})`);
+    U.toast(`1등뽑기 파일을 ${merge ? '합쳤습니다' : '불러왔습니다'}. (${info})`);
   }
 
   function drawRGrp() {
