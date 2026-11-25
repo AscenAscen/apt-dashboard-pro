@@ -931,8 +931,10 @@ const Start = (() => {
         <div class="st-row"><label class="inline"><input type="checkbox" id="stOther"> 상가·관리동</label><button class="mini" id="stManual" title="켜고 지도에서 땅을 누르면 그 필지가 경계에 들어가거나 빠집니다 (고친 결과는 저장돼요)">필지 추가/빼기</button><button class="mini" id="stOlAuto" hidden title="손으로 고친 필지를 지우고 자동으로 찾은 경계로">↺ 자동 경계로</button></div>
         <div class="hint" id="stOlMsg"></div>
       </div>
+      <button type="button" id="stLoc" class="cxmloc" title="내 위치로 이동"><span>◎</span><b>내 위치</b></button>
       <div class="st-msg" id="stMsg" hidden></div>
     </div>`;
+    $('stLoc').addEventListener('click', () => myLocation(false));
     $('stSide').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-p]'); if (!b) return;
       const k = b.dataset.p;
