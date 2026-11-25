@@ -144,7 +144,7 @@ const Supply = (() => {
       pts.push(p);
       const el = document.createElement('div');                 // 단지 라벨 (모양은 오른쪽 위 🏷 라벨)
       LabelKit.render(el, 'supply', { id: 'sp:' + it.id, name: it.nm, ym: it.mv, hh: it.hh });
-      LabelKit.bind(el, 'supply', 'sp:' + it.id, () => map);
+      LabelKit.bind(el, 'supply', 'sp:' + it.id, () => map, p);
       el.title = `${it.nm} · ${it.hh.toLocaleString()}세대 · 입주 ${ymTxt(it.mv)}`;
       el.onclick = () => { const tr = document.querySelector(`#spTable1 tr[data-id="${CSS.escape(it.id)}"]`); if (tr) { tr.scrollIntoView({ behavior: 'smooth', block: 'center' }); tr.classList.add('flash'); setTimeout(() => tr.classList.remove('flash'), 1500); } U.toast(el.title); };
       const ov = new kakao.maps.CustomOverlay({ position: new kakao.maps.LatLng(p.lat, p.lng), content: el, yAnchor: 1, xAnchor: 0.5, clickable: true, zIndex: 3 });

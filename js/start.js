@@ -133,7 +133,7 @@ const Start = (() => {
       el.addEventListener('mouseenter', () => { if (!isTouch()) showTip(cx, el, false); });
       el.addEventListener('mouseleave', () => { if (!isTouch() && !tipPin) hideSoon(); });
       el.addEventListener('click', (e) => { e.stopPropagation(); showTip(cx, el, true); outline(cx); });
-      LabelKit.bind(el, 'start', cx.id, () => map);
+      LabelKit.bind(el, 'start', cx.id, () => map, p);
       const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(p), content: el, yAnchor: 1, xAnchor: 0.5, clickable: true, zIndex: 3 });
       o = { ov, el }; ovs.set(cx.id, o);
     }
@@ -184,12 +184,12 @@ const Start = (() => {
       o.el.classList.remove('mini');
       if (o.el.classList.contains('lk-hid')) { o.ov.setZIndex(ed ? 2 : 1); continue; }
       const sel = OL.cx && OL.cx.id === cx.id, big = sel || isEmph(cx);
-      if (!big && st.mode === 'emph') { o.el.classList.add('mini'); o.ov.setZIndex(1); continue; }
+      if (!big && st.mode === 'emph' && !o.el.classList.contains('lk-moved')) { o.el.classList.add('mini'); o.ov.setZIndex(1); continue; }
       // 멀리 볼 때(동그라미) · 중간 거리의 작은 단지(점)는 CSS 가 모양을 바꾸므로 겹침 계산을 하지 않음
       if (!big && (stg === 'far' || (stg === 'mid' && o.el.classList.contains('lk-small')))) { o.ov.setZIndex(1); continue; }
       const r = o.el.getBoundingClientRect();
       if (r.right < box.left || r.left > box.right || r.bottom < box.top || r.top > box.bottom) continue;
-      const hit = !sel && placed.some(q => !(r.right < q.left + 2 || r.left > q.right - 2 || r.bottom < q.top + 2 || r.top > q.bottom - 2));
+      const hit = !sel && !o.el.classList.contains('lk-moved') && placed.some(q => !(r.right < q.left + 2 || r.left > q.right - 2 || r.bottom < q.top + 2 || r.top > q.bottom - 2));
       if (hit) o.el.classList.add('mini'); else placed.push(r);
       o.ov.setZIndex(hit ? 1 : sel ? 9 : isEmph(cx) ? 6 : 4);
     }

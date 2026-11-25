@@ -167,7 +167,7 @@ const CxMap = (() => {
       el.addEventListener('mouseenter', () => { if (!isTouch()) showTip(cx, el, false); });
       el.addEventListener('mouseleave', () => { if (!isTouch() && !tipPin) hideSoon(); });
       el.addEventListener('click', (e) => { e.stopPropagation(); if (tipPin && tip && tip.cx === cx) { hideTip(); return; } showTip(cx, el, true); });
-      LabelKit.bind(el, 'cxmap', cx.id, () => map);
+      LabelKit.bind(el, 'cxmap', cx.id, () => map, p);
       const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(p), content: el, yAnchor: 1, xAnchor: 0.5, clickable: true, zIndex: cx.leader ? 5 : 2 });
       o = { ov, el }; ovs.set(cx.id, o);
     }
@@ -226,7 +226,7 @@ const CxMap = (() => {
       } else if (mode === 'dot' && !big) { o.el.classList.add('mini'); z(o, true, cx); continue; }
       const r = o.el.getBoundingClientRect();
       if (r.right < box.left || r.left > box.right || r.bottom < box.top || r.top > box.bottom) { z(o, false, cx); continue; }
-      const hit = placed.some(q => !(r.right < q.left + 2 || r.left > q.right - 2 || r.bottom < q.top + 2 || r.top > q.bottom - 2));
+      const hit = !o.el.classList.contains('lk-moved') && placed.some(q => !(r.right < q.left + 2 || r.left > q.right - 2 || r.bottom < q.top + 2 || r.top > q.bottom - 2));
       if (hit) o.el.classList.add('mini'); else placed.push(r);
       z(o, hit, cx);
     }

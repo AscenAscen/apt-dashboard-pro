@@ -419,7 +419,7 @@ const SupplyMap = (() => {
           el = document.createElement('div');
           LabelKit.render(el, 'supplymap', { id: 'sm:' + r.id, name: r.name, ym: +String(r.ym || '').replace('-', '') || null, hh: r.hh });
           el.title = `${r.name} · ${fmtYm(r.ym)} 입주 · ${r.hh.toLocaleString()}세대`;
-          LabelKit.bind(el, 'supplymap', 'sm:' + r.id, () => map);
+          LabelKit.bind(el, 'supplymap', 'sm:' + r.id, () => map, p);
         } else el = labelEl(r);
         el.onclick = (e) => { e.stopPropagation(); showCard(r); };
         const ya = sty === 'mini' ? 0.5 : 1, xa = sty === 'mini' ? 0 : 0.5;
@@ -447,7 +447,7 @@ const SupplyMap = (() => {
       if (!on || !o.fw) { want.set(o, false); return; }
       const pt = proj.containerPointFromCoords(KMap.LL(o.p));
       const b = mini ? { l: pt.x, t: pt.y - o.fh / 2, r: pt.x + o.fw, b: pt.y + o.fh / 2 } : mid ? { l: pt.x - o.fw / 2, t: pt.y - o.fh / 2, r: pt.x + o.fw / 2, b: pt.y + o.fh / 2 } : { l: pt.x - o.fw / 2, t: pt.y - o.fh, r: pt.x + o.fw / 2, b: pt.y };
-      const hit = placed.some(p => b.l < p.r + pad && b.r > p.l - pad && b.t < p.b + pad && b.b > p.t - pad);
+      const hit = !o.el.classList.contains('lk-moved') && placed.some(p => b.l < p.r + pad && b.r > p.l - pad && b.t < p.b + pad && b.b > p.t - pad);
       want.set(o, hit); if (!hit) placed.push(b);
     });
     // 구별 합계: 줄인 이름표끼리도 겹치면 숨김 (확대하면 다시 보임)

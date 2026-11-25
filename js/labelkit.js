@@ -5,6 +5,7 @@
    · 확대 단계: 멀리 = 세대수 크기 동그라미, 중간 = 이름만(작은 단지는 점), 가까이 = 전체 라벨
    · 지도마다 오른쪽 위 [🏷 라벨] 버튼 → 같은 모양의 설정 창
    · 직접 고치기(편집 모드): 끌어서 옮기기 · 짧은 이름 · 숨기기 · ★ 강조 · 원래대로
+     (지도 위 [✥ 이동] 버튼으로 한 번에 켬. 옮긴 위치는 "g,위도차,경도차" 로 저장해 확대·축소해도 점을 따라가고, 점과 가는 선으로 이어짐 · 예전 "x,y" 픽셀 값도 그대로 동작)
    쓰는 지도: 홈 · 단지 지도 · 공급지도 · 공급 · 입지 분석 · 인구이동 (시세지도·랜드마크는 js/maplabel.js 가 같은 디자인을 씀)
    저장: apt.labels.v1 (지도별 설정) · apt.labelEdits.v1 (단지별 짧은 이름·숨김·강조·위치) · apt.labelPresets.v1 (내 프리셋)
          세 값 모두 백업 파일과 자동 동기화(js/autosync.js)에 들어갑니다.
@@ -168,6 +169,59 @@ const LabelKit = (() => {
   const hidden = (id) => !!E(id).h;
   // 옮긴 위치는 "x,y" 글자로 저장 (자동 동기화에서 한 값으로 합쳐지게)
   const offset = (m, id) => { const v = E(id).o && E(id).o[m]; if (!v) return null; const a = String(v).split(',').map(Number); return a.length === 2 && a.every(isFinite) ? a : null; };
+  /* 옮긴 위치 저장 형식: 예전 "x,y" = 화면 픽셀 · 새 "g,위도차,경도차" = 지도 좌표 차이 (확대·축소해도 점을 따라감) */
+  const parseO = (m, id) => {
+    const v = E(id).o && E(id).o[m]; if (!v) return null;
+    const a = String(v).split(',');
+    if (a[0] === 'g') { const g = [+a[1], +a[2]]; return g.every(isFinite) ? { g } : null; }
+    const px = a.map(Number); return px.length === 2 && px.every(isFinite) ? { px } : null;
+  };
+  const LLof = (p) => new kakao.maps.LatLng(p.lat, p.lng);
+  const projOf = (el) => { try { const mp = el._lkmap && el._lkmap(); return mp && mp.getProjection ? mp.getProjection() : null; } catch (er) { return null; } };
+  /** 점에서 라벨까지 가는 연결선 (라벨 안에 그려서 라벨과 함께 움직임. 작은 점·동그라미 모양일 땐 CSS 가 숨김) */
+  function lead(el, t) {
+    let ld = el.querySelector(':scope > .lk-lead');
+    if (!t || Math.hypot(t[0], t[1]) < 14) { if (ld) ld.remove(); return; }
+    if (!ld) { ld = document.createElement('i'); ld.className = 'lk-lead'; el.appendChild(ld); }
+    const sc = parseFloat(getComputedStyle(el).getPropertyValue('--lks')) || 1;      // 라벨 크기 배율만큼 늘어나므로 미리 나눔
+    ld.style.width = (Math.hypot(t[0], t[1]) / sc).toFixed(1) + 'px';
+    ld.style.transform = `rotate(${Math.atan2(-t[1], -t[0])}rad)`;
+  }
+  /** 저장된 위치를 라벨에 적용 (그릴 때 · 확대/축소할 때마다) */
+  function applyOff(el) {
+    const m = el._lkm, id = el._lkid; if (!m || id == null) return;
+    const o = parseO(m, id); let t = null;
+    el._lkg = !!(o && o.g);
+    if (o && o.px) t = o.px;
+    else if (o && o.g && el._lkpos) {
+      const pr = projOf(el);
+      if (pr) {
+        const a = pr.containerPointFromCoords(LLof(el._lkpos)), b = pr.containerPointFromCoords(LLof({ lat: el._lkpos.lat + o.g[0], lng: el._lkpos.lng + o.g[1] }));
+        t = [Math.round(b.x - a.x), Math.round(b.y - a.y)];
+      }
+    }
+    el._lkpx = t;
+    el.style.translate = t ? `${t[0]}px ${t[1]}px` : '';
+    el.classList.toggle('lk-moved', !!t);
+    if (el._lkg) trackZoom(el);
+    if (t) el.classList.remove('mini', 'sp-dot');                 // 옮긴 라벨은 겹쳐도 점으로 줄이지 않음
+    lead(el, t);
+  }
+  const zreg = new WeakMap();        // 지도 → 그 지도의 라벨들 (확대·축소하면 옮긴 라벨 위치를 다시 계산)
+  function trackZoom(el) {
+    const mp = el._lkmap && el._lkmap(); if (!mp || !window.kakao) return;
+    let set = zreg.get(mp);
+    if (!set) {
+      set = new Set(); zreg.set(mp, set);
+      const upd = () => {
+        if (set.size > 1500) set.forEach(x => { if (!x.isConnected) set.delete(x); });      // 지워진 라벨 정리 (다시 그려지면 applyOff 가 다시 등록)
+        set.forEach(x => { if (x._lkg && x.isConnected) applyOff(x); });
+      };
+      kakao.maps.event.addListener(mp, 'zoom_changed', upd);
+      kakao.maps.event.addListener(mp, 'idle', upd);
+    }
+    set.add(el);
+  }
 
   /* ═══ 라벨 그리기 ═══ */
   const eok = (v) => (v == null ? '' : v >= 10000 ? `${+(v / 10000).toFixed(v >= 100000 ? 1 : 2)}억` : `${Math.round(v).toLocaleString()}만`);
@@ -221,10 +275,10 @@ const LabelKit = (() => {
     el.className = ['lk', 'lk-' + s.ds, d.emph || e.s ? 'emph' : '', d.on ? 'on' : '', (d.hh || 0) < (s.du || 0) && !d.emph && !e.s ? 'lk-small' : '', e.h ? 'lk-hid' : '', d.cls || '', ...keep].filter(Boolean).join(' ');
     el.style.setProperty('--lkc', c);
     el.style.setProperty('--lkr', Math.round(7 + Math.min(d.hh || 0, 3000) / 3000 * 15) + 'px');
-    const o = offset(m, d.id);
-    el.style.translate = o ? `${o[0]}px ${o[1]}px` : '';
+    el._lkm = m; el._lkid = d.id;
     el.innerHTML = `${h}<i class="lk-tail"></i><b class="lk-dt">${dotTxt(d.hh || 0)}</b>`;
     el.dataset.lkname = d.name || '';
+    applyOff(el);
     return el;
   }
   const isLK = (m) => get(m).ds !== 'legacy';
@@ -243,7 +297,7 @@ const LabelKit = (() => {
       if (x.el.classList.contains('lk-hid')) continue;
       const r = x.el.getBoundingClientRect();
       if (!r.width) continue;
-      const hit = !x.el.classList.contains('on') && placed.some(q => !(r.right < q.left + 2 || r.left > q.right - 2 || r.bottom < q.top + 2 || r.top > q.bottom - 2));
+      const hit = !x.el.classList.contains('on') && !x.el.classList.contains('lk-moved') && placed.some(q => !(r.right < q.left + 2 || r.left > q.right - 2 || r.bottom < q.top + 2 || r.top > q.bottom - 2));
       if (hit) x.el.classList.add('mini'); else placed.push(r);
       if (x.ov.setZIndex) x.ov.setZIndex(hit ? 1 : x.el.classList.contains('emph') ? 6 : 3);
     }
@@ -269,10 +323,16 @@ const LabelKit = (() => {
     btn.type = 'button'; btn.className = 'lk-btn'; btn.innerHTML = '🏷 <b>라벨</b>'; btn.title = '라벨 모양·표시 항목·크기·글꼴 바꾸기, 라벨 직접 고치기';
     const pnl = document.createElement('div'); pnl.className = 'lk-panel'; pnl.hidden = true;
     const lg = opt.legendBox || Object.assign(document.createElement('div'), { className: 'lk-legend' });
+    let mv = null;                                   // 지도 위에서 한 번에 켜는 [✥ 이동] 버튼 (라벨을 끌어서 옮기기)
+    if ((MAPS[m] && MAPS[m].edit) || opt.move) {
+      mv = document.createElement('button'); mv.type = 'button'; mv.className = 'lk-btn lk-mv';
+      mv.title = '라벨을 끌어서 옮기기 (한 번 더 누르면 끝)'; mv.innerHTML = '✥ <b>이동</b>';
+      mv.onclick = () => { if (opt.move) opt.move(); else setEditing(m, !editing.has(m)); };
+    }
     const stop = (e) => e.stopPropagation();
-    [btn, pnl, lg].forEach(x => ['mousedown', 'touchstart', 'pointerdown', 'wheel', 'dblclick'].forEach(t => x.addEventListener(t, stop, { passive: true })));
-    host.appendChild(btn); host.appendChild(pnl); if (!opt.legendBox) host.appendChild(lg);
-    const mt = { host, btn, panel: pnl, legend: lg, opt };
+    [btn, pnl, lg, mv].filter(Boolean).forEach(x => ['mousedown', 'touchstart', 'pointerdown', 'wheel', 'dblclick'].forEach(t => x.addEventListener(t, stop, { passive: true })));
+    host.appendChild(btn); if (mv) host.appendChild(mv); host.appendChild(pnl); if (!opt.legendBox) host.appendChild(lg);
+    const mt = { host, btn, mv, panel: pnl, legend: lg, opt, moveOn: false };
     mounts.set(m, mt);
     btn.onclick = () => {
       if (opt.ext) { opt.ext(); return; }
@@ -292,7 +352,14 @@ const LabelKit = (() => {
     h.dataset.lkds = s.ds;
     h.classList.toggle('lk-editing', editing.has(m));
     if (mt.btn) mt.btn.classList.toggle('editing', editing.has(m));
+    if (mt.mv) {
+      const on = mt.opt.move ? !!mt.moveOn : editing.has(m);       // 시세지도·랜드마크는 자기 편집 모드 상태를 따라감
+      mt.mv.classList.toggle('on', on);
+      mt.mv.innerHTML = on ? '✓ <b>이동 끝내기</b>' : '✥ <b>이동</b>';
+    }
   }
+  /** 시세지도·랜드마크처럼 자기 편집 모드가 따로 있는 지도가 [✥ 이동] 버튼 표시를 맞출 때 */
+  function moveState(m, on) { const mt = mounts.get(m); if (mt) { mt.moveOn = !!on; applyVars(m); } }
   function legend(m) {
     const mt = mounts.get(m); if (!mt || !mt.legend) return;
     const k = kindOf(m), s = get(m);
@@ -329,7 +396,7 @@ const LabelKit = (() => {
       <div class="lk-sec"><label class="lk-inl"><input type="checkbox" data-act="link"${store.link ? ' checked' : ''}> 모든 지도에 똑같이 적용</label>
         <button type="button" class="lk-mini" data-act="copy">지금 설정을 모든 지도에 복사</button></div>
       ${info.edit ? `<div class="lk-sec"><button type="button" class="lk-edit${editing.has(m) ? ' on' : ''}" data-act="edit">✎ 라벨 직접 고치기 ${editing.has(m) ? '켜짐 (끝내기)' : ''}</button>
-        <p class="lk-note">켜면 라벨을 끌어서 옮기거나, 눌러서 짧은 이름·숨기기·★ 강조를 정할 수 있어요. 짧은 이름·숨김·강조는 모든 지도에 같이 적용돼요.</p>
+        <p class="lk-note">켜면 라벨을 끌어서 옮기거나(점과 선으로 이어져요), 눌러서 짧은 이름·숨기기·★ 강조를 정할 수 있어요. 지도 위 [✥ 이동] 버튼으로도 켤 수 있어요. 짧은 이름·숨김·강조는 모든 지도에 같이 적용돼요.</p>
         <div class="lk-pre"><button type="button" data-act="unhide"${nHid ? '' : ' disabled'}>숨긴 라벨 ${nHid}개 다시 보이기</button><button type="button" data-act="resetpos"${nPos ? '' : ' disabled'}>이 지도에서 옮긴 위치 ${nPos}개 원래대로</button><button type="button" data-act="resetedits">짧은 이름·숨김·강조 전부 원래대로</button></div></div>` : ''}
       <div class="lk-sec lk-foot">${mt.opt.more ? `<button type="button" data-act="more">${esc(mt.opt.moreLabel || '이 지도만의 설정')}</button>` : ''}<button type="button" data-act="def">이 지도 기본값으로</button></div>`;
   }
@@ -389,10 +456,12 @@ const LabelKit = (() => {
     U.toast(onOff ? '라벨 직접 고치기: 라벨을 끌어서 옮기거나, 눌러서 짧은 이름·숨기기·★ 강조를 정하세요.' : '라벨 직접 고치기를 끝냈습니다.');
   }
   const isEditing = (m) => editing.has(m);
-  /** 라벨 el 이 편집 모드에서 움직이도록 연결. getMap() = 카카오 지도 */
-  function bind(el, m, id, getMap) {
-    el._lkid = id;
-    if (el._lkb) return; el._lkb = 1;
+  /** 라벨 el 이 편집 모드에서 움직이도록 연결. getMap() = 카카오 지도, pos = 단지 점의 좌표 { lat, lng } (주면 옮긴 위치를 지도 좌표로 저장) */
+  function bind(el, m, id, getMap, pos) {
+    el._lkid = id; el._lkm = m; el._lkmap = getMap;
+    if (pos && isFinite(pos.lat) && isFinite(pos.lng)) el._lkpos = { lat: +pos.lat, lng: +pos.lng };
+    trackZoom(el);
+    if (el._lkb) { applyOff(el); return; } el._lkb = 1;
     let drag = null, justDragged = 0;
     const block = (e) => { if (!editing.has(m)) return; e.stopImmediatePropagation(); };
     el.addEventListener('mouseenter', block, true);
@@ -406,7 +475,7 @@ const LabelKit = (() => {
     el.addEventListener('pointerdown', (e) => {
       if (!editing.has(m) || e.button > 0) return;
       e.stopPropagation(); e.preventDefault();
-      const o = offset(m, el._lkid) || [0, 0], map = getMap && getMap();
+      const o = el._lkpx || offset(m, el._lkid) || [0, 0], map = getMap && getMap();
       drag = { sx: e.clientX, sy: e.clientY, ox: o[0], oy: o[1], moved: false, map };
       if (map && map.setDraggable) map.setDraggable(false);
       try { el.setPointerCapture(e.pointerId); } catch (er) { /* 무시 */ }
@@ -415,8 +484,10 @@ const LabelKit = (() => {
       if (!drag) return;
       const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
       if (!drag.moved && Math.hypot(dx, dy) < 4) return;
-      drag.moved = true; el.classList.add('lk-drag');
-      el.style.translate = `${drag.ox + dx}px ${drag.oy + dy}px`;
+      drag.moved = true; el.classList.add('lk-drag', 'lk-moved'); el.classList.remove('mini', 'sp-dot');
+      const t = [drag.ox + dx, drag.oy + dy];
+      el.style.translate = `${t[0]}px ${t[1]}px`;
+      lead(el, t);
     });
     const end = (e, cancel) => {
       if (!drag) return;
@@ -424,12 +495,21 @@ const LabelKit = (() => {
       if (d.map && d.map.setDraggable) d.map.setDraggable(true);
       if (!d.moved) return;
       justDragged = Date.now();
-      if (cancel) { const o = offset(m, el._lkid); el.style.translate = o ? `${o[0]}px ${o[1]}px` : ''; return; }
-      const x = Math.round(d.ox + e.clientX - d.sx), y = Math.round(d.oy + e.clientY - d.sy);
-      setE(el._lkid, { o: { ...(E(el._lkid).o || {}), [m]: `${x},${y}` } });
+      if (cancel) { applyOff(el); return; }
+      const x = Math.round(d.ox + e.clientX - d.sx), y = Math.round(d.oy + e.clientY - d.sy), id = el._lkid;
+      let val = Math.hypot(x, y) < 3 ? null : `${x},${y}`;                  // 거의 제자리로 돌려놓으면 '원래대로'
+      const pr = projOf(el);
+      if (val && pr && el._lkpos) {                                          // 지도 좌표 차이로 바꿔 저장 → 확대·축소해도 점을 따라감
+        const a = pr.containerPointFromCoords(LLof(el._lkpos)), ll = pr.coordsFromContainerPoint(new kakao.maps.Point(a.x + x, a.y + y));
+        val = `g,${(ll.getLat() - el._lkpos.lat).toFixed(7)},${(ll.getLng() - el._lkpos.lng).toFixed(7)}`;
+      }
+      setE(id, { o: { ...(E(id).o || {}), [m]: val } });
+      applyOff(el);
+      fire(m);                                                               // 겹침 정리 다시 (옮긴 라벨은 점으로 안 줄임)
     };
     el.addEventListener('pointerup', (e) => end(e));
     el.addEventListener('pointercancel', (e) => end(e, true));
+    applyOff(el);
   }
   let pop = null;
   function closePop() { if (pop) { pop.remove(); pop = null; } }
@@ -467,5 +547,5 @@ const LabelKit = (() => {
   document.addEventListener('pointerdown', (e) => { if (pop && !pop.contains(e.target) && !e.target.closest('.lk')) closePop(); }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(); });
 
-  return { get, set, on, reload, render, isLK, stage, declutter, mount, wrap, legend, bind, isEditing, setEditing, font, colorOf, nameOf, starred, hidden, MAPS, FONTS };
+  return { get, set, on, reload, render, isLK, stage, declutter, mount, wrap, legend, bind, isEditing, setEditing, moveState, font, colorOf, nameOf, starred, hidden, MAPS, FONTS };
 })();

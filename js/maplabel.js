@@ -349,7 +349,7 @@ const MapLabel = (() => {
     function setCapture(on) {
       if (cap === on) return;
       cap = on;
-      if (on) { edit = false; sel = null; adding = false; }
+      if (on) { edit = false; sel = null; adding = false; if (o.onEdit) o.onEdit(false); }
       // 버튼은 처음 3초 또렷이 보였다가 흐려지고, 화면을 건드리면 다시 또렷해집니다 (캡처 사진에 거의 안 보이게)
       const wake = () => { exitBtn.classList.remove('dim'); clearTimeout(fade); fade = setTimeout(() => exitBtn.classList.add('dim'), 3000); };
       if (on) { wake(); panel._wake = wake; ['pointermove', 'pointerdown', 'touchstart'].forEach(t => panel.addEventListener(t, wake, { passive: true }));
@@ -393,7 +393,15 @@ const MapLabel = (() => {
       if (k === 'ff' || k === 'ds') { setG({ [k]: e.target.value }); for (const r of rows.values()) style(r); queue();
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(relayout, 60)); setTimeout(relayout, 900); }
     });
-    ctl.addEventListener('change', (e) => { if (e.target.dataset.ml === 'edit') { edit = e.target.checked; if (!edit) sel = null; for (const r of rows.values()) style(r); syncCtl(); relayout(); } });
+    /** 라벨 편집(이동) 모드 켜고 끄기 — 체크 상자와 지도 위 [✥ 이동] 버튼이 같이 씀 */
+    function setEdit(on) {
+      on = !!on; if (cap) on = false;
+      if (edit === on) { syncCtl(); return; }
+      edit = on; if (!edit) sel = null;
+      for (const r of rows.values()) style(r); syncCtl(); relayout();
+      if (o.onEdit) o.onEdit(edit);
+    }
+    ctl.addEventListener('change', (e) => { if (e.target.dataset.ml === 'edit') setEdit(e.target.checked); });
     ctl.addEventListener('click', (e) => {
       const k = e.target.dataset.ml; if (!k) return;
       if (k === 'capture') setCapture(true);
@@ -414,7 +422,7 @@ const MapLabel = (() => {
       if (k === 'iclose') { sel = null; for (const r of rows.values()) style(r); syncCtl(); }
     });
     syncCtl();
-    return { set, relayout, setCapture };
+    return { set, relayout, setCapture, setEdit, isEdit: () => edit };
   }
 
   return { create, layout, edgePoint, rectGap };
