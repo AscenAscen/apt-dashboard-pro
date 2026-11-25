@@ -13,7 +13,7 @@ const YardMap = (() => {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => U.esc(s);
   const KEY = 'apt.yardmap.v1', UKEY = 'apt.yardmapUi.v1';
-  const DBL = 280, LONG = 550;                       // 두 번 누르기 간격 · 길게 누르기 시간 (ms)
+  const DBL = 400, LONG = 550;                       // 두 번 누르기 간격 · 길게 누르기 시간 (ms)
   const SIDO = { 서울: '서울특별시', 경기: '경기도', 인천: '인천광역시', 부산: '부산광역시', 대구: '대구광역시', 광주: '광주광역시', 대전: '대전광역시', 울산: '울산광역시',
     경남: '경상남도', 충북: '충청북도', 충남: '충청남도', 전북: '전북특별자치도', 경북: '경상북도', 강원: '강원특별자치도', 세종: '세종특별자치시', 전남: '전라남도', 제주: '제주특별자치도' };
   // 급지 색 (박스 테두리·켜졌을 때 색) — 이미지의 빨강·노랑·초록·파랑·보라
@@ -171,8 +171,10 @@ const YardMap = (() => {
     return { s: q?.s ?? rl?.sale?.price ?? null, r: q?.r ?? rl?.rent?.price ?? null, real: q?.s == null && !!rl?.sale };
   }
   const eok = (v) => (v == null ? '-' : Kit.eok(v));
+  let lastOpen = 0;
   async function openDetail(id) {
     const x = find(id); if (!x) return;
+    lastOpen = Date.now();
     const { b } = x, code = codeOf(b), box = $('ymDb');
     $('ymDt').textContent = `${b.name}${b.city ? ` (${b.city})` : ''} · ${x.g.name}`;
     $('ymDetail').hidden = false;
@@ -250,6 +252,13 @@ const YardMap = (() => {
       if (pend && pend.id === id && now - pend.t < DBL) { clearTimeout(pend.timer); pend = null; openDetail(id); return; }      // 두 번 누름
       flush();
       pend = { id, t: now, timer: setTimeout(() => { const p = pend; pend = null; if (p) toggle(p.id); }, DBL) };           // 한 번 누름: 두 번째가 안 오면 켜고 끔
+    });
+    // 브라우저가 알려 주는 '더블클릭'도 인식 — 컴퓨터 설정이 느린 더블클릭이라 위 간격을 넘겨도 단지 창이 열리게 함
+    root.addEventListener('dblclick', (e) => {
+      const el = e.target.closest('.ym-b'); if (!el || edit || e.target.closest('[data-del]')) return;
+      clearTimeout(pend?.timer); pend = null;
+      if (Date.now() - lastOpen < 700) return;                                        // 위에서 이미 열었으면 건너뜀
+      openDetail(el.dataset.id);
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('ymDetail') && !$('ymDetail').hidden) $('ymDetail').hidden = true; });
   }
