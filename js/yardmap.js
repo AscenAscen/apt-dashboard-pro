@@ -171,7 +171,86 @@ const YardMap = (() => {
     return { s: q?.s ?? rl?.sale?.price ?? null, r: q?.r ?? rl?.rent?.price ?? null, real: q?.s == null && !!rl?.sale };
   }
   const eok = (v) => (v == null ? '-' : Kit.eok(v));
-  let lastOpen = 0;
+  let lastOpen = 0, cur = null;                          // cur: 지금 열린 창 { lm, tr } (표를 다시 그릴 때 씀)
+  const curYm = () => { const t = new Date(); return t.getFullYear() * 100 + t.getMonth() + 1; };
+  const ymd = (d) => { const t = String(d); return { y: t.slice(2, 4), m: t.slice(4, 6), d: t.slice(6, 8) }; };
+
+  /* ── 호가 (랜드마크 탭 · 시세트래킹 탭 어느 쪽에 적었든 입력한 값을 보여 줌) ── */
+  /** 이 기록에서 f(s=매매, r=전세)가 적힌 가장 최근 달 → { v(만원), m(연월), at(입력일) } */
+  const latestQ = (rec, f) => {
+    if (!rec || !rec.quotes) return null;
+    for (const m of Object.keys(rec.quotes).map(Number).sort((a, b) => b - a)) { const v = rec.quotes[m]?.[f]; if (v != null) return { v, m, at: rec.qt?.[m] || '' }; }
+    return null;
+  };
+  const atText = (at) => {
+    const m = typeof at === 'string' ? at.match(/^\d{4}-(\d{2})-(\d{2})/) : null; if (m) return `${m[1]}.${m[2]}`;
+    if (typeof at === 'number' && at > 1e9) { const d = new Date(at); return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; }
+    return '';
+  };
+  const qMaps = () => ({ L: new Map((typeof Land !== 'undefined' ? Land.all() : []).map(l => [l.id, l])), T: new Map((typeof Tracking !== 'undefined' ? Tracking.all() : []).map(t => [t.id, t])) });
+  /** 두 탭에 다 있으면 더 최근 달 값, 같은 달이면 이 줄이 속한 탭(own) 값 */
+  function qShow(mp, id, f, own) {
+    const a = latestQ(mp.L.get(id), f), b = latestQ(mp.T.get(id), f);
+    if (!a || !b) return a || b;
+    return a.m !== b.m ? (a.m > b.m ? a : b) : (own === 'L' ? a : b);
+  }
+  const qVal = (r) => (r ? +(r.v / 10000).toFixed(2) : '');
+  const qTip = (r) => (r ? (atText(r.at) ? `${atText(r.at)} 입력` : '입력일 없음') : '호가를 입력하세요 (억 단위)');
+  const qCell = (mp, id, f, own) => { const r = qShow(mp, id, f, own); return `<td><input class="ym-q num" inputmode="decimal" data-id="${esc(id)}" data-f="${f}" data-own="${own}" placeholder="억" value="${qVal(r)}" title="${esc(qTip(r))}"></td>`; };
+  function refreshQ(force) {
+    const mp = qMaps();
+    $('ymDb').querySelectorAll('.ym-q').forEach(inp => {
+      if (inp === document.activeElement && inp !== force) return;
+      const r = qShow(mp, inp.dataset.id, inp.dataset.f, inp.dataset.own);
+      inp.value = qVal(r); inp.title = qTip(r);
+    });
+  }
+  /** 호가 저장: 같은 단지가 두 탭에 다 있으면 같이 저장. 비우면 보이던(가장 최근) 값을 두 탭에서 지움 */
+  function saveQ(inp) {
+    if (locked()) return false;
+    const id = inp.dataset.id, f = inp.dataset.f, raw = inp.value.trim().replace(/,/g, ''), v = raw === '' ? null : Number(raw);
+    if (v != null && (isNaN(v) || v < 0)) { U.toast('숫자만 적어 주세요.'); return false; }
+    const mp = qMaps(), hasL = mp.L.has(id), hasT = mp.T.has(id), ym = curYm();
+    if (!hasL && !hasT) return false;
+    if (v == null) {
+      [[hasL, mp.L, Land], [hasT, mp.T, Tracking]].forEach(([has, m, mod]) => { if (!has) return; const r = latestQ(m.get(id), f); if (r) mod.setQuote(id, r.m, { [f]: null }); });
+    } else {
+      const man = Math.round(v * 10000);
+      if (hasL) Land.setQuote(id, ym, { [f]: man });
+      if (hasT) Tracking.setQuote(id, ym, { [f]: man });
+    }
+    if (hasT && typeof Tracking.render === 'function') { try { Tracking.render(); } catch (e) { console.error(e); } }   // 시세트래킹 표도 바로 새로
+    if (v == null) { const r = qShow(qMaps(), id, f, inp.dataset.own); U.toast(r ? `지웠습니다. 이전 기록(${r.m % 100}월) ${qVal(r)}억이 대신 보입니다.` : '호가를 지웠습니다.'); return true; }
+    U.toast(`${f === 's' ? '매매' : '전세'} 호가 ${v}억을 저장했습니다${hasL && hasT ? ' (랜드마크·시세트래킹 둘 다)' : hasL ? ' (랜드마크)' : ' (시세트래킹)'}.`);
+    return true;
+  }
+
+  /* ── 직전 실거래 (매매·전세 각각 가장 최근 1건, 직거래 제외) ── */
+  const tradeText = (t) => {
+    if (!t) return '<span class="ym-na">-</span>';
+    const d = ymd(t.d), dt = new Date(2000 + +d.y, +d.m - 1, +d.d), cut = new Date(); cut.setFullYear(cut.getFullYear() - 1);
+    const old = dt < cut, fl = t.floor ? `·${t.floor}층` : '';
+    return `<span class="${old ? 'ym-old' : ''}">${eok(t.price)} <small>(${old ? d.y + '.' : ''}${d.m}.${d.d}${fl})</small></span>`;
+  };
+
+  function paintDetail() {
+    const { lm, tr } = cur, box = $('ymDb'), mp = qMaps();
+    const dongs = new Map(); [...lm, ...tr].forEach(v => { const k = v.name || ''; (dongs.get(k) || dongs.set(k, new Set()).get(k)).add(v.dong || ''); });
+    const nm = (v) => `<td class="l ym-nm" title="${esc(v.dong || '')}">${esc(v.name)}${dongs.get(v.name || '').size > 1 && v.dong ? `<small>${esc(v.dong)}</small>` : ''}</td>`;
+    const py = (g) => `<td>${g}㎡</td>`;
+    const tradeCells = (id) => { const rl = (typeof Real !== 'undefined' ? Real.get(id) : null) || {}; return `<td class="l">${tradeText(rl.sale)}</td><td class="l">${tradeText(rl.rent)}</td>`; };
+    const head = (first) => `<thead><tr><th class="ym-c0">${first}</th><th class="l">단지</th><th>평형</th><th>매매 호가(억)</th><th>전세 호가(억)</th><th class="l">직전 실거래 매매</th><th class="l">직전 실거래 전세</th></tr></thead>`;
+    const lmRows = lm.map(l => `<tr><td class="ym-c0">${esc(grade(l.grade).name || l.grade)}</td>${nm(l)}${py(l.g)}${qCell(mp, l.id, 's', 'L')}${qCell(mp, l.id, 'r', 'L')}${tradeCells(l.id)}</tr>`).join('');
+    const trRows = tr.slice().sort((a, c) => (a.dong || '').localeCompare(c.dong || '', 'ko') || (a.name || '').localeCompare(c.name || '', 'ko'))
+      .map(it => `<tr><td class="ym-c0"></td>${nm(it)}${py(it.g)}${qCell(mp, it.id, 's', 'T')}${qCell(mp, it.id, 'r', 'T')}${tradeCells(it.id)}</tr>`).join('');
+    box.innerHTML = `<div class="ym-sec"><b>★ 랜드마크 ${lm.length}개</b> <button class="mini" data-go="land">랜드마크 탭 ▸</button></div>` +
+      (lm.length ? `<div class="tablewrap"><table class="ym-t">${head('등급')}<tbody>${lmRows}</tbody></table></div>`
+        : '<p class="hint">이 지역에 등록한 랜드마크가 없습니다. 랜드마크 탭에서 추가하세요.</p>') +
+      `<div class="ym-sec"><b>⭐ 시세트래킹 ${tr.length}개</b> <button class="mini" data-go="tracking">시세트래킹 탭 ▸</button></div>` +
+      (tr.length ? `<div class="tablewrap"><table class="ym-t">${head('')}<tbody>${trRows}</tbody></table></div>`
+        : '<p class="hint">이 지역에 담은 시세트래킹 단지가 없습니다.</p>') +
+      '<p class="hint">호가는 억 단위로 적고 Enter 를 누르면 저장됩니다. 랜드마크·시세트래킹 탭에 같이 반영되고(둘 다 있는 단지), 칸에 마우스를 올리면 입력일이 보입니다. 비운 칸은 아직 적은 호가가 없다는 뜻입니다. 실거래는 직거래를 뺀 가장 최근 1건 (<small>(월.일·층)</small>, 1년 넘은 거래는 연도 포함·옅게).</p>';
+  }
   async function openDetail(id) {
     const x = find(id); if (!x) return;
     lastOpen = Date.now();
@@ -184,20 +263,8 @@ const YardMap = (() => {
     const tr = (typeof Tracking !== 'undefined' ? Tracking.all() : []).filter(it => it.code === code);
     try { await Real.load([...lm, ...tr].map(v => ({ id: v.id, code: v.code, key: v.key, g: v.g }))); } catch (e) { console.error(e); }
     if ($('ymDetail').hidden || $('ymDt').textContent.indexOf(b.name) !== 0) return;
-    const py = (g) => `${g}㎡`;
-    const lmRows = lm.map(l => { const p = priceOf(l); return `<tr><td>${esc(grade(l.grade).name || l.grade)}</td><td class="l">${esc(l.name)}</td><td class="l">${esc(l.dong || '')}</td><td>${py(l.g)}</td><td>${eok(p.s)}${p.real ? '<small class="ym-real">실</small>' : ''}</td><td>${eok(p.r)}</td></tr>`; }).join('');
-    const trRows = tr.slice().sort((a, c) => (a.dong || '').localeCompare(c.dong || '', 'ko') || (a.name || '').localeCompare(c.name || '', 'ko')).map(it => {
-      const rec = typeof Tracking.rec === 'function' ? (Tracking.rec(it.id) || it) : it, p = priceOf({ id: it.id, rec });
-      const ld = typeof Land !== 'undefined' && Land.leadOf && p.s ? Land.leadOf({ id: it.id, code: it.code, s: p.s }) : null;
-      return `<tr><td class="l">${esc(it.name)}</td><td class="l">${esc(it.dong || '')}</td><td>${py(it.g)}</td><td>${eok(p.s)}${p.real ? '<small class="ym-real">실</small>' : ''}</td><td>${eok(p.r)}</td><td title="${ld ? esc(ld.name) : ''}">${ld ? ld.pct.toFixed(0) + '%' : '-'}</td></tr>`;
-    }).join('');
-    box.innerHTML = `<div class="ym-sec"><b>★ 랜드마크 ${lm.length}개</b> <button class="mini" data-go="land">랜드마크 탭 ▸</button></div>` +
-      (lm.length ? `<div class="tablewrap"><table class="ym-t"><thead><tr><th>등급</th><th class="l">단지</th><th class="l">동</th><th>평형</th><th>매매</th><th>전세</th></tr></thead><tbody>${lmRows}</tbody></table></div>`
-        : '<p class="hint">이 지역에 등록한 랜드마크가 없습니다. 랜드마크 탭에서 추가하세요.</p>') +
-      `<div class="ym-sec"><b>⭐ 시세트래킹 ${tr.length}개</b> <button class="mini" data-go="tracking">시세트래킹 탭 ▸</button></div>` +
-      (tr.length ? `<div class="tablewrap"><table class="ym-t"><thead><tr><th class="l">단지</th><th class="l">동</th><th>평형</th><th>매매</th><th>전세</th><th title="같은 지역 랜드마크 매매가 대비 %">랜드마크 대비</th></tr></thead><tbody>${trRows}</tbody></table></div>`
-        : '<p class="hint">이 지역에 담은 시세트래킹 단지가 없습니다.</p>') +
-      '<p class="hint">가격은 적어 둔 호가가 먼저, 없으면 최근 실거래(<small class="ym-real">실</small>)입니다.</p>';
+    cur = { lm, tr };
+    paintDetail();
   }
 
   /* ── 지역 추가 ── */
@@ -253,6 +320,11 @@ const YardMap = (() => {
       flush();
       pend = { id, t: now, timer: setTimeout(() => { const p = pend; pend = null; if (p) toggle(p.id); }, DBL) };           // 한 번 누름: 두 번째가 안 오면 켜고 끔
     });
+    root.addEventListener('change', (e) => {                                          // 호가 입력칸
+      const t = e.target.closest('.ym-q'); if (!t) return;
+      saveQ(t); refreshQ(t);
+    });
+    root.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.closest('.ym-q')) e.target.blur(); });
     // 브라우저가 알려 주는 '더블클릭'도 인식 — 컴퓨터 설정이 느린 더블클릭이라 위 간격을 넘겨도 단지 창이 열리게 함
     root.addEventListener('dblclick', (e) => {
       const el = e.target.closest('.ym-b'); if (!el || edit || e.target.closest('[data-del]')) return;

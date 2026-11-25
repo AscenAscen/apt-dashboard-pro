@@ -14,6 +14,9 @@ const Land = (() => {
   const grade = (k) => CONFIG.GRADES.find(g => g.k === k) || CONFIG.GRADES[CONFIG.GRADES.length - 1];
   const rank = (k) => { const i = CONFIG.GRADES.findIndex(g => g.k === k); return i < 0 ? 99 : i; };
   const save = () => { Store.set(KEY, map); Store.set(MKEY, months); };
+  const todayStr = () => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; };
+  /** 'YYYY-MM-DD'(또는 시각 숫자) → '11.26' (입력일 표시용) */
+  const qdText = (at) => { const m = typeof at === 'string' ? at.match(/^\d{4}-(\d{2})-(\d{2})/) : null; if (m) return `${m[1]}.${m[2]}`; if (typeof at === 'number' && at > 1e9) { const d = new Date(at); return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; } return ''; };
   const all = () => Object.keys(map).map(id => ({ ...Kit.parseId(id), ...map[id] })).sort((a, b) => rank(a.grade) - rank(b.grade) || a.name.localeCompare(b.name, 'ko'));
   /** 랜드마크의 지금 가격: 이 탭의 시세 기록에 적은 매매 호가 → 없으면 최근 실거래 */
   function price(l) {
@@ -114,7 +117,8 @@ const Land = (() => {
       ms.map((m, k) => `<th colspan="4" class="grp c">${Kit.ymText(m)}${k === 0 ? ' · 최신' : ''} <button class="mini" data-delm="${m}" title="이 달 기록 삭제">×</button></th>`).join('') + '</tr><tr>' +
       ms.map(() => QF.map(f => `<th>${f[1]}</th>`).join('')).join('') + '</tr></thead><tbody>' +
       list.map(l => `<tr data-id="${U.esc(l.id)}"><td><b style="color:${grade(l.grade).color}">${U.esc(l.grade)}</b></td><td class="l">${U.esc(l.sgg)} ${U.esc(l.dong)} <b>${U.esc(l.name)}</b></td><td>${l.g}㎡<small>${CONFIG.toPyeong(l.g)}평</small></td>` +
-        ms.map(m => QF.map(f => `<td><input class="num" inputmode="decimal" data-m="${m}" data-f="${f[0]}" value="${val(l, m, f[0])}" placeholder="${f[0] === 's' || f[0] === 'r' ? '억' : '개'}"></td>`).join('')).join('') + '</tr>').join('') + '</tbody>';
+        ms.map(m => QF.map(f => { const mny = f[0] === 's' || f[0] === 'r', at = mny && l.quotes?.[m]?.[f[0]] != null ? qdText(l.qt?.[m]) : '';
+          return `<td><input class="num" inputmode="decimal" data-m="${m}" data-f="${f[0]}" value="${val(l, m, f[0])}" placeholder="${mny ? '억' : '개'}">${at ? `<small class="qd" title="${at} 입력">${at}</small>` : ''}</td>`; }).join('')).join('') + '</tr>').join('') + '</tbody>';
   }
   function quoteExcel() {
     const ms = sortedMonths(), list = all();
@@ -216,8 +220,8 @@ const Land = (() => {
       const m = t.dataset.m, f = t.dataset.f, raw = t.value.trim().replace(/,/g, ''), v = raw === '' ? null : Number(raw);
       if (v != null && (isNaN(v) || v < 0)) { U.toast('숫자만 적어 주세요.'); t.value = ''; return; }
       const q = ((map[id].quotes = map[id].quotes || {})[m] = map[id].quotes[m] || {});
-      if (v == null) delete q[f]; else q[f] = (f === 's' || f === 'r') ? Math.round(v * 10000) : Math.round(v);
-      if (!Object.keys(q).length) delete map[id].quotes[m];
+      if (v == null) delete q[f]; else { q[f] = (f === 's' || f === 'r') ? Math.round(v * 10000) : Math.round(v); (map[id].qt = map[id].qt || {})[m] = todayStr(); }
+      if (!Object.keys(q).length) { delete map[id].quotes[m]; if (map[id].qt) delete map[id].qt[m]; }
       save(); table(all()); gap();
     };
     $('ldQuotes').onclick = (e) => {
@@ -247,5 +251,18 @@ const Land = (() => {
   }
   const open = () => { if (inited) render(); };
   const reload = () => { map = Store.get(KEY, {}); months = Store.get(MKEY, []); };
-  return { init, open, all, leadOf, reload };
+  const has = (id) => !!map[id];
+  /** 다른 탭(앞마당)에서 호가 넣기: patch = { s, r } (만원, null 이면 지움). 입력일(qt)도 함께 기록 */
+  function setQuote(id, ym, patch) {
+    const l = map[id]; if (!l) return false;
+    if (!months.includes(ym)) { months.push(ym); months.sort((a, b) => b - a); }
+    const q = ((l.quotes = l.quotes || {})[ym] = l.quotes[ym] || {});
+    for (const f of ['s', 'r']) if (f in patch) { if (patch[f] == null) delete q[f]; else q[f] = patch[f]; }
+    l.qt = l.qt || {};
+    if (Object.keys(q).length) l.qt[ym] = todayStr(); else { delete l.quotes[ym]; delete l.qt[ym]; }
+    save();
+    if (inited) { try { const list = all(); table(list); quoteTable(list); gap(); } catch (e) { console.error(e); } }
+    return true;
+  }
+  return { init, open, all, leadOf, reload, has, setQuote };
 })();

@@ -133,7 +133,8 @@ const Tracking = (() => {
     if (!months.includes(ym)) { months.push(ym); months.sort((a, b) => b - a); }
     const q = it.quotes[ym] = { ...(it.quotes[ym] || {}) };
     for (const f of ['s', 'r']) if (f in patch) { if (patch[f] == null) delete q[f]; else q[f] = patch[f]; }
-    it.qt = it.qt || {}; it.qt[ym] = Date.now();
+    it.qt = it.qt || {}; it.qt[ym] = today();                         // 입력일은 탭에서 직접 입력할 때와 같은 'YYYY-MM-DD' 글자로
+    if (!Object.keys(q).length) { delete it.quotes[ym]; delete it.qt[ym]; }
     save(); return true;
   }
   /** 폴더에서 빼기. 그 폴더에만 있던 단지면 시세트래킹에서 지움 → 'deleted' */
@@ -775,5 +776,5 @@ const Tracking = (() => {
   }
 
   const ext = () => ({ get items() { return items; }, checked, folders, get months() { return months; }, real, save, render, compute, gapPct, GAPLIM, ymLabel, pyeong, folderList: () => folders, setFolders: (f) => { folders = f; Store.set(FKEY, folders); if (!folders.includes(curFolder)) { curFolder = ''; Store.set('apt.curFolder', ''); } fillSelects(); render(); } });
-  return { ext, init, add, fillHH, setField, setQuote, removeFrom, focus, renameFolder, deleteFolder, moveFolder, pinFolder, pickFolder, folderList: () => folders, folderCount: (f) => items.filter(it => it.folders.includes(f)).length, curFolder: () => curFolder, checkedIds: () => [...checked], all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
+  return { ext, init, add, fillHH, setField, setQuote, render, removeFrom, focus, renameFolder, deleteFolder, moveFolder, pinFolder, pickFolder, folderList: () => folders, folderCount: (f) => items.filter(it => it.folders.includes(f)).length, curFolder: () => curFolder, checkedIds: () => [...checked], all, open, pyeong, quotesOf, rec, has, save, getMonths, addMonth, ymLabel, allRecords, exportAll, importAll, sameDay: today, FIXED, GROUP, STATUSES };
 })();
