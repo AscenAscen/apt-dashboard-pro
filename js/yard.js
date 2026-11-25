@@ -415,6 +415,7 @@ const Yard = (() => {
         <div><span class="hint" style="margin:0">가격대 폭</span><div class="presets" id="ydStep">${[0.5, 1, 2].map(v => `<button data-v="${v}" class="${v === stepNow ? 'on' : ''}">${v}억</button>`).join('')}<input id="ydStepIn" class="num" inputmode="decimal" style="width:56px" placeholder="직접" value="${[0.5, 1, 2].includes(stepNow) ? '' : stepNow}"></div></div>
         <label>1등 저장 달 <input type="month" id="ydYm" value="${ymShort(ui.ym)}"></label>
         <label class="row" style="flex-direction:row;align-items:center;padding-bottom:7px;gap:6px"><input type="checkbox" id="ydOnlyPick" ${ui.onlyPick ? 'checked' : ''}> 픽한 단지만 보기</label>
+        <label class="row" style="flex-direction:row;align-items:center;padding-bottom:7px;gap:6px"><input type="checkbox" id="ydDim" ${ui.dim ? 'checked' : ''}> 픽 안 한 단지 흐리게</label>
         <label>칸 안 정렬 <select id="ydSort">${[['s', '호가 낮은 순'], ['pick', '픽 먼저'], ['by', '신축순'], ['hh', '세대수 많은 순'], ['gap', '투자금 적은 순'], ['chg', '지난 대비 오른 순'], ['name', '단지명순']].map(([k, t]) => `<option value="${k}" ${ui.sort === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         <span class="grow"></span>
         <button id="ydPickAllTrk" title="이 달에 지정한 1등(모든 평형)을 시세트래킹에 담기">🥇 ${ymLabel(ui.ym)} 1등 전체 트래킹 담기</button>
@@ -454,7 +455,7 @@ const Yard = (() => {
       return section(lo, `<b>${bandLabel(lo, hi)}</b> <small>(${bandRange(lo, hi)})</small> · ${list.length}개 · 픽 ${list.filter(r => picked(r.id)).length}개` +
         `<span class="yd-pickname">${p ? `🥇 1등: <b>${esc(pn)}</b> ${p.id.split('#')[1]}㎡` : '<span class="hint" style="margin:0">🥇 1등: 아직 안 고름</span>'}</span>`, list);
     };
-    const table = rows.length ? `<div class="tablewrap yd-table"><table id="ydTable"><thead><tr><th class="c"><input type="checkbox" id="ydChkAll" title="보이는 단지 모두 체크"></th>` +
+    const table = rows.length ? `<div class="tablewrap yd-table"><table id="ydTable" class="${ui.dim ? 'yd-dim' : ''}"><thead><tr><th class="c"><input type="checkbox" id="ydChkAll" title="보이는 단지 모두 체크"></th>` +
       H('pick', '픽', 'c') + H('first', '1등', 'c') + H('sgg', '시·군·구', 'l') + H('dong', '동', 'l') + H('name', '단지명', 'l') + H('area', '평형') + H('s', '매매(억)') + H('r', '전세(억)') + H('gap', '투자금') + H('chg', '지난 대비') +
       H('by', '연식') + H('hh', '세대수') + H('sale', '최근 실거래(매매)') + H('rent', '<span title="국토부 전세 실거래(월세 제외). 갱신계약도 섞여 있어 시세보다 낮게 보일 수 있습니다">최근 실거래(전세) ⓘ</span>') + H('drop', '전고 대비') + H('rise', '전저 대비') + H('memo', '메모', 'l') + H('sent', '트래킹', 'c') + '<th></th></tr></thead>' +
       (fresh.length ? section('fresh', `<b>🆕 새로 추가한 단지 · 호가 입력 필요</b> (${fresh.length}개)`, fresh.sort((a, b) => a.name.localeCompare(b.name, 'ko')), 'yd-new') : '') +
@@ -480,6 +481,7 @@ const Yard = (() => {
     $('ydStepIn').onchange = (e) => { const v = Number(e.target.value); if (!(v > 0 && v <= 20)) return U.toast('0.1~20 사이 억 단위로 적어 주세요. (예: 1.5)'); set(() => { ui.step = Math.round(v * 100) / 100; }); };
     $('ydYm').onchange = (e) => { const ym = +String(e.target.value).replace('-', ''); if (ym) set(() => { ui.ym = ym; }); };
     $('ydOnlyPick').onchange = (e) => set(() => { ui.onlyPick = e.target.checked; });
+    $('ydDim').onchange = (e) => set(() => { ui.dim = e.target.checked; });
     $('ydSort').onchange = (e) => { if (e.target.value === '__hdr') return; set(() => { ui.sort = e.target.value; }); };
     $('ydPickXl').onclick = () => pickExcel(rows);
     $('ydPickAllTrk').onclick = () => {
