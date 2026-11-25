@@ -124,6 +124,7 @@ tbody tr:hover { background: var(--hover); }
 tbody tr.sel { background: var(--sel); }
 #listTable tbody tr { cursor: pointer; }
 td small { color: var(--sub); margin-left: 4px; }
+td small.qd { display: block; margin: 1px 0 0; font-size: 10px; text-align: right; }
 .up { color: var(--up); }
 .down { color: var(--down); }
 .sale { color: var(--accent); }
