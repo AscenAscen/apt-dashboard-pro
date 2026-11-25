@@ -289,7 +289,8 @@ const LabelKit = (() => {
   const isLK = (m) => get(m).ds !== 'legacy';
   /** 지도 확대 정도 → 'far' | 'mid' | 'near'. 지도를 담은 상자에 표시해 두면 CSS 가 모양을 바꿉니다 */
   function stage(m, level) {
-    const s = get(m), st = !s.zm || editing.has(m) ? 'near' : level >= 8 ? 'far' : level >= 6 ? 'mid' : 'near';
+    const s = get(m), small = m === 'start' && window.matchMedia('(max-width: 760px)').matches;      // 휴대폰 홈: 화면이 작아 한 단계 일찍 간단히
+    const st = !s.zm || editing.has(m) ? 'near' : level >= (small ? 7 : 8) ? 'far' : level >= (small ? 5 : 6) ? 'mid' : 'near';
     const mt = mounts.get(m); if (mt) mt.host.dataset.lkz = st;
     return st;
   }

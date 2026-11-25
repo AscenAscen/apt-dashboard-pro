@@ -209,6 +209,7 @@ const Start = (() => {
   }
   function showTip(cx, el, pin) {
     clearTimeout(tipTimer);
+    if (isTouch() && pop) { pop = ''; renderPop(); }              // 휴대폰: 단지 창을 열면 아래 펼침 창은 닫음
     const same = tip && tip.cx === cx;
     tip = { cx, el, pc: same ? tip.pc : focusPc(cx) };
     tipPin = pin || (same && tipPin);
@@ -490,6 +491,7 @@ const Start = (() => {
     const all = Store.get(FIX_KEY, {}) || {};
     if (f && ((f.add && f.add.length) || (f.del && f.del.length))) all[id] = f; else delete all[id];
     Store.set(FIX_KEY, all);
+    const cc = Store.get(CKEY, {}) || {}; if (cc[id]) { delete cc[id]; Store.set(CKEY, cc); }      // 경계가 바뀌었으니 단지 중심도 다시 구함
   }
   const jimok = (f) => { const j = pick(f.properties, ['jibun']); const m = j.match(/([가-힣])\s*$/); return m ? m[1] : ''; };
   /** 카카오 장소 검색으로 단지 위치 (주소 위치에서 1km 안, 이름이 맞는 아파트만) */
@@ -612,6 +614,43 @@ const Start = (() => {
       d.labels.push({ ...lb, c });
     }
   }
+  /* ═════════ 단지 중심 (시세지도 같은 다른 탭이 점을 단지 한가운데에 찍을 때 씀) ═════════
+     · 단지 경계(필지 합친 모양)의 무게중심. 한가운데가 경계 밖(ㄱ자 단지 등)이면 경계 안의 가장 가까운 점
+     · 브이월드 자료로 구한 값이라 저장해 둠 → 한 번 구하면 다음부터는 바로 (apt.cxCenter.v1)
+     · 구하지 못했거나 주소 위치에서 400m 넘게 벗어나면 "못 구함"으로 적어 두고 7일 뒤 다시 시도 (주소 위치를 그대로 씀)
+     · 네트워크·키 문제처럼 잠깐 안 되는 경우는 적어 두지 않고 10분만 쉼 */
+  const CKEY = 'apt.cxCenter.v1', RETRY_MS = 7 * 864e5, PAUSE_MS = 10 * 60000, MAX_OFF = 400;
+  const cenErr = new Map();
+  const centers = () => Store.get(CKEY, {}) || {};
+  /** 저장해 둔 중심 { lat, lng } (없으면 null) */
+  function centerCached(id) { const c = centers()[id]; return c && c.lat != null ? { lat: c.lat, lng: c.lng } : null; }
+  /** info = { code, key, name } · p = 주소로 찾은 위치 { lat, lng } → 단지 중심 { lat, lng } 또는 null */
+  async function centerOf(info, p) {
+    const id = `${info.code}|${info.key}`, hit = centers()[id];
+    if (hit && hit.lat != null) return { lat: hit.lat, lng: hit.lng };
+    if (hit && hit.x && Date.now() - hit.t < RETRY_MS) return null;
+    if (cenErr.has(id) && Date.now() - cenErr.get(id) < PAUSE_MS) return null;
+    if (!p) return null;
+    let out = null;
+    try {
+      const kp = await Data.kapt(info.code), m = (kp && kp.m && kp.m[info.key]) || [];
+      const cx = { id, code: info.code, key: info.key, name: info.name, alias: (typeof Alias !== 'undefined' && Alias.of(info.code, info.key)) || '', hh: info.hh || m[0] || null, dn: m[1] || null };
+      if (!pos.get(id)) pos.set(id, p);
+      const d = await computeOl(cx);
+      if (d) {
+        await loadTurf(); finalize(d);
+        if (d.u) {
+          let c = turf.centerOfMass(d.u);
+          if (!inside(c, d.u)) c = turf.pointOnFeature(d.u);
+          const [lng, lat] = c.geometry.coordinates;
+          if (turf.distance(turf.point([p.lng, p.lat]), turf.point([lng, lat]), { units: 'meters' }) <= MAX_OFF) out = { lat: +lat.toFixed(6), lng: +lng.toFixed(6) };
+        }
+      }
+    } catch (e) { cenErr.set(id, Date.now()); console.warn('단지 중심 계산 실패', id, e); return null; }
+    const cur = centers(); cur[id] = out ? { ...out, t: Date.now() } : { x: 1, t: Date.now() }; Store.set(CKEY, cur);
+    return out;
+  }
+
   /* 그리기: strong = 고른 단지(굵게) / 아니면 저절로 그린 경계(가늘게) */
   function drawOl(d, strong) {
     if (!d.labels) finalize(d);
@@ -872,7 +911,7 @@ const Start = (() => {
     side.querySelector('[data-p="label"]').classList.toggle('on', st.mode === 'emph');
     side.querySelector('[data-p="trk"]').classList.toggle('on', !!st.trk);
     side.querySelector('[data-p="cmp"] small').textContent = basket.length ? `${basket.length}/4` : '단지비교';
-    side.querySelector('[data-p="filter"]').classList.toggle('on', !!(st.hh !== 300 || st.age));
+    side.querySelector('[data-p="filter"]').classList.toggle('on', !!(st.hh !== 300 || st.age || st.pys.length));
     ['region', 'cmp', 'filter'].forEach(k => side.querySelector(`[data-p="${k}"]`).classList.toggle('open', pop === k));
     side.querySelectorAll('[data-py]').forEach(c => { c.checked = st.pys.includes(c.dataset.py); });
   }
@@ -881,6 +920,8 @@ const Start = (() => {
   }
   function renderPop() {
     const p = $('stPop'); p.hidden = !pop; sideState();
+    const w = $('stWrap'); if (w) w.classList.toggle('pop-open', !!pop);
+    if (pop && isTouch() && tip) hideTip();                       // 휴대폰: 시트는 한 번에 하나만
     if (!pop) return;
     let h = '';
     if (pop === 'region') {
@@ -907,7 +948,9 @@ const Start = (() => {
         <div class="st-sub">마우스 올렸을 때 창</div>${seg('tip', [['A', 'A 한 평형씩'], ['B', 'B 평형별 표']], st.tip)}
         <div class="st-sub">단지 경계 자동 표시 <small>(지도를 이만큼 확대하면 화면 안 단지 경계가 저절로)</small></div>${seg('aol', [[0, '끄기'], [2, '많이 확대'], [3, '확대 (기본)'], [4, '조금 확대']], st.autoLv)}
         <div class="st-sub">단지 경계</div><label class="inline"><input type="checkbox" id="stOther2" ${st.other ? 'checked' : ''}> 상가·관리동 이름도 표시</label>
-        <p class="hint">평형은 왼쪽 아래 59·74·84 체크로 고릅니다.</p>`;
+        <div class="st-sub st-mobonly">평형 <small>(여러 개 고를 수 있어요)</small></div>
+        <span class="seg st-mobonly" id="stPyPick">${PY_PICK.map(p => `<button data-py="${p}" class="${st.pys.includes(p) ? 'on' : ''}">${p}</button>`).join('')}</span>
+        <p class="hint st-deskonly">평형은 왼쪽 아래 59·74·84 체크로 고릅니다.</p>`;
     }
     p.innerHTML = h;
   }
@@ -922,6 +965,11 @@ const Start = (() => {
     if (d.bk) { basket.splice(+d.bk, 1); redraw(); return renderPop(); }
     if ('bkclear' in d) { basket = []; redraw(); return renderPop(); }
     if ('send' in d) return sendCompare();
+    if (d.py) {
+      st.pys = PY_PICK.filter(x => (x === d.py ? !st.pys.includes(x) : st.pys.includes(x))); save(); redraw();
+      if (tip) { tip.pc = focusPc(tip.cx); renderTip(); }
+      return renderPop();
+    }
     if (d.hh != null) { st.hh = +d.hh; save(); redraw(); return renderPop(); }
     if (d.age != null) { st.age = +d.age; save(); redraw(); return renderPop(); }
     if (d.tip) { st.tip = d.tip; save(); if (tip) renderTip(); return renderPop(); }
@@ -939,6 +987,7 @@ const Start = (() => {
       <div id="stMap" class="st-map"></div>
       <div class="st-top">
         <div class="st-search"><input id="stQ" type="search" placeholder="🔍 단지 이름 검색 (전국)" autocomplete="off"></div>
+        <button type="button" class="st-lybtn" id="stLyBtn" title="학교·지하철·상권 같은 레이어 켜고 끄기">🗂 레이어<b id="stLyN"></b></button>
         <div class="st-layers" id="stLayers">${LAYERS.map(L => `<button data-ly="${L.k}" title="${U.esc(L.tip || L.name)} · 확대하면 보입니다"><span>${L.icon}</span>${L.name}</button>`).join('')}</div>
       </div>
       <div class="st-side" id="stSide">
@@ -971,9 +1020,10 @@ const Start = (() => {
       st.pys = PY_PICK.filter(p => (p === c.dataset.py ? c.checked : st.pys.includes(p))); save(); redraw();
       if (tip) { tip.pc = focusPc(tip.cx); renderTip(); }
     });
+    $('stLyBtn').addEventListener('click', () => { const top = document.querySelector('#stWrap .st-top'); top.classList.toggle('lyopen'); $('stLyBtn').classList.toggle('on', top.classList.contains('lyopen')); });
     $('stLayers').addEventListener('click', (e) => {
       const b = e.target.closest('[data-ly]'); if (!b) return;
-      const k = b.dataset.ly; st.layers[k] = st.layers[k] ? 0 : 1; save();
+      const k = b.dataset.ly; st.layers[k] = st.layers[k] ? 0 : 1; save(); lyBadge();
       if (!st.layers[k]) lyClear(k);
       const L = LAYERS.find(x => x.k === k);
       if (st.layers[k] && map && map.getLevel() > L.maxLv) U.toast(`${L.name}은(는) 지도를 더 확대하면 보입니다.`);
@@ -991,6 +1041,8 @@ const Start = (() => {
     if (typeof Finder !== 'undefined') Finder.attach($('stQ'), goTo);
   }
 
+  /** 휴대폰 [레이어] 단추에 켜 둔 레이어 수 표시 */
+  function lyBadge() { const el = $('stLyN'); if (el) el.textContent = Object.values(st.layers || {}).filter(Boolean).length || ''; }
   /* 지도 높이: 화면 아래 끝까지 */
   function fitHeight() {
     const w = $('stWrap'); if (!w || !visible()) return;
@@ -1011,7 +1063,7 @@ const Start = (() => {
     places = new kakao.maps.services.Places();
     kakao.maps.event.addListener(map, 'idle', onIdle);
     kakao.maps.event.addListener(map, 'zoom_changed', () => { declutterSoon(); olLabelsVis(); if (st.autoLv && map.getLevel() > st.autoLv) autoClear(); });
-    kakao.maps.event.addListener(map, 'click', (e) => { if (OL.manual) return toggleParcel(e.latLng); if (tipPin) hideTip(); if (pop) { pop = ''; renderPop(); } });
+    kakao.maps.event.addListener(map, 'click', (e) => { if (OL.manual) return toggleParcel(e.latLng); if (tipPin) hideTip(); if (pop) { pop = ''; renderPop(); } const tp = document.querySelector('#stWrap .st-top'); if (tp && tp.classList.contains('lyopen')) { tp.classList.remove('lyopen'); $('stLyBtn').classList.remove('on'); } });
     fitHeight();
     const saved = st.codes.slice(); st.codes = [];
     for (const c of saved) addRegion(c);
@@ -1029,7 +1081,7 @@ const Start = (() => {
     LabelKit.mount('start', { el: $('stMap'), host: $('stWrap') });
     LabelKit.on('start', relabel);
     inited = true;
-    sideState();
+    sideState(); lyBadge();
     document.addEventListener('keydown', (e) => {
       if (!visible()) return;
       if (e.key === 'Escape') { if (tip) hideTip(); else if (pop) { pop = ''; renderPop(); } else if (OL.manual) { OL.manual = false; olBox(); } }
@@ -1040,5 +1092,5 @@ const Start = (() => {
   }
   function leave() { hideTip(); }
 
-  return { init, open, leave };
+  return { init, open, leave, centerOf, centerCached };
 })();

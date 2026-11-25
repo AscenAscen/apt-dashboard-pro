@@ -64,12 +64,40 @@ const PriceMap = (() => {
     $('pmMonth').innerHTML = '<option value="">최신 호가</option>' + ms.map(m => `<option value="${m}">${Kit.ymText(m)}</option>`).join('');
     if (ms.map(String).includes(String(cm))) $('pmMonth').value = cm;
   }
+  /** 점을 단지 한가운데로 옮김. 중심은 홈 탭의 단지 경계 계산(브이월드)으로 구해 저장해 두므로, 처음 한 번만 시간이 걸리고 다음부터는 바로 뜹니다.
+      구하는 동안은 주소 위치에 점이 있다가 하나씩 중심으로 옮겨 갑니다. (라벨을 옮겨도 점은 고정 — 라벨만 움직임) */
+  let cenMsg = '';
+  function setCountMsg() { const el = $('pmCount'); if (el) el.textContent = el.textContent.replace(/ · 단지 중심 맞추는 중 \(\d+\/\d+\)/, '') + cenMsg; }
+  async function centerJob(my, list) {
+    if (typeof Start === 'undefined' || !Start.centerOf || !(CONFIG.VWORLD_KEY || Store.get('apt.vworldKey', ''))) return;
+    const todo = new Map();
+    list.forEach(r => { const ck = `${r.code}|${r.key}`; if (!r.cen && r.pos && !todo.has(ck)) todo.set(ck, r); });
+    if (!todo.size) return;
+    const q = [...todo.entries()], total = q.length;
+    let n = 0, since = 0, changed = false;
+    const worker = async () => {
+      while (q.length && my === seq) {
+        const [ck, r] = q.shift();
+        const c = await Start.centerOf({ code: r.code, key: r.key, name: r.name }, r.pos).catch(() => null);
+        n++; cenMsg = ` · 단지 중심 맞추는 중 (${n}/${total})`;
+        if (c && my === seq) {
+          [...lastRows, ...lmRows].forEach(x => { if (`${x.code}|${x.key}` === ck) { x.pos = c; x.cen = true; } });
+          baseItems.forEach(i => { if (i.cen === ck) i.pos = c; });
+          changed = true;
+          if (++since >= 4) { since = 0; refreshMap(); } else setCountMsg();
+        } else setCountMsg();
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    cenMsg = '';
+    if (my === seq && changed) refreshMap(); else setCountMsg();
+  }
   /** 지도만 다시 그림 (위치·가격은 다시 찾지 않음). 지도에서 숨긴 단지는 뺌 */
   function refreshMap() {
     const hid = setOf(HKEY), vis = baseItems.filter(i => !hid.has(i.id) && !i.lm).length, nlm = baseItems.filter(i => i.lm).length;
     if (ctrl) ctrl.set([...baseItems.filter(i => !hid.has(i.id)), ...userItems()]);
     const nh = baseItems.filter(i => hid.has(i.id)).length;
-    $('pmCount').textContent = `· ${vis}개 단지 표시 중` + (nlm ? ` + 랜드마크 ${nlm}개` : '') + (nh ? ` (지도에서 숨긴 ${nh}개)` : '') + notFound;
+    $('pmCount').textContent = `· ${vis}개 단지 표시 중` + (nlm ? ` + 랜드마크 ${nlm}개` : '') + (nh ? ` (지도에서 숨긴 ${nh}개)` : '') + notFound + cenMsg;
   }
   /** 단지 목록 (서랍): 지도 보이기 · 라벨 보이기 · ★ 랜드마크 */
   function renderList() {
@@ -228,7 +256,11 @@ const PriceMap = (() => {
       let n = 0;
       const queue = [...geo];
       await Promise.all(Array.from({ length: 4 }, async () => {
-        while (queue.length) { const r = queue.shift(); r.pos = await KMap.geocode(r); if (my !== seq) return; say(`단지 위치를 찾는 중… (${++n}/${geo.length})`); }
+        while (queue.length) {
+          const r = queue.shift(), cc = typeof Start !== 'undefined' && Start.centerCached ? Start.centerCached(`${r.code}|${r.key}`) : null;     // 한 번 구해 둔 단지 중심이면 바로 사용
+          r.cen = !!cc; r.pos = cc || await KMap.geocode(r);
+          if (my !== seq) return; say(`단지 위치를 찾는 중… (${++n}/${geo.length})`);
+        }
       }));
     } catch (e) { return say(U.esc(e.message || String(e))); }
     if (my !== seq) return;
@@ -256,9 +288,9 @@ const PriceMap = (() => {
     const cnt = new Map(); ok.forEach(r => cnt.set(`${r.code}|${r.key}`, (cnt.get(`${r.code}|${r.key}`) || 0) + 1));
     const items = ok.map(r => {
       const t = labelOf(r, cnt.get(`${r.code}|${r.key}`) > 1), rt = rates(r);
-      return { id: r.id, ck: `${r.code}|${r.key}`, pos: r.pos, text: t.text, name: t.name, lines: t.lines, sub: t.sub, compact: t.compact, drop: rt.drop, rise: rt.rise,
+      return { id: r.id, ck: `${r.code}|${r.key}`, cen: `${r.code}|${r.key}`, pos: r.pos, text: t.text, name: t.name, lines: t.lines, sub: t.sub, compact: t.compact, drop: rt.drop, rise: rt.rise,
         color: t.real ? '#f5a742' : '#4f9cff', rank: hot.has(r.id) ? 1 : 0, cls: hot.has(r.id) ? 'mlhot' : '' };
-    }).concat(okL.map(L => ({ id: 'lm:' + L.id, lm: L.id, pos: L.pos, text: `★ ${L.name}`, color: '#8e8e93', rank: -1, cls: 'mllm' })));
+    }).concat(okL.map(L => ({ id: 'lm:' + L.id, lm: L.id, cen: `${L.code}|${L.key}`, pos: L.pos, text: `★ ${L.name}`, color: '#8e8e93', rank: -1, cls: 'mllm' })));
     map.relayout();
     baseItems = items;
     lastRows = rows;
@@ -272,6 +304,7 @@ const PriceMap = (() => {
     if (pts.length > 1) KMap.fit(map, pts); else { map.setCenter(KMap.LL(pts[0])); map.setLevel(5); }
     refreshMap();
     if (!$('pmCard').innerHTML && ok[0]) card(ok[0]);
+    centerJob(my, [...ok, ...okL]);                           // 점을 단지 한가운데로 (라벨은 그대로, 점만 고정된 중심으로)
   }
 
   /* ── 지도 아래 표 (엑셀식 열 필터는 표에만 적용 — 지도 라벨은 그대로) ── */
