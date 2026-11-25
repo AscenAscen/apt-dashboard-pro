@@ -239,8 +239,8 @@ const PriceMap = (() => {
     if (!map) {
       applySize();
       map = KMap.create($('pmMap'), first, 7);
-      LabelKit.mount('map', { el: $('pmMap'), host: $('pmMap').parentElement, move: () => { if (ctrl) ctrl.setEdit(!ctrl.isEdit()); }, ext: () => { drawer(true); setTimeout(() => $('pmCtl').scrollIntoView({ behavior: 'smooth', block: 'center' }), 60); } });
-      ctrl = MapLabel.create({ key: 'map', map, panel: $('pmPanel'), ctl: $('pmCtl'), onEdit: (on) => LabelKit.moveState('map', on),
+      LabelKit.mount('map', { el: $('pmMap'), host: $('pmMap').parentElement, ext: () => { drawer(true); setTimeout(() => $('pmCtl').scrollIntoView({ behavior: 'smooth', block: 'center' }), 60); } });
+      ctrl = MapLabel.create({ key: 'map', map, panel: $('pmPanel'), ctl: $('pmCtl'), 
         onPreset: (k) => { if (k === 'field') { $('pmShow').value = 'sr'; $('pmSubWrap').hidden = true; saveOpts(); setTimeout(draw, 50); } },   // 임장용 = 매매 + 전세
         onPick: (it) => { if (!it.user) popup(it); },
         onAdd: (pos) => {

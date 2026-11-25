@@ -1,7 +1,8 @@
 /* ─────────────────────────────────────────────────────────
    maplabel.js — 지도 라벨(말풍선) 제어. [시세지도]·[랜드마크] 두 지도가 함께 씁니다.
    · 자동 배치: 단지가 몰린 곳은 라벨이 서로·점과 겹치지 않게 상하좌우로 밀어서 놓고, 멀어지면 가는 연결선을 긋습니다.
-   · [라벨 편집 모드]: 라벨을 마우스·손가락으로 끌어 옮김 → 위치가 저장됨. 라벨을 눌러 개별 크기·글자 크기도 조정.
+   · 라벨 옮기기: 버튼 없이 라벨을 0.25초 꾹 누른 채 끌면 이동 (바로 끌면 지도가 밀림). 옮긴 위치는 저장하지 않고 화면에만 둠 → 새로고침하면 자동 배치로 돌아감.
+   · [라벨 편집 모드]: 라벨을 바로 끌어 옮기고, 라벨을 눌러 개별 크기·글자 크기도 조정 (크기는 저장됨).
    · 라벨 크기(배율)·글자 크기(px) 슬라이더, [📷 깔끔하게 캡처 모드] (버튼·검색창·탭을 숨기고 지도와 라벨만 남김)
    저장: apt.mapLabel.v1 — 라벨이 점에서 얼마나 떨어졌는지(도 단위 차이)만 저장하고 단지 좌표는 저장하지 않습니다.
    ───────────────────────────────────────────────────────── */
@@ -92,6 +93,7 @@ const MapLabel = (() => {
   function create(o) {
     const { key, map, panel, ctl } = o, LL = KMap.LL;
     const rows = new Map();
+    const moved = new Map();       // 손으로 옮긴 라벨 위치 { id → { dy, dx } } — 저장하지 않고 화면에만 둠 (새로고침하면 자동 배치로 돌아감)
     let edit = false, sel = null, cap = false, timer = null, drag = null, adding = false, fade = null;
     const gKey = `${key}:_g`, iKey = (id) => `${key}:${id}`;
     const G = () => { const g = { ...DEF, ...(rd()[gKey] || {}) }; if (g.dr == null || (g.bd && (rd()[gKey] || {}).dr == null)) g.dr = g.bd ? 1 : 0; return g; };   // 예전 '하락률 뱃지' 켜 둔 분은 하락률 켬
@@ -134,7 +136,7 @@ const MapLabel = (() => {
         <button class="mini" data-ml="iclear">개별 설정 지우기</button>
         <button class="mini" data-ml="iclose">닫기</button>
       </div>
-      <p class="hint" data-ml-v="hint" style="margin:6px 0 0" hidden>라벨을 끌어서 옮기세요. 옮기면 점과 라벨 사이에 연결선이 생깁니다. 라벨을 한 번 누르면 그 라벨만 크기를 따로 조정할 수 있습니다.</p>`;
+      <p class="hint" data-ml-v="hint" style="margin:6px 0 0" hidden>라벨을 바로 끌어서 옮기세요 (편집 모드가 아니어도 꾹 누르고 끌면 옮겨져요). 옮기면 점과 라벨 사이에 연결선이 생기고, 새로고침하면 원래 자리로 돌아갑니다. 라벨을 한 번 누르면 그 라벨만 크기를 따로 조정할 수 있습니다.</p>`;
     const q = (k) => ctl.querySelector(`[data-ml="${k}"]`), v = (k) => ctl.querySelector(`[data-ml-v="${k}"]`);
     const exitBtn = document.createElement('button');
     exitBtn.className = 'ml-exit'; exitBtn.textContent = '← 돌아가기'; exitBtn.title = '캡처 모드 끝내기 (Esc 키 또는 뒤로 가기)';
@@ -169,8 +171,10 @@ const MapLabel = (() => {
       const line = new kakao.maps.Polyline({ path: [LL(item.pos), LL(item.pos)], strokeWeight: 1.5, strokeColor: item.color || '#ff3b30', strokeOpacity: 0.9 });
       dotOv.setMap(map); lblOv.setMap(map);
       const row = { item, dotEl, el, dotOv, lblOv, line, shown: true, lineOn: false };
-      // 지도가 끌려가지 않게 이벤트를 여기서 끊음
-      ['mousedown', 'touchstart', 'pointerdown'].forEach(t => { el.addEventListener(t, (e) => e.stopPropagation()); dotEl.addEventListener(t, (e) => e.stopPropagation()); });
+      // 점은 눌러도 지도가 끌려가지 않게 · 라벨은 편집 모드에서만 끊음 (평소엔 바로 끌면 지도가 밀리고, 꾹 누르고 끌면 라벨이 움직임)
+      ['mousedown', 'touchstart', 'pointerdown'].forEach(t => { dotEl.addEventListener(t, (e) => e.stopPropagation()); el.addEventListener(t, (e) => { if (edit) e.stopPropagation(); }); });
+      el.addEventListener('touchmove', (e) => { if (drag) { e.preventDefault(); e.stopPropagation(); } }, { passive: false });
+      el.addEventListener('contextmenu', (e) => { if (pend || drag) e.preventDefault(); });
       dotEl.addEventListener('click', () => { if (!edit && o.onPick) o.onPick(item); });
       el.addEventListener('pointerdown', (e) => onDown(e, row));
       el.addEventListener('pointermove', (e) => onMove(e, row));
@@ -267,14 +271,25 @@ const MapLabel = (() => {
 
     /* ── 끌어 옮기기 ── */
     const rel = (e) => { const r = map.getNode().getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    const LONG = 250, SLOP = 6;                                   // 평소엔 0.25초 꾹 누른 뒤 끌면 이동, 바로 끌면 지도가 밀림
+    let pend = null;
+    function arm(row, e0, pid) {
+      try { row.el.setPointerCapture(pid); } catch (er) { /* 무시 */ }
+      const proj = map.getProjection(), c = proj.containerPointFromCoords(row.lblOv.getPosition()), p = rel(e0);
+      drag = { id: row.item.id, offX: p.x - c.x, offY: p.y - c.y, sx: p.x, sy: p.y, moved: false, soft: !edit };
+      if (drag.soft && map.setDraggable) map.setDraggable(false);
+      row.el.classList.add('lifted');
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (er) { /* 무시 */ }
+    }
     function onDown(e, row) {
-      if (!edit) { if (o.onPick) o.onPick(row.item); return; }
-      e.preventDefault();
-      row.el.setPointerCapture(e.pointerId);
-      const proj = map.getProjection(), c = proj.containerPointFromCoords(row.lblOv.getPosition()), p = rel(e);
-      drag = { id: row.item.id, offX: p.x - c.x, offY: p.y - c.y, sx: p.x, sy: p.y, moved: false };
+      if (e.button > 0) return;
+      if (edit) { e.preventDefault(); arm(row, e, e.pointerId); return; }
+      if (pend) clearTimeout(pend.t);
+      const e0 = { clientX: e.clientX, clientY: e.clientY };
+      pend = { row, e0, x: e.clientX, y: e.clientY, pid: e.pointerId, t: setTimeout(() => { const q = pend; pend = null; if (q) arm(q.row, q.e0, q.pid); }, LONG) };
     }
     function onMove(e, row) {
+      if (pend && pend.row === row) { if (Math.hypot(e.clientX - pend.x, e.clientY - pend.y) > SLOP) { clearTimeout(pend.t); pend = null; } return; }
       if (!drag || drag.id !== row.item.id) return;
       const p = rel(e);
       if (!drag.moved && Math.hypot(p.x - drag.sx, p.y - drag.sy) < 4) return;
@@ -285,13 +300,24 @@ const MapLabel = (() => {
       drawLine(row, pt.x, pt.y);
     }
     function onUp(e, row, cancelled) {
+      if (pend && pend.row === row) {                              // 꾹 누르기 전에 뗌 = 그냥 눌렀음 → 단지 정보 열기
+        clearTimeout(pend.t); pend = null;
+        if (!cancelled && o.onPick) o.onPick(row.item);
+        return;
+      }
       if (!drag || drag.id !== row.item.id) return;
       const d = drag; drag = null;
+      row.el.classList.remove('lifted');
+      if (d.soft && map.setDraggable) map.setDraggable(true);
       if (cancelled) { relayout(); return; }
-      if (!d.moved) { sel = row.item.id; for (const r of rows.values()) style(r); syncCtl(); return; }   // 끌지 않고 눌렀다 뗌 → 선택
+      if (!d.moved) {
+        if (d.soft) { if (o.onPick) o.onPick(row.item); return; }  // 꾹 눌렀다 그냥 뗌
+        sel = row.item.id; for (const r of rows.values()) style(r); syncCtl(); return;   // 편집 모드: 끌지 않고 눌렀다 뗌 → 선택
+      }
       const proj = map.getProjection(), ll = proj.coordsFromContainerPoint(d.last);
-      setI(row.item.id, { dy: +(ll.getLat() - row.item.pos.lat).toFixed(7), dx: +(ll.getLng() - row.item.pos.lng).toFixed(7) });
-      sel = row.item.id; relayout(); syncCtl();
+      moved.set(row.item.id, { dy: +(ll.getLat() - row.item.pos.lat).toFixed(7), dx: +(ll.getLng() - row.item.pos.lng).toFixed(7) });
+      if (edit) sel = row.item.id;
+      relayout(); syncCtl();
     }
     /** 점 → 라벨 가장자리 연결선 그리기 (라벨 중심 cx,cy 는 화면 좌표) */
     function drawLine(row, cx, cy) {
@@ -316,7 +342,7 @@ const MapLabel = (() => {
         if (show !== row.shown) { row.lblOv.setMap(show ? map : null); row.shown = show; }
         style(row);
         if (!show) { if (row.lineOn) { row.line.setMap(null); row.lineOn = false; } continue; }
-        const e = eff(it.id), dot = proj.containerPointFromCoords(LL(it.pos)), m = I(it.id);
+        const e = eff(it.id), dot = proj.containerPointFromCoords(LL(it.pos)), m = moved.get(it.id) || {};
         let w = row.el.offsetWidth, h = row.el.offsetHeight;
         if (!w || !h) { unmeasured = true; w = Math.max(40, it.text.length * e.f * 0.95 + 14); h = (e.f * 1.3 + 6) * (it.lines && row.el.classList.contains('multi') ? it.lines.length + 1 : 1); }
         const f = m.dy != null ? proj.containerPointFromCoords(LL({ lat: it.pos.lat + m.dy, lng: it.pos.lng + m.dx })) : null;
@@ -413,11 +439,10 @@ const MapLabel = (() => {
         setI(sel, { hide: true }); sel = null; for (const x of rows.values()) style(x); syncCtl(); relayout(); U.toast('라벨을 숨겼습니다. [숨긴 라벨 보이기]로 되살릴 수 있습니다.');
       }
       if (k === 'reset') {
-        if (!confirm('손으로 옮긴 라벨 위치를 모두 지우고 자동 배치로 되돌릴까요? (크기 설정은 그대로입니다)')) return;
-        const a = rd(); Object.keys(a).filter(x => x.startsWith(key + ':') && !x.endsWith(':_g')).forEach(x => { delete a[x].dy; delete a[x].dx; if (!Object.keys(a[x]).length) delete a[x]; });
-        wr(a); relayout();
+        if (!confirm('옮긴 라벨 위치를 모두 지우고 자동 배치로 되돌릴까요? (크기 설정은 그대로입니다)')) return;
+        moved.clear(); relayout();
       }
-      if (sel && k === 'ipos') { setI(sel, {}, ['dy', 'dx']); relayout(); }
+      if (sel && k === 'ipos') { moved.delete(sel); relayout(); }
       if (sel && k === 'iclear') { setI(sel, {}, ['s', 'f']); syncCtl(); relayout(); }
       if (k === 'iclose') { sel = null; for (const r of rows.values()) style(r); syncCtl(); }
     });
