@@ -170,3 +170,12 @@ body.cxm-cap .lk-btn, body.cxm-cap .lk-panel, body.map-capture .lk-btn, body.map
 @keyframes lkFlash { 0%, 60% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
 .lk-pop .lk-inl { flex-direction: column; align-items: stretch; gap: 4px; font-size: 12px; color: var(--sub); }
 .lk-pop .lk-inl input { width: 100%; }
+
+/* ── 라벨 이동: 연결선 · [✥ 이동] 버튼 ── */
+.lk-lead { position: absolute; left: 50%; top: 100%; height: 0; border-top: 2px solid var(--lkc, #2563eb); opacity: .85; transform-origin: 0 0; pointer-events: none; z-index: -1; }
+.lk-lead::after { content: ''; position: absolute; right: -4px; top: -5px; width: 7px; height: 7px; border-radius: 50%; background: var(--lkc, #2563eb); box-shadow: 0 0 0 1.5px #fff; }
+/* 멀리 볼 때(동그라미)·중간 거리의 작은 단지(점)는 점 자리에 그대로 둠 (옮긴 위치는 확대하면 보임) */
+.lk-host[data-lkz="far"] .lk.lk-moved:not(.on):not(.emph),
+.lk-host[data-lkz="mid"] .lk.lk-small.lk-moved:not(.on):not(.emph) { translate: none !important; }
+.lk-btn.lk-mv { right: 98px; }
+.lk-btn.lk-mv.on { background: #2563eb; color: #fff; border-color: #2563eb; }
