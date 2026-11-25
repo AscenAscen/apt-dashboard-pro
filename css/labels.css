@@ -177,5 +177,8 @@ body.cxm-cap .lk-btn, body.cxm-cap .lk-panel, body.map-capture .lk-btn, body.map
 /* 멀리 볼 때(동그라미)·중간 거리의 작은 단지(점)는 점 자리에 그대로 둠 (옮긴 위치는 확대하면 보임) */
 .lk-host[data-lkz="far"] .lk.lk-moved:not(.on):not(.emph),
 .lk-host[data-lkz="mid"] .lk.lk-small.lk-moved:not(.on):not(.emph) { translate: none !important; }
-.lk-btn.lk-mv { right: 98px; }
-.lk-btn.lk-mv.on { background: #2563eb; color: #fff; border-color: #2563eb; }
+/* 꾹 눌러 끌기: 잡히면 살짝 떠오름 · 글자 선택·길게 누르기 메뉴 막기 */
+.lk { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+.lk.lk-drag { transform: scale(var(--lks, 1)) scale(1.07); filter: drop-shadow(0 8px 14px rgba(15, 23, 42, .38)); }
+.mllabel { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+.mllabel.lifted { box-shadow: 0 8px 16px rgba(15, 23, 42, .4); outline: 2px solid #2563eb; cursor: grabbing; }
