@@ -59,7 +59,7 @@ const Start = (() => {
         if (!by.has(key)) {
           const p = Data.parseKey(key);
           by.set(key, { id: `${code}|${key}`, code, key, sido: r[1], sgg: r[2], dong: p.dong, jibun: p.jibun, name: p.name,
-            year: idx.c[key] || null, hh: (kp.m[key] && kp.m[key][0]) || null, vl: Data.vlRat(kp, key), n5: 0, gs: new Map() });
+            year: idx.c[key] || null, hh: (kp.m[key] && kp.m[key][0]) || null, dn: (kp.m[key] && kp.m[key][1]) || null, vl: Data.vlRat(kp, key), n5: 0, gs: new Map() });
           const ex = Data.extraOf(code, key), cx = by.get(key);
           if (ex) { cx.ex = ex; cx.addr = ex.addr; cx.year = cx.year || ex.year; }
         }
@@ -538,6 +538,30 @@ const Start = (() => {
         const tall = info.filter(x => x.fl >= 5).map(x => ({ ...x, d: turf.distance(here, x.pt, { units: 'meters' }) })).sort((a, b) => a.d - b.d);
         if (tall.length && tall[0].n) sel = info.filter(x => x.n === tall[0].n && turf.distance(here, x.pt, { units: 'meters' }) <= 600); else sel = tall.filter(x => x.d <= 150);
       }
+      // ③-2 동 수 보강: K-apt 동 수보다 적게 잡혔으면, 붙어 있는 건물을 '모자란 동 수만큼만' 가까운 순서로 더 넣기
+      //      (건물 이름에 단지명이 없거나 비어 있어서 빠진 동을 찾기 위함 · 다른 단지 이름이 붙은 건물, 이미 있는 동 번호와 겹치는 건물은 제외)
+      let grown = 0;
+      if (cx.dn >= 3 && sel.length) {
+        const dl = (x) => { const d = dongLabel(x.b.properties); return d.apt ? d.text : ''; };
+        const labs = new Set(sel.map(dl).filter(Boolean));
+        const have = labs.size || sel.filter(x => x.fl >= 5).length;
+        let need = cx.dn - have;
+        if (have >= 2 && need > 0) {
+          const GAP = 150;                                              // 이미 잡힌 건물과 이만큼(m) 안에 붙어 있어야 함
+          const dist = (a, b) => { const c = a.geometry.coordinates, e = b.geometry.coordinates; return Math.hypot((c[0] - e[0]) * Math.cos(c[1] * Math.PI / 180) * 111000, (c[1] - e[1]) * 111000); };
+          const otherNm = (n) => { const rem = n.replace(/제?\d{1,4}동?/g, '').replace(/[a-z가-하]동$/, ''); return rem.length >= 2 && ![target, alias].some(t => t && (t.includes(rem) || rem.includes(t))); };
+          const have0 = new Set(sel);
+          const rest = info.filter(x => !have0.has(x) && x.fl >= 5 && !(dl(x) && labs.has(dl(x))) && !otherNm(x.n));
+          const cur = sel.map(x => x.pt);
+          while (need > 0 && rest.length) {
+            let bi = -1, bd = GAP;
+            rest.forEach((x, i) => { for (const q of cur) { const d = dist(x.pt, q); if (d < bd) { bd = d; bi = i; } } });
+            if (bi < 0) break;
+            const [x] = rest.splice(bi, 1);
+            sel.push(x); cur.push(x.pt); if (dl(x)) labs.add(dl(x)); need--; grown++;
+          }
+        }
+      }
       // ④ 고른 건물이 서 있는 필지 + 시작 필지 → 단지 경계
       const parcels = new Map();
       seeds.forEach(f => parcels.set(pnu(f), f));
@@ -555,7 +579,7 @@ const Start = (() => {
         const extra = await Promise.all((fx.add || []).map(a => bldsNear({ lng: a.p[0], lat: a.p[1] }, 150).catch(() => new Map())));
         extra.forEach(m => m.forEach((v, k) => pool.set(k, v)));
       }
-      return { parcels, pool, u: null, labels: null, fixed: !!fx, two: seeds.length > 1 };
+      return { parcels, pool, u: null, labels: null, fixed: !!fx, two: seeds.length > 1, grown };
     })().catch(e => { olCache.delete(cx.id); throw e; });
     olCache.set(cx.id, pr);
     return pr;
@@ -641,7 +665,7 @@ const Start = (() => {
       if (map.getLevel() > 3) map.setLevel(3);
     }
     const apt = d.labels.filter(l => l.apt).length, none = d.labels.filter(l => !l.text).length;
-    olMsg(`필지 ${d.parcels.size}개 · 동 번호 ${apt}개${none ? ` · 이름 없는 건물 ${none}개` : ''}${d.fixed ? ' · <b>손으로 고친 경계</b>' : ''}${map.getLevel() > 4 ? ' · 확대하면 동 번호가 보입니다' : ''}`);
+    olMsg(`필지 ${d.parcels.size}개 · 동 번호 ${apt}개${none ? ` · 이름 없는 건물 ${none}개` : ''}${d.grown ? ` · 동 수(${cx.dn}동) 맞추려고 ${d.grown}동 더 넣음` : ''}${d.fixed ? ' · <b>손으로 고친 경계</b>' : ''}${map.getLevel() > 4 ? ' · 확대하면 동 번호가 보입니다' : ''}`);
     olFixBtn();
     declutterSoon();
   }
