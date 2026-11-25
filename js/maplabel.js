@@ -1,14 +1,14 @@
 /* ─────────────────────────────────────────────────────────
    maplabel.js — 지도 라벨(말풍선) 제어. [시세지도]·[랜드마크] 두 지도가 함께 씁니다.
    · 자동 배치: 단지가 몰린 곳은 라벨이 서로·점과 겹치지 않게 상하좌우로 밀어서 놓고, 멀어지면 가는 연결선을 긋습니다.
-   · 라벨 옮기기: 버튼 없이 라벨을 0.25초 꾹 누른 채 끌면 이동 (바로 끌면 지도가 밀림). 옮긴 위치는 저장하지 않고 화면에만 둠 → 새로고침하면 자동 배치로 돌아감.
+   · 라벨 옮기기: 버튼 없이 라벨을 바로 끌면 이동 (조절 막대의 [라벨 옮기기]에서 꾹 눌러 끌기·끄기로 바꿈). 옮긴 위치는 저장하지 않고 화면에만 둠 → 새로고침하면 자동 배치로 돌아감. 옮긴 라벨을 두 번 누르면 그 라벨만 원위치.
    · [라벨 편집 모드]: 라벨을 바로 끌어 옮기고, 라벨을 눌러 개별 크기·글자 크기도 조정 (크기는 저장됨).
    · 라벨 크기(배율)·글자 크기(px) 슬라이더, [📷 깔끔하게 캡처 모드] (버튼·검색창·탭을 숨기고 지도와 라벨만 남김)
    저장: apt.mapLabel.v1 — 라벨이 점에서 얼마나 떨어졌는지(도 단위 차이)만 저장하고 단지 좌표는 저장하지 않습니다.
    ───────────────────────────────────────────────────────── */
 const MapLabel = (() => {
   const KEY = 'apt.mapLabel.v1';
-  const DEF = { s: 1, f: 12, ff: '', ds: 'lkp', ic: 0, bd: 0, dr: 0, ri: 0, zs: 1, mu: 1 };   // dr 하락률 · ri 상승률 · zs 축소하면 간단히 · mu 지도 바탕 흐리게
+  const DEF = { s: 1, f: 12, ff: '', ds: 'lkp', ic: 0, bd: 0, dr: 0, ri: 0, zs: 1, mu: 1, mv: 'now' };   // mv: 라벨 옮기는 방법 now 바로 끌기 · hold 꾹 눌러 끌기 · off 끄기 · dr 하락률 · ri 상승률 · zs 축소하면 간단히 · mu 지도 바탕 흐리게
   const ZLV = 7;                  // 카카오 지도 레벨이 이 값 이상(멀리 봄)이면 '간단히' 모양
   // 라벨 프리셋 — 크기·글자·모양·아이콘을 한 번에 바꿈
   const PRESETS = [{ k: '', name: '(프리셋 고르기)' }, { k: 'report', name: '보고서용 (깔끔·중간 크기)', v: { s: 1.1, f: 14, ds: '', ff: 'pretendard', ic: 0 } },
@@ -112,6 +112,7 @@ const MapLabel = (() => {
     /* ── 조절 막대 ── */
     ctl.classList.add('mlctl');
     ctl.innerHTML = `<label class="inline"><input type="checkbox" data-ml="edit"> 라벨 편집 모드</label>
+      <label class="inline" title="편집 모드가 아니어도 라벨을 끌어서 옮깁니다. 옮긴 위치는 저장되지 않고 새로고침하면 자동 배치로 돌아갑니다. 옮긴 라벨을 두 번 누르면 그 라벨만 원위치">라벨 옮기기 <select data-ml="mv"><option value="now">바로 끌기</option><option value="hold">꾹 눌러 끌기</option><option value="off">끄기</option></select></label>
       <label class="inline">라벨 크기 <input type="range" min="50" max="200" step="5" data-ml="scale"> <b data-ml-v="scale"></b></label>
       <label class="inline">글자 크기 <input type="range" min="8" max="28" step="1" data-ml="font"> <b data-ml-v="font"></b></label>
       <label class="inline">글씨체 <select data-ml="ff">${FONTS.map(f => `<option value="${f.k}">${f.name}</option>`).join('')}</select></label>
@@ -136,7 +137,7 @@ const MapLabel = (() => {
         <button class="mini" data-ml="iclear">개별 설정 지우기</button>
         <button class="mini" data-ml="iclose">닫기</button>
       </div>
-      <p class="hint" data-ml-v="hint" style="margin:6px 0 0" hidden>라벨을 바로 끌어서 옮기세요 (편집 모드가 아니어도 꾹 누르고 끌면 옮겨져요). 옮기면 점과 라벨 사이에 연결선이 생기고, 새로고침하면 원래 자리로 돌아갑니다. 라벨을 한 번 누르면 그 라벨만 크기를 따로 조정할 수 있습니다.</p>`;
+      <p class="hint" data-ml-v="hint" style="margin:6px 0 0" hidden>라벨을 바로 끌어서 옮기세요. 옮기면 점과 라벨 사이에 연결선이 생기고, 두 번 누르면 원위치, 새로고침하면 모두 원래 자리로 돌아갑니다. 라벨을 한 번 누르면 그 라벨만 크기를 따로 조정할 수 있습니다.</p>`;
     const q = (k) => ctl.querySelector(`[data-ml="${k}"]`), v = (k) => ctl.querySelector(`[data-ml-v="${k}"]`);
     const exitBtn = document.createElement('button');
     exitBtn.className = 'ml-exit'; exitBtn.textContent = '← 돌아가기'; exitBtn.title = '캡처 모드 끝내기 (Esc 키 또는 뒤로 가기)';
@@ -146,7 +147,7 @@ const MapLabel = (() => {
       const g = G();
       q('scale').value = Math.round(g.s * 100); v('scale').textContent = Math.round(g.s * 100) + '%';
       q('font').value = g.f; v('font').textContent = g.f + 'px';
-      q('ff').value = g.ff || ''; q('ds').value = g.ds || ''; q('dr').checked = !!g.dr; q('ri').checked = !!g.ri; q('zs').checked = !!g.zs; q('mu').checked = !!g.mu; q('preset').value = '';
+      q('mv').value = g.mv || 'now'; q('ff').value = g.ff || ''; q('ds').value = g.ds || ''; q('dr').checked = !!g.dr; q('ri').checked = !!g.ri; q('zs').checked = !!g.zs; q('mu').checked = !!g.mu; q('preset').value = '';
       map.getNode().classList.toggle('muted', !!g.mu);
       q('edit').checked = edit; v('hint').hidden = !edit;
       if (q('add')) q('add').classList.toggle('on', adding);
@@ -171,8 +172,8 @@ const MapLabel = (() => {
       const line = new kakao.maps.Polyline({ path: [LL(item.pos), LL(item.pos)], strokeWeight: 1.5, strokeColor: item.color || '#ff3b30', strokeOpacity: 0.9 });
       dotOv.setMap(map); lblOv.setMap(map);
       const row = { item, dotEl, el, dotOv, lblOv, line, shown: true, lineOn: false };
-      // 점은 눌러도 지도가 끌려가지 않게 · 라벨은 편집 모드에서만 끊음 (평소엔 바로 끌면 지도가 밀리고, 꾹 누르고 끌면 라벨이 움직임)
-      ['mousedown', 'touchstart', 'pointerdown'].forEach(t => { dotEl.addEventListener(t, (e) => e.stopPropagation()); el.addEventListener(t, (e) => { if (edit) e.stopPropagation(); }); });
+      // 점은 눌러도 지도가 끌려가지 않게 · 라벨은 편집 모드에서만 끊음 (옮기는 방법이 '바로 끌기'면 눌렀을 때부터 라벨이 움직이고, '꾹 눌러 끌기'·'끄기'면 바로 끌 때 지도가 밀림)
+      ['mousedown', 'touchstart', 'pointerdown'].forEach(t => { dotEl.addEventListener(t, (e) => e.stopPropagation()); el.addEventListener(t, (e) => { if (edit || (G().mv || 'now') === 'now') e.stopPropagation(); }); });
       el.addEventListener('touchmove', (e) => { if (drag) { e.preventDefault(); e.stopPropagation(); } }, { passive: false });
       el.addEventListener('contextmenu', (e) => { if (pend || drag) e.preventDefault(); });
       dotEl.addEventListener('click', () => { if (!edit && o.onPick) o.onPick(item); });
@@ -271,28 +272,37 @@ const MapLabel = (() => {
 
     /* ── 끌어 옮기기 ── */
     const rel = (e) => { const r = map.getNode().getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
-    const LONG = 250, SLOP = 6;                                   // 평소엔 0.25초 꾹 누른 뒤 끌면 이동, 바로 끌면 지도가 밀림
-    let pend = null;
-    function arm(row, e0, pid) {
+    const LONG = 250, SLOP = 6, DBL = 350;
+    let pend = null, lastTap = { id: null, t: 0 };
+    function arm(row, e0, pid, hold) {
       try { row.el.setPointerCapture(pid); } catch (er) { /* 무시 */ }
       const proj = map.getProjection(), c = proj.containerPointFromCoords(row.lblOv.getPosition()), p = rel(e0);
-      drag = { id: row.item.id, offX: p.x - c.x, offY: p.y - c.y, sx: p.x, sy: p.y, moved: false, soft: !edit };
+      drag = { id: row.item.id, offX: p.x - c.x, offY: p.y - c.y, sx: p.x, sy: p.y, moved: false, soft: !edit, hold: !!hold };
       if (drag.soft && map.setDraggable) map.setDraggable(false);
-      row.el.classList.add('lifted');
-      try { if (navigator.vibrate) navigator.vibrate(12); } catch (er) { /* 무시 */ }
+      if (hold) { row.el.classList.add('lifted'); try { if (navigator.vibrate) navigator.vibrate(12); } catch (er) { /* 무시 */ } }
     }
+    /** 옮긴 라벨을 가볍게 두 번 누르면 그 라벨만 자동 배치로 돌아감. 돌아갔으면 true */
+    function dblTap(row) {
+      const id = row.item.id, now = Date.now();
+      if (moved.has(id) && lastTap.id === id && now - lastTap.t < DBL) { moved.delete(id); lastTap = { id: null, t: 0 }; relayout(); return true; }
+      lastTap = { id, t: now }; return false;
+    }
+    function tapPick(row) { if (!dblTap(row) && o.onPick) o.onPick(row.item); }
     function onDown(e, row) {
       if (e.button > 0) return;
-      if (edit) { e.preventDefault(); arm(row, e, e.pointerId); return; }
+      if (edit) { e.preventDefault(); arm(row, e, e.pointerId, false); return; }
+      const md = G().mv || 'now';
+      if (md === 'now') { e.preventDefault(); arm(row, e, e.pointerId, false); return; }
       if (pend) clearTimeout(pend.t);
       const e0 = { clientX: e.clientX, clientY: e.clientY };
-      pend = { row, e0, x: e.clientX, y: e.clientY, pid: e.pointerId, t: setTimeout(() => { const q = pend; pend = null; if (q) arm(q.row, q.e0, q.pid); }, LONG) };
+      pend = { row, e0, x: e.clientX, y: e.clientY, pid: e.pointerId, t: md === 'hold' ? setTimeout(() => { const q = pend; pend = null; if (q) arm(q.row, q.e0, q.pid, true); }, LONG) : null };
     }
     function onMove(e, row) {
       if (pend && pend.row === row) { if (Math.hypot(e.clientX - pend.x, e.clientY - pend.y) > SLOP) { clearTimeout(pend.t); pend = null; } return; }
       if (!drag || drag.id !== row.item.id) return;
       const p = rel(e);
       if (!drag.moved && Math.hypot(p.x - drag.sx, p.y - drag.sy) < 4) return;
+      if (!drag.moved) row.el.classList.add('lifted');
       drag.moved = true;
       const proj = map.getProjection(), pt = new kakao.maps.Point(p.x - drag.offX, p.y - drag.offY);
       row.lblOv.setPosition(proj.coordsFromContainerPoint(pt));
@@ -300,9 +310,9 @@ const MapLabel = (() => {
       drawLine(row, pt.x, pt.y);
     }
     function onUp(e, row, cancelled) {
-      if (pend && pend.row === row) {                              // 꾹 누르기 전에 뗌 = 그냥 눌렀음 → 단지 정보 열기
+      if (pend && pend.row === row) {                              // 끌지 않고 뗌 = 그냥 눌렀음 → 단지 정보 열기 (옮긴 라벨을 두 번 누르면 원위치)
         clearTimeout(pend.t); pend = null;
-        if (!cancelled && o.onPick) o.onPick(row.item);
+        if (!cancelled) tapPick(row);
         return;
       }
       if (!drag || drag.id !== row.item.id) return;
@@ -311,11 +321,12 @@ const MapLabel = (() => {
       if (d.soft && map.setDraggable) map.setDraggable(true);
       if (cancelled) { relayout(); return; }
       if (!d.moved) {
-        if (d.soft) { if (o.onPick) o.onPick(row.item); return; }  // 꾹 눌렀다 그냥 뗌
+        if (d.soft) { if (d.hold) { if (o.onPick) o.onPick(row.item); } else tapPick(row); return; }   // 꾹 눌렀다 그냥 뗌 / 그냥 누름
         sel = row.item.id; for (const r of rows.values()) style(r); syncCtl(); return;   // 편집 모드: 끌지 않고 눌렀다 뗌 → 선택
       }
       const proj = map.getProjection(), ll = proj.coordsFromContainerPoint(d.last);
       moved.set(row.item.id, { dy: +(ll.getLat() - row.item.pos.lat).toFixed(7), dx: +(ll.getLng() - row.item.pos.lng).toFixed(7) });
+      lastTap = { id: null, t: 0 };
       if (edit) sel = row.item.id;
       relayout(); syncCtl();
     }
@@ -416,6 +427,7 @@ const MapLabel = (() => {
       const k = e.target.dataset.ml;
       if (k === 'preset') { const pr = PRESETS.find(x => x.k === e.target.value); if (pr && pr.v) { setG(pr.v); if (o.onPreset) o.onPreset(pr.k); for (const r of rows.values()) style(r); syncCtl(); queue(); setTimeout(relayout, 900); } return; }
       if (['ic', 'bd', 'dr', 'ri', 'zs', 'mu'].includes(k)) { setG({ [k]: e.target.checked ? 1 : 0 }); for (const r of rows.values()) style(r); syncCtl(); queue(); return; }
+      if (k === 'mv') { setG({ mv: e.target.value }); return; }
       if (k === 'ff' || k === 'ds') { setG({ [k]: e.target.value }); for (const r of rows.values()) style(r); queue();
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => setTimeout(relayout, 60)); setTimeout(relayout, 900); }
     });

@@ -5,7 +5,7 @@
    · 확대 단계: 멀리 = 세대수 크기 동그라미, 중간 = 이름만(작은 단지는 점), 가까이 = 전체 라벨
    · 지도마다 오른쪽 위 [🏷 라벨] 버튼 → 같은 모양의 설정 창
    · 직접 고치기(편집 모드): 끌어서 옮기기 · 짧은 이름 · 숨기기 · ★ 강조 · 원래대로
-     (라벨 옮기기: 0.25초 꾹 누르고 끌기 · 버튼 없음. 옮긴 위치는 저장하지 않고 화면에만 임시로 둠 → 새로고침하면 원위치.
+     (라벨 옮기기: 버튼 없이 바로 끌기(기본) · 꾹 눌러 끌기 · 끄기 — 🏷 라벨 창에서 고름. 옮긴 위치는 저장하지 않고 화면에만 임시로 둠 → 새로고침하면 원위치.
       지도 좌표 차이로 기억해 확대·축소해도 점을 따라가고, 점과 가는 선으로 이어짐)
    쓰는 지도: 홈 · 단지 지도 · 공급지도 · 공급 · 입지 분석 · 인구이동 (시세지도·랜드마크는 js/maplabel.js 가 같은 디자인을 씀)
    저장: apt.labels.v1 (지도별 설정) · apt.labelEdits.v1 (단지별 짧은 이름·숨김·강조·위치) · apt.labelPresets.v1 (내 프리셋)
@@ -50,7 +50,7 @@ const LabelKit = (() => {
     map: { name: '시세지도', kind: 'ext' },
     land: { name: '랜드마크', kind: 'ext' },
   };
-  const DEF = { ds: 'tag', it: ['yr', 'hh'], cm: 'age', oc: '#2563eb', s: 1, f: 13, ff: 'pretendard', zm: 1, du: 300, lg: 1 };
+  const DEF = { ds: 'tag', it: ['yr', 'hh'], cm: 'age', oc: '#2563eb', s: 1, f: 13, ff: 'pretendard', zm: 1, du: 300, lg: 1, mv: 'now' };   // mv: 라벨 옮기는 방법 — now 바로 끌기 · hold 꾹 눌러 끌기 · off 끄기
   const DEF_BY = { supplymap: { cm: 'move', du: 0 }, supply: { cm: 'move', du: 0 }, infra: { f: 12 }, migration: { f: 11 } };
   const BUILTIN = [
     { k: 'field', name: '임장용 (크게)', v: { ds: 'tag', s: 1.2, f: 15, ff: 'gmarket' } },
@@ -387,8 +387,10 @@ const LabelKit = (() => {
         <button type="button" data-act="savepre">＋ 지금 설정 저장</button></div></div>` : ''}
       <div class="lk-sec"><label class="lk-inl"><input type="checkbox" data-act="link"${store.link ? ' checked' : ''}> 모든 지도에 똑같이 적용</label>
         <button type="button" class="lk-mini" data-act="copy">지금 설정을 모든 지도에 복사</button></div>
-      ${info.edit ? `<div class="lk-sec"><button type="button" class="lk-edit${editing.has(m) ? ' on' : ''}" data-act="edit">✎ 라벨 직접 고치기 ${editing.has(m) ? '켜짐 (끝내기)' : ''}</button>
-        <p class="lk-note">라벨 옮기기는 켜지 않아도 돼요 — 라벨을 0.25초쯤 꾹 누른 채 끌면 옮겨지고(점과 선으로 이어져요), 새로고침하면 원래 위치로 돌아옵니다. 이 버튼은 라벨을 눌러 짧은 이름·숨기기·★ 강조를 정할 때 쓰세요. 짧은 이름·숨김·강조는 모든 지도에 같이 적용돼요.</p>
+      ${info.edit ? `<div class="lk-sec"><span>라벨 옮기는 방법</span>${seg('mv', [['now', '바로 끌기'], ['hold', '꾹 눌러 끌기'], ['off', '끄기']], s.mv || 'now')}
+        <p class="lk-note">라벨을 끌어서 옮겨요. 점·동그라미로 줄어든 라벨은 지도가 밀리고, 옮긴 라벨은 두 번 누르면 원위치예요. 새로고침하면 모두 원위치로 돌아옵니다.</p></div>
+      <div class="lk-sec"><button type="button" class="lk-edit${editing.has(m) ? ' on' : ''}" data-act="edit">✎ 라벨 직접 고치기 ${editing.has(m) ? '켜짐 (끝내기)' : ''}</button>
+        <p class="lk-note">이 버튼은 라벨을 눌러 짧은 이름·숨기기·★ 강조를 정할 때 쓰세요. (라벨 옮기기는 이 버튼 없이도 돼요) 짧은 이름·숨김·강조는 모든 지도에 같이 적용돼요.</p>
         <div class="lk-pre"><button type="button" data-act="unhide"${nHid ? '' : ' disabled'}>숨긴 라벨 ${nHid}개 다시 보이기</button><button type="button" data-act="resetpos"${nPos ? '' : ' disabled'}>옮긴 라벨 ${nPos}개 원래대로</button><button type="button" data-act="resetedits">짧은 이름·숨김·강조 전부 원래대로</button></div></div>` : ''}
       <div class="lk-sec lk-foot">${mt.opt.more ? `<button type="button" data-act="more">${esc(mt.opt.moreLabel || '이 지도만의 설정')}</button>` : ''}<button type="button" data-act="def">이 지도 기본값으로</button></div>`;
   }
@@ -449,15 +451,24 @@ const LabelKit = (() => {
   }
   const isEditing = (m) => editing.has(m);
   /** 라벨 el 을 끌어서 옮길 수 있게 연결. getMap() = 카카오 지도, pos = 단지 점의 좌표 { lat, lng }
-      · 평소: 라벨을 0.25초 꾹 누른 뒤 끌면 이동 (바로 끌면 지도가 밀림) · 편집 모드: 바로 끌기
-      · 옮긴 위치는 화면에만 임시로 둠 (새로고침하면 원위치) */
+      · 🏷 라벨 창의 [라벨 옮기는 방법]: 바로 끌기(기본) · 꾹 눌러 끌기(0.25초) · 끄기
+      · 점·동그라미로 줄어든 라벨은 옮기지 않고 지도가 밀림 (확대해서 전체 라벨일 때만 옮겨짐) · 편집 모드에서는 늘 바로 끌기
+      · 옮긴 라벨을 두 번 누르면 원위치 · 옮긴 위치는 화면에만 임시로 둠 (새로고침하면 원위치) */
   function bind(el, m, id, getMap, pos) {
     el._lkid = id; el._lkm = m; el._lkmap = getMap;
     if (pos && isFinite(pos.lat) && isFinite(pos.lng)) el._lkpos = { lat: +pos.lat, lng: +pos.lng };
     trackZoom(el);
     if (el._lkb) { applyOff(el); return; } el._lkb = 1;
-    const LONG = 250, SLOP = 6;
-    let drag = null, pend = null, justDragged = 0;
+    const LONG = 250, SLOP = 6, DBL = 350;
+    let drag = null, pend = null, justDragged = 0, lastTap = 0;
+    const mode = () => (editing.has(m) ? 'now' : (get(m).mv || 'now'));
+    const small = () => {                              // 점·동그라미 모양일 땐 옮기지 않고 지도가 밀리게 둠
+      if (editing.has(m)) return false;
+      if (el.classList.contains('mini') || el.classList.contains('sp-dot')) return true;
+      if (el.classList.contains('on') || el.classList.contains('emph')) return false;
+      const host = el.closest && el.closest('.lk-host'), z = host && host.dataset.lkz;
+      return z === 'far' || (z === 'mid' && el.classList.contains('lk-small'));
+    };
     const block = (e) => { if (editing.has(m) || drag) e.stopImmediatePropagation(); };
     el.addEventListener('mouseenter', block, true);
     el.addEventListener('mouseleave', block, true);
@@ -467,26 +478,38 @@ const LabelKit = (() => {
       e.stopImmediatePropagation(); e.preventDefault();
       openPop(m, el._lkid, el);
     }, true);
-    const begin = (x, y, pid) => {
+    el.addEventListener('dblclick', (e) => { if (sess.has(sk(m, el._lkid))) { e.stopPropagation(); e.preventDefault(); } });   // 두 번 눌러도 지도가 확대되지 않게
+    // 바로 끌기일 땐 눌렀을 때부터 지도가 같이 밀리지 않게 끊음
+    ['mousedown', 'touchstart'].forEach(t => el.addEventListener(t, (e) => { if (editing.has(m) || (mode() === 'now' && !small())) e.stopPropagation(); }));
+    /** 옮긴 라벨을 가볍게 두 번 누르면 그 라벨만 원위치 */
+    const tap = () => {
+      if (editing.has(m)) return;
+      const now = Date.now(), k = sk(m, el._lkid);
+      if (sess.has(k) && now - lastTap < DBL) { lastTap = 0; justDragged = now; setPos(m, el._lkid, null); applyOff(el); fire(m); return; }
+      lastTap = now;
+    };
+    const begin = (x, y, pid, hold) => {
       const o = el._lkpx || [0, 0], map = getMap && getMap();
-      drag = { sx: x, sy: y, ox: o[0], oy: o[1], moved: false, map };
+      drag = { sx: x, sy: y, ox: o[0], oy: o[1], moved: false, map, hold };
       if (map && map.setDraggable) map.setDraggable(false);
       try { el.setPointerCapture(pid); } catch (er) { /* 무시 */ }
-      el.classList.add('lk-drag');                                            // 떠오른 모양
-      try { if (navigator.vibrate) navigator.vibrate(12); } catch (er) { /* 무시 */ }
+      if (hold) { el.classList.add('lk-drag'); try { if (navigator.vibrate) navigator.vibrate(12); } catch (er) { /* 무시 */ } }   // 꾹 눌러 잡으면 떠오름
     };
     el.addEventListener('pointerdown', (e) => {
       if (e.button > 0) return;
-      if (editing.has(m)) { e.stopPropagation(); e.preventDefault(); begin(e.clientX, e.clientY, e.pointerId); return; }
+      if (editing.has(m)) { e.stopPropagation(); e.preventDefault(); begin(e.clientX, e.clientY, e.pointerId, false); return; }
+      const md = mode();
+      if (md === 'off' || small()) return;
+      if (md === 'now') { e.stopPropagation(); e.preventDefault(); begin(e.clientX, e.clientY, e.pointerId, false); return; }
       if (pend) clearTimeout(pend.t);
-      pend = { x: e.clientX, y: e.clientY, pid: e.pointerId, t: setTimeout(() => { const p = pend; pend = null; if (p) begin(p.x, p.y, p.pid); }, LONG) };
+      pend = { x: e.clientX, y: e.clientY, pid: e.pointerId, t: setTimeout(() => { const p = pend; pend = null; if (p) begin(p.x, p.y, p.pid, true); }, LONG) };
     });
     el.addEventListener('pointermove', (e) => {
       if (pend) { if (Math.hypot(e.clientX - pend.x, e.clientY - pend.y) > SLOP) { clearTimeout(pend.t); pend = null; } return; }   // 바로 끌면 지도 밀기
       if (!drag) return;
       const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
-      if (!drag.moved && Math.hypot(dx, dy) < 3) return;
-      drag.moved = true; el.classList.add('lk-moved'); el.classList.remove('mini', 'sp-dot');
+      if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+      drag.moved = true; el.classList.add('lk-drag', 'lk-moved'); el.classList.remove('mini', 'sp-dot');
       const t = [drag.ox + dx, drag.oy + dy];
       el.style.translate = `${t[0]}px ${t[1]}px`;
       lead(el, t);
@@ -494,12 +517,12 @@ const LabelKit = (() => {
     el.addEventListener('touchmove', (e) => { if (drag) { e.preventDefault(); e.stopPropagation(); } }, { passive: false });
     el.addEventListener('contextmenu', (e) => { if (pend || drag) e.preventDefault(); });
     const end = (e, cancel) => {
-      if (pend) { clearTimeout(pend.t); pend = null; return; }
+      if (pend) { clearTimeout(pend.t); pend = null; if (!cancel) tap(); return; }
       if (!drag) return;
       const d = drag; drag = null; el.classList.remove('lk-drag');
       if (d.map && d.map.setDraggable) d.map.setDraggable(true);
-      if (d.moved || !editing.has(m)) justDragged = Date.now();              // 꾹 눌렀다 뗀 것도 '눌러서 열기'로 치지 않음
-      if (!d.moved) return;
+      if (d.moved || (d.hold && !editing.has(m))) justDragged = Date.now();   // 끌었거나 꾹 눌렀다 뗀 직후의 클릭은 무시
+      if (!d.moved) { if (!cancel && !d.hold) tap(); return; }
       if (cancel) { applyOff(el); return; }
       const x = Math.round(d.ox + e.clientX - d.sx), y = Math.round(d.oy + e.clientY - d.sy), id = el._lkid;
       let rec = Math.hypot(x, y) < 3 ? null : { px: [x, y] };                // 거의 제자리로 돌려놓으면 '원래대로'
@@ -509,6 +532,7 @@ const LabelKit = (() => {
         rec = { g: [ll.getLat() - el._lkpos.lat, ll.getLng() - el._lkpos.lng] };
       }
       setPos(m, id, rec);
+      lastTap = 0;
       applyOff(el);
       fire(m);                                                                // 겹침 정리 다시 (옮긴 라벨은 점으로 안 줄임)
     };
