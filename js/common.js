@@ -55,7 +55,7 @@ const Xl = (() => {
   /** 전체 내보내기: 보이는 탭을 차례로 열어 표를 모음 (한 파일, 탭별 시트) */
   async function all() {
     const cur = document.querySelector('#tabs button.on')?.dataset.tab, sheets = [], used = new Set();
-    const btns = [...document.querySelectorAll('#tabs button')].filter(b => !b.hidden && b.offsetParent !== null);
+    const btns = [...document.querySelectorAll('#tabs button[data-tab]')];      // [더보기] 안의 탭도 포함
     const cover = document.createElement('div'); cover.className = 'xlcover'; document.body.appendChild(cover);
     try {
       for (const b of btns) {

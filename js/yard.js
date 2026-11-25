@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────
-   yard.js — [앞마당] 탭 : 앞마당 단지를 모아 두고, 매달 평형별·가격대별 1등을 뽑는 작업대
+   yard.js — [1등뽑기] 탭 (예전 이름: 앞마당) : 앞마당 단지를 모아 두고, 매달 평형별·가격대별 1등을 뽑는 작업대
    · ① 1등 뽑기  : 평형 그룹(59·74·84…)을 고르면 내가 적은 매매 호가로 가격대 칸(기본 1억)을 나누고, 칸마다 🥇 1등을 지정 (달별 저장)
    · ② 조사 기록 : 조사한 날짜(회차)마다 매매·전세 호가와 매물 수를 적음 → 과거 가격 추적, 두 조사 비교
    · ③ 1등 기록  : 달별로 가격대마다 누가 1등이었는지
@@ -95,7 +95,7 @@ const Yard = (() => {
   function frame() {
     root.innerHTML = `
     <section class="panel yd-head">
-      <div class="bar"><strong>🏡 앞마당</strong><span class="hint" style="margin:0" id="ydStatus"></span><span class="grow"></span>
+      <div class="bar"><strong>🥇 1등뽑기</strong><span class="hint" style="margin:0" id="ydStatus"></span><span class="grow"></span>
         <span class="yd-remind" id="ydRemind" hidden></span>
         <span class="yd-saved" id="ydSaved" title="호가·픽·1등·메모는 입력하는 순간 이 브라우저에 자동 저장됩니다">✓ 자동 저장 중</span>
         <button id="ydSave" title="지금 상태를 이 브라우저에 저장 (입력할 때마다 자동으로도 저장됩니다)">💾 저장</button>

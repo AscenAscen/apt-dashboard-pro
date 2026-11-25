@@ -20,6 +20,7 @@ const App = (() => {
     lazyOpen(name);
     document.querySelectorAll('.tab').forEach(el => { el.hidden = el.id !== 'tab-' + name; });
     TabTools.open(name);
+    if (typeof Settings !== 'undefined' && Settings.sync) Settings.sync(name);      // 지금 탭이 [더보기] 안에 있으면 단추에 이름 표시
     document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
     try { sessionStorage.setItem('apt.curTab', name); } catch (e) { /* 무시 */ }      // 새로고침하면 이 탭으로 돌아옴
     const nav = $('tabs'), on = nav && nav.querySelector('button.on');               // 휴대폰처럼 메뉴가 옆으로 넘칠 때: 누른 탭을 가운데로
