@@ -432,7 +432,9 @@ const Start = (() => {
   const auto = new Map();                     // 단지 id → 저절로 그린 경계 { remove, vis }
   let autoSeq = 0;
   const pick = (p, keys) => { p = p || {}; for (const k of keys) if (p[k] != null && String(p[k]).trim() !== '') return String(p[k]).trim(); return ''; };
-  const normNm = (s) => String(s || '').replace(/\(.*?\)/g, '').replace(/\s/g, '').replace(/아파트|apt/gi, '').toLowerCase();
+  // 이름 맞추기: 괄호·띄어쓰기·'아파트' 빼고, 영문 표기를 한글 읽기로 통일 (DMC = 디엠씨, e편한세상 = 이편한세상 …)
+  const NM_VARIANTS = [[/dmc/g, '디엠씨'], [/sk/g, '에스케이'], [/lh/g, '엘에이치'], [/gs/g, '지에스'], [/kcc/g, '케이씨씨'], [/kb/g, '케이비'], [/e편한/g, '이편한'], [/ipark/g, '아이파크'], [/xi/g, '자이'], [/the/g, '더'], [/hillstate/g, '힐스테이트'], [/lotte/g, '롯데']];
+  const normNm = (s) => NM_VARIANTS.reduce((t, [a, b]) => t.replace(a, b), String(s || '').replace(/\(.*?\)/g, '').replace(/\s/g, '').replace(/아파트|apt/gi, '').toLowerCase());
   const pnu = (f) => pick(f.properties, ['pnu']) || fid(f);
   function dongLabel(p) {
     let s = pick(p, DONG_KEYS);
@@ -453,7 +455,9 @@ const Start = (() => {
     $('stOther').checked = !!st.other;
     $('stManual').classList.toggle('on', OL.manual);
     $('stManual').textContent = OL.manual ? '필지 추가/빼기: 켜짐' : '필지 추가/빼기';
+    olFixBtn();
   }
+  function olFixBtn() { const b = $('stOlAuto'); if (b) b.hidden = !(OL.cx && fixOf(OL.cx.id)); }
 
   /* 건물 자료: 약 500m 칸으로 나눠 칸마다 한 번만 받기 */
   function tileBlds(tx, ty) {
@@ -474,34 +478,84 @@ const Start = (() => {
     return out;
   }
 
-  /* 한 단지의 경계 구하기 (결과는 기억) */
+  /* 한 단지의 경계 구하기 (결과는 기억)
+     ① 시작 필지: 실거래 주소(대표 지번) 필지 + 카카오 장소 검색 위치의 필지 (길로 나뉜 단지도 잡히게)
+     ② 주변 건물: 세대수가 많을수록 넓게 (300세대 미만 300m · 500세대+ 450m · 1,000세대+ 600m)
+     ③ 이 단지 건물 고르기: 이름 일치(영문·한글 표기 차이 무시) + 시작 필지 안 건물
+     ④ 고른 건물이 서 있는 필지 + 시작 필지 → 단지 경계
+     ⑤ 손으로 고친 필지(필지 추가/빼기)는 저장해 두었다가 늘 반영 (apt.olFix.v1) */
+  const FIX_KEY = 'apt.olFix.v1';
+  const fixOf = (id) => (Store.get(FIX_KEY, {}) || {})[id] || null;
+  function saveFix(id, f) {
+    const all = Store.get(FIX_KEY, {}) || {};
+    if (f && ((f.add && f.add.length) || (f.del && f.del.length))) all[id] = f; else delete all[id];
+    Store.set(FIX_KEY, all);
+  }
+  const jimok = (f) => { const j = pick(f.properties, ['jibun']); const m = j.match(/([가-힣])\s*$/); return m ? m[1] : ''; };
+  /** 카카오 장소 검색으로 단지 위치 (주소 위치에서 1km 안, 이름이 맞는 아파트만) */
+  function kakaoSpot(cx, p) {
+    return new Promise((res) => {
+      if (!(window.kakao && kakao.maps.services)) return res(null);
+      const target = normNm(cx.name), alias = normNm((cx.alias || '').split(',')[0]);
+      // 이름이 같거나, 한쪽이 다른 쪽을 품되 남는 부분에 숫자(2단지·3차 등 다른 단지)가 없을 때만
+      const same = (n, t) => n === t || (n.includes(t) && !/\d/.test(n.replace(t, ''))) || (n.length >= 4 && t.includes(n) && !/\d/.test(t.replace(n, '')));
+      const ok = (pl) => { const n = normNm(pl.place_name); return n.length >= 2 && [target, alias].some(t => t && t.length >= 2 && same(n, t)) && /아파트|주거|주택/.test(pl.category_name || '') && +pl.distance <= 800; };
+      const done = setTimeout(() => res(null), 6000);
+      new kakao.maps.services.Places().keywordSearch(cx.name + ' 아파트', (list, stt) => {
+        clearTimeout(done);
+        const hit = stt === kakao.maps.services.Status.OK ? (list || []).find(ok) : null;
+        res(hit ? { lat: +hit.y, lng: +hit.x } : null);
+      }, { location: new kakao.maps.LatLng(p.lat, p.lng), radius: 1000, sort: kakao.maps.services.SortBy.DISTANCE });
+    });
+  }
+  const parcelAt = (q) => vw({ data: 'LP_PA_CBND_BUBUN', geomFilter: `POINT(${q.lng} ${q.lat})` }).then(vwFeatures).then(f => f[0] || null);
   function computeOl(cx) {
     if (olCache.has(cx.id)) return olCache.get(cx.id);
     const pr = (async () => {
       const p = pos.get(cx.id); if (!p) return null;
       await loadTurf();
-      const here = turf.point([p.lng, p.lat]);
-      // ① 단지 주소(지번) 위치의 필지  ② 주변 건물 (반경 300m)
-      const [seed, pool] = await Promise.all([vw({ data: 'LP_PA_CBND_BUBUN', geomFilter: `POINT(${p.lng} ${p.lat})` }).then(vwFeatures), bldsNear(p, 300)]);
-      // ③ 이 단지 건물 고르기: 이름 일치 → 주소 필지 안 건물 → 가까운 5층 이상 건물과 같은 이름
+      const hh = cx.hh || 0, R = hh >= 1000 ? 600 : hh >= 500 ? 450 : 300, NEAR = R + 300;
+      // ① 시작 필지 (카카오 위치가 주소 위치와 30m 넘게 떨어져 있을 때만 두 번째 시작점으로)
+      const kp = await kakaoSpot(cx, p).catch(() => null);
+      const pts = [p];
+      if (kp && turf.distance(turf.point([p.lng, p.lat]), turf.point([kp.lng, kp.lat]), { units: 'meters' }) > 30) pts.push(kp);
+      const [seedRaw, pools] = await Promise.all([Promise.all(pts.map(q => parcelAt(q).catch(() => null))), Promise.all(pts.map(q => bldsNear(q, R)))]);
+      // 카카오 위치가 길·공원 위에 찍혔으면 그 필지는 쓰지 않음 (대지만)
+      const seeds = seedRaw.filter((f, i) => f && (i === 0 || jimok(f) === '대' || !jimok(f)));
+      const pool = new Map(); pools.forEach(m => m.forEach((v, k) => pool.set(k, v)));
+      const heres = pts.map(q => turf.point([q.lng, q.lat]));
+      const near = (pt) => Math.min(...heres.map(h => turf.distance(h, pt, { units: 'meters' })));
+      // ③ 이 단지 건물 고르기
       const target = normNm(cx.name), alias = normNm(cx.alias);
       const info = [...pool.values()].map(b => ({ b, n: normNm(pick(b.properties, NAME_KEYS)), fl: Number(pick(b.properties, FLOOR_KEYS)) || 0, pt: ptOf(b) }));
       const nameHit = (n) => n.length >= 2 && [target, alias].some(t => t && (n.includes(t) || (n.length >= 4 && t.includes(n))));
-      let sel = info.filter(x => nameHit(x.n) && turf.distance(here, x.pt, { units: 'meters' }) <= 600);
-      if (!sel.length && seed.length) sel = info.filter(x => inside(x.pt, seed[0]));
+      const selSet = new Set();
+      info.forEach(x => { if (nameHit(x.n) && near(x.pt) <= NEAR) selSet.add(x); });
+      info.forEach(x => { if (seeds.some(sp => inside(x.pt, sp))) selSet.add(x); });          // 시작 필지 안 건물은 늘 포함
+      let sel = [...selSet];
       if (!sel.length) {
+        const here = heres[0];
         const tall = info.filter(x => x.fl >= 5).map(x => ({ ...x, d: turf.distance(here, x.pt, { units: 'meters' }) })).sort((a, b) => a.d - b.d);
         if (tall.length && tall[0].n) sel = info.filter(x => x.n === tall[0].n && turf.distance(here, x.pt, { units: 'meters' }) <= 600); else sel = tall.filter(x => x.d <= 150);
       }
-      // ④ 고른 건물이 서 있는 필지 + 주소 필지 → 단지 경계
+      // ④ 고른 건물이 서 있는 필지 + 시작 필지 → 단지 경계
       const parcels = new Map();
-      if (seed[0]) parcels.set(pnu(seed[0]), seed[0]);
+      seeds.forEach(f => parcels.set(pnu(f), f));
       if (sel.length) {
         const bb = turf.bbox(turf.featureCollection(sel.map(x => x.b))), pad = 0.0002;
         const ps = await vwAll('LP_PA_CBND_BUBUN', boxOf([bb[0] - pad, bb[1] - pad, bb[2] + pad, bb[3] + pad]), 3);
         ps.forEach(pc => { if (sel.some(x => inside(x.pt, pc))) parcels.set(pnu(pc), pc); });
       }
-      return { parcels, pool, u: null, labels: null };
+      // ⑤ 손으로 고친 필지 반영
+      const fx = fixOf(cx.id);
+      if (fx) {
+        (fx.del || []).forEach(k => parcels.delete(k));
+        const added = await Promise.all((fx.add || []).map(a => parcelAt({ lng: a.p[0], lat: a.p[1] }).catch(() => null)));
+        added.forEach(f => { if (f) parcels.set(pnu(f), f); });
+        const extra = await Promise.all((fx.add || []).map(a => bldsNear({ lng: a.p[0], lat: a.p[1] }, 150).catch(() => new Map())));
+        extra.forEach(m => m.forEach((v, k) => pool.set(k, v)));
+      }
+      return { parcels, pool, u: null, labels: null, fixed: !!fx, two: seeds.length > 1 };
     })().catch(e => { olCache.delete(cx.id); throw e; });
     olCache.set(cx.id, pr);
     return pr;
@@ -587,7 +641,8 @@ const Start = (() => {
       if (map.getLevel() > 3) map.setLevel(3);
     }
     const apt = d.labels.filter(l => l.apt).length, none = d.labels.filter(l => !l.text).length;
-    olMsg(`필지 ${d.parcels.size}개 · 동 번호 ${apt}개${none ? ` · 이름 없는 건물 ${none}개` : ''}${map.getLevel() > 4 ? ' · 확대하면 동 번호가 보입니다' : ''}`);
+    olMsg(`필지 ${d.parcels.size}개 · 동 번호 ${apt}개${none ? ` · 이름 없는 건물 ${none}개` : ''}${d.fixed ? ' · <b>손으로 고친 경계</b>' : ''}${map.getLevel() > 4 ? ' · 확대하면 동 번호가 보입니다' : ''}`);
+    olFixBtn();
     declutterSoon();
   }
   function olClear() {
@@ -606,9 +661,17 @@ const Start = (() => {
       olMsg('필지 확인 중…');
       const f = vwFeatures(await vw({ data: 'LP_PA_CBND_BUBUN', geomFilter: `POINT(${lng} ${lat})` }));
       if (!f.length) return olMsg('이 위치의 필지를 찾지 못했습니다.');
-      const pc = f[0], key = pnu(pc);
-      if (d.parcels.has(key)) d.parcels.delete(key);
-      else { d.parcels.set(key, pc); (await bldsNear({ lat, lng }, 150)).forEach((b, k) => d.pool.set(k, b)); }
+      const pc = f[0], key = pnu(pc), id = OL.cx && OL.cx.id;
+      const fx = (id && fixOf(id)) || { add: [], del: [] };
+      fx.add = fx.add || []; fx.del = fx.del || [];
+      if (d.parcels.has(key)) {
+        d.parcels.delete(key);
+        if (fx.add.some(a => a.k === key)) fx.add = fx.add.filter(a => a.k !== key); else if (!fx.del.includes(key)) fx.del.push(key);
+      } else {
+        d.parcels.set(key, pc); (await bldsNear({ lat, lng }, 150)).forEach((b, k) => d.pool.set(k, b));
+        if (fx.del.includes(key)) fx.del = fx.del.filter(k => k !== key); else fx.add.push({ k: key, p: [+lng.toFixed(6), +lat.toFixed(6)] });
+      }
+      if (id) { saveFix(id, fx); d.fixed = !!fixOf(id); olFixBtn(); }      // 저장 → 새로고침해도 이 경계 그대로
       d.labels = null; d.u = null;                // 바뀐 필지로 다시 계산 (기억해 둔 결과에도 반영)
       if (OL.data === d) olShow(false);
     } catch (e) { olMsg(`<span class="warn">${U.esc(e.message || String(e))}</span>`); }
@@ -865,7 +928,7 @@ const Start = (() => {
       <div class="st-pop" id="stPop" hidden></div>
       <div class="st-ol" id="stOl" hidden>
         <div class="st-row"><b id="stOlName"></b><span class="hint" style="margin:0">경계</span><span class="grow"></span><button class="mini" id="stOlClear" title="경계 지우기">✕ 지우기</button></div>
-        <div class="st-row"><label class="inline"><input type="checkbox" id="stOther"> 상가·관리동</label><button class="mini" id="stManual" title="켜고 지도에서 땅을 누르면 그 필지가 경계에 들어가거나 빠집니다">필지 추가/빼기</button></div>
+        <div class="st-row"><label class="inline"><input type="checkbox" id="stOther"> 상가·관리동</label><button class="mini" id="stManual" title="켜고 지도에서 땅을 누르면 그 필지가 경계에 들어가거나 빠집니다 (고친 결과는 저장돼요)">필지 추가/빼기</button><button class="mini" id="stOlAuto" hidden title="손으로 고친 필지를 지우고 자동으로 찾은 경계로">↺ 자동 경계로</button></div>
         <div class="hint" id="stOlMsg"></div>
       </div>
       <div class="st-msg" id="stMsg" hidden></div>
@@ -894,6 +957,10 @@ const Start = (() => {
     $('stPop').addEventListener('change', onPopChange);
     $('stOlClear').onclick = olClear;
     $('stOther').onchange = () => { st.other = $('stOther').checked ? 1 : 0; save(); olRestyle(); };
+    $('stOlAuto').onclick = () => {
+      const cx = OL.cx; if (!cx || !confirm(`${nameOf(cx)} 경계에서 손으로 고친 필지를 지우고 자동 경계로 되돌릴까요?`)) return;
+      saveFix(cx.id, null); olCache.delete(cx.id); autoRemove(cx.id); outline(cx);
+    };
     $('stManual').onclick = () => { OL.manual = !OL.manual; olBox(); if (OL.manual) olMsg('지도에서 단지 땅을 누르면 필지가 들어가거나 빠집니다.'); };
     if (typeof Finder !== 'undefined') Finder.attach($('stQ'), goTo);
   }

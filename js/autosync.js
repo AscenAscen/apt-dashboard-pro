@@ -14,7 +14,7 @@ const AutoSync = (() => {
   const TRK = ['apt.tracking.v1', 'apt.folders.v1', 'apt.trkMonths.v1', 'apt.survey.v1'];     // 시세트래킹이 한꺼번에 저장하는 값
   const TRK_ETC = ['apt.trkPins.v1'];                                                          // 고정한 폴더
   const YARD = ['apt.yard.v1', 'apt.yardSurveys.v1', 'apt.yardPicks.v1', 'apt.yardOpts.v1'];   // 앞마당
-  const LBL = ['apt.labels.v1', 'apt.labelEdits.v1', 'apt.labelPresets.v1'];                  // 지도 라벨 설정·짧은 이름·숨김·강조 (js/labelkit.js)
+  const LBL = ['apt.labels.v1', 'apt.labelEdits.v1', 'apt.labelPresets.v1', 'apt.olFix.v1'];   // + 홈 단지 경계에서 손으로 고친 필지                  // 지도 라벨 설정·짧은 이름·숨김·강조 (js/labelkit.js)
   const KEYS = [...TRK, ...TRK_ETC, ...YARD, ...LBL];
   const DELAY = 30000, POLL = 10000, REMOTE_EVERY = 5 * 60000, MIN_GAP = 15000;
   let cfg = { on: 1, last: 0 }, busy = false, again = false, lastTry = 0, err = '', dirtyTimer = null, retryTimer = null, localHash = '', inited = false;

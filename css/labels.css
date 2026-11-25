@@ -122,7 +122,7 @@
 .lk-legend b { font-weight: 800; }
 .lk-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 .lk-legend .sub { color: #6b7280; font-weight: 500; }
-.lk-host[data-lkmap="start"] .lk-legend { left: 92px; bottom: 10px; }
+.lk-host[data-lkmap="start"] .lk-legend { left: auto; right: 10px; bottom: 10px; }   /* 왼쪽 아래 경계 상자와 겹치지 않게 오른쪽 아래로 */
 .lk-pop { position: fixed; z-index: 3000; width: 280px; padding: 10px 12px; border-radius: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.35);
   display: flex; flex-direction: column; gap: 8px; font: 13px/1.4 'Pretendard', system-ui, sans-serif; }
 .lk-pop .lk-pre button { font-size: 12px; }
@@ -157,7 +157,7 @@
 body.cxm-cap .lk-btn, body.cxm-cap .lk-panel, body.map-capture .lk-btn, body.map-capture .lk-panel { display: none !important; }
 @media (max-width: 760px) {
   .lk-panel { width: auto; left: 10px; }
-  .lk-host[data-lkmap="start"] .lk-legend { left: 10px; bottom: 84px; }
+  .lk-host[data-lkmap="start"] .lk-legend { left: 10px; right: auto; bottom: 84px; }
   .lk-host[data-lkmap="start"] .lk-btn { top: 116px; }
   .lk-host[data-lkmap="start"] .lk-panel { top: 158px; max-height: calc(100% - 270px); }
   .lk-legend { font-size: 11px; }
