@@ -31,11 +31,12 @@
 .ym-cl small { font-weight: 500; }
 .ym-cb { flex: 1; display: grid; gap: 6px; min-width: 0; }
 /* 두 번 누르면 나오는 옆 창 */
-.ym-detail { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 94vw); z-index: 35; overflow: auto; padding: 12px 14px 24px; background: var(--bg); border-left: 1px solid var(--line); box-shadow: -12px 0 30px rgba(0,0,0,.35); }
+.ym-detail { position: fixed; top: 0; right: 0; bottom: 0; width: min(820px, 96vw); z-index: 35; overflow: auto; padding: 12px 14px 24px; background: var(--bg); border-left: 1px solid var(--line); box-shadow: -12px 0 30px rgba(0,0,0,.35); }
 .ym-detail[hidden] { display: none; }
 .ym-dh { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 15px; position: sticky; top: -12px; background: var(--bg); padding: 4px 0; }
 .ym-sec { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; }
 .ym-t { width: 100%; font-size: 12.5px; }
+.ym-na { color: var(--sub); }
 .ym-real { margin-left: 3px; padding: 0 3px; border-radius: 3px; background: #ff9500; color: #fff; font-size: 10px; }
 /* 휴대폰: 권역을 위아래로 쌓고 접었다 펴기, 옆 창은 아래에서 올라오는 시트 */
 @media (max-width: 760px) {
@@ -52,3 +53,16 @@
   .ym-cb { grid-template-columns: repeat(2, 1fr); }
   .ym-detail { top: auto; left: 0; width: auto; max-height: 78vh; border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.4); }
 }
+
+/* 단지 창 표: 호가 입력칸 · 단지명 고정 · 오래된 실거래 옅게 */
+.ym-t input.ym-q { width: 66px; padding: 4px 6px; text-align: right; border-radius: 6px; }
+.ym-t input.ym-q:placeholder-shown { background: color-mix(in srgb, var(--accent) 7%, var(--bg)); }
+.ym-t th.ym-c0, .ym-t td.ym-c0 { width: 44px; min-width: 44px; max-width: 44px; padding-left: 6px; padding-right: 6px; text-align: center; }
+.ym-t td.ym-nm, .ym-t thead th:nth-child(2) { position: sticky; left: 44px; z-index: 1; background: var(--bg); }
+.ym-t thead th:nth-child(2) { z-index: 3; background: var(--panel2); }
+.ym-t td.ym-c0, .ym-t th.ym-c0 { position: sticky; left: 0; z-index: 1; background: var(--bg); }
+.ym-t thead th.ym-c0 { z-index: 3; background: var(--panel2); }
+.ym-t td.ym-nm small { margin-left: 4px; }
+.ym-t .ym-old { opacity: .6; }
+.ym-t td small { font-size: 11.5px; }
+@media (max-width: 760px) { .ym-t input.ym-q { width: 72px; min-height: 36px; font-size: 15px; } }
