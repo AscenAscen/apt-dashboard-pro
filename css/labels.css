@@ -157,9 +157,9 @@
 body.cxm-cap .lk-btn, body.cxm-cap .lk-panel, body.map-capture .lk-btn, body.map-capture .lk-panel { display: none !important; }
 @media (max-width: 760px) {
   .lk-panel { width: auto; left: 10px; }
-  .lk-host[data-lkmap="start"] .lk-legend { left: 10px; right: auto; bottom: 84px; }
-  .lk-host[data-lkmap="start"] .lk-btn { top: 116px; }
-  .lk-host[data-lkmap="start"] .lk-panel { top: 158px; max-height: calc(100% - 270px); }
+  .lk-host[data-lkmap="start"] .lk-legend { left: 8px; right: auto; bottom: 66px; max-width: calc(100% - 70px); }
+  .lk-host[data-lkmap="start"] .lk-btn { top: 56px; right: 8px; padding: 6px 10px; }
+  .lk-host[data-lkmap="start"] .lk-panel { top: 96px; left: 8px; right: 8px; max-height: calc(100% - 180px); }
   .lk-legend { font-size: 11px; }
 }
 

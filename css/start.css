@@ -93,18 +93,39 @@
 .st-bnd { font-size: 12px; font-weight: 800; color: #7c3aed; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; white-space: nowrap; pointer-events: none; }
 .st-bnd.ly-emd { color: #0369a1; font-size: 11px; }
 
-/* 휴대폰·좁은 화면 */
+/* 레이어 묶음 단추 (휴대폰에서만 보임) · 평형 줄(휴대폰의 필터 창 안) */
+.st-lybtn, .st-mobonly { display: none; }
+
+/* ── 휴대폰·좁은 화면: 한 손으로 쓰는 간단한 모양 ──
+   위: 검색 한 줄 + [레이어] 단추 하나 (눌러야 레이어 목록이 펼쳐짐)
+   아래: 단추 5개 한 줄 (평형은 [필터] 창 안으로) · 펼침 창은 아래에서 올라오는 시트 · 한 번에 하나만 */
 @media (max-width: 760px) {
   #tab-start { padding: 0; }
   .st-wrap { border-radius: 0; }
-  .st-top { flex-direction: column; right: 10px; }
-  .st-search { width: 100%; }
-  .st-search input { height: 40px; }
-  .st-side { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; flex-direction: row; overflow-x: auto; }
-  .st-side > button { min-width: 56px; }
-  .st-py { flex-direction: row; border-top: 0; border-left: 1px solid var(--line); margin: 0; padding: 0 0 0 6px; align-items: center; }
-  .st-pop { top: 110px; left: 10px; right: 10px; width: auto; max-height: calc(100% - 200px); }
-  .st-ol { bottom: 84px; left: 10px; right: 10px; width: auto; }
-  .st-msg { bottom: 84px; }
+  .st-top { top: 8px; left: 8px; right: 8px; flex-direction: row; align-items: center; gap: 6px; }
+  .st-search { flex: 1; width: auto; min-width: 0; }
+  .st-search input { height: 42px; border-radius: 12px; }
+  .st-lybtn { display: flex; align-items: center; gap: 4px; flex: none; height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); font-size: 13px; font-weight: 700; box-shadow: 0 4px 16px rgba(0,0,0,.28); }
+  .st-lybtn b { min-width: 18px; padding: 0 5px; border-radius: 999px; background: #e5322d; color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+  .st-lybtn b:empty { display: none; }
+  .st-lybtn.on { border-color: var(--accent); }
+  .st-layers { display: none; }
+  .st-top.lyopen .st-layers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; position: absolute; top: 48px; left: 0; right: 0; padding: 6px; }
+  .st-top.lyopen .st-layers button { min-width: 0; padding: 6px 2px; }
+  .st-side { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; flex-direction: row; gap: 2px; padding: 4px; border-radius: 16px; }
+  .st-side > button { flex: 1; min-width: 0; padding: 5px 0; font-size: 11px; }
+  .st-side > button span { font-size: 19px; }
+  .st-py { display: none; }
+  .st-mobonly { display: block; }
+  .st-deskonly { display: none; }
+  .st-pop { top: auto; left: 8px; right: 8px; bottom: 66px; width: auto; max-height: 52vh; border-radius: 16px; padding: 12px 14px; }
+  .st-wrap.pop-open .st-ol { display: none; }                                    /* 펼침 창이 열려 있으면 경계 상자는 잠시 숨김 (한 번에 하나만) */
+  .st-ol { left: 8px; right: 8px; bottom: 66px; width: auto; }
+  .st-msg { bottom: 68px; max-width: 86%; }
+  #tab-start .cxmloc { bottom: 74px; right: 10px; }
+  .st-gus button, .st-pop .seg button { padding: 7px 10px; min-height: 34px; }
+  /* 라벨: 한 단계 일찍 간단히 + 보통 거리에서는 2째 줄(연식·세대수) 숨김 (강조·선택한 단지는 그대로) */
+  .st-wrap[data-lv="4"] .lk:not(.emph):not(.on) :is(.lk-i, .lk-h, .lk-v, small),
+  .st-wrap[data-lv="5"] .lk:not(.emph):not(.on) :is(.lk-i, .lk-h, .lk-v, small) { display: none; }
 }
 .st-dong.sm { font-size: 11px; padding: 0 5px; border-width: 1px; }
