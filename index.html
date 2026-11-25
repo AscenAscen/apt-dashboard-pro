@@ -24,34 +24,30 @@
 <header class="top">
   <h1>아파트 실거래가 대시보드</h1>
   <nav class="tabs" id="tabs" aria-label="탭 메뉴">
-    <span class="tabgrp">지도</span>
     <button data-tab="start" class="on">홈</button>
-    <button data-tab="cxmap">단지 지도</button>
-    <button data-tab="map">시세지도</button>
-    <button data-tab="supplymap">공급지도</button>
-    <button data-tab="v3d">3D</button>
-    <button data-tab="sat">위성지도</button>
-    <span class="tabgrp">조사</span>
-    <button data-tab="survey">전수조사</button>
-    <button data-tab="count">단지 수</button>
-    <button data-tab="yard">앞마당</button>
+    <button data-tab="yard">1등뽑기</button>
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
     <button data-tab="land">랜드마크</button>
-    <button data-tab="imjang">임장</button>
-    <span class="tabgrp">분석</span>
-    <button data-tab="home">최근 거래</button>
-    <button data-tab="search">실거래 조회</button>
-    <button data-tab="compare">단지 비교</button>
-    <button data-tab="eval">비교 평가</button>
-    <button data-tab="infra">입지 분석</button>
-    <button data-tab="grouping">시세그룹핑</button>
-    <button data-tab="trends">지역 동향</button>
-    <button data-tab="supply">공급</button>
-    <button data-tab="migration">인구이동</button>
-    <button data-tab="invest">투자금</button>
-    <button data-tab="market">시장 신호</button>
-    <button data-tab="my">내 분석</button>
-    <span class="tabgrp">설정</span>
+    <button data-tab="survey">전수조사</button>
+    <button data-tab="cxmap" data-more>단지 지도</button>
+    <button data-tab="map" data-more>시세지도</button>
+    <button data-tab="supplymap" data-more>공급지도</button>
+    <button data-tab="v3d" data-more>3D</button>
+    <button data-tab="sat" data-more>위성지도</button>
+    <button data-tab="count" data-more>단지 수</button>
+    <button data-tab="imjang" data-more>임장</button>
+    <button data-tab="home" data-more>최근 거래</button>
+    <button data-tab="search" data-more>실거래 조회</button>
+    <button data-tab="compare" data-more>단지 비교</button>
+    <button data-tab="eval" data-more>비교 평가</button>
+    <button data-tab="infra" data-more>입지 분석</button>
+    <button data-tab="grouping" data-more>시세그룹핑</button>
+    <button data-tab="trends" data-more>지역 동향</button>
+    <button data-tab="supply" data-more>공급</button>
+    <button data-tab="migration" data-more>인구이동</button>
+    <button data-tab="invest" data-more>투자금</button>
+    <button data-tab="market" data-more>시장 신호</button>
+    <button data-tab="my" data-more>내 분석</button>
     <button data-tab="guide">가이드·설정</button>
   </nav>
   <button id="btnLock" class="lockbtn">🔓 잠금</button>
@@ -432,7 +428,7 @@
 </main>
 
 <!-- ═══════════════ 시세트래킹 ═══════════════ -->
-<!-- ═══════════════ 앞마당 (가격대별 1등 뽑기) — 화면은 js/yard.js 가 만듭니다 ═══════════════ -->
+<!-- ═══════════════ 1등뽑기 (구 앞마당 · 가격대별 1등 뽑기) — 화면은 js/yard.js 가 만듭니다 ═══════════════ -->
 <main id="tab-yard" class="tab" hidden></main>
 
 <main id="tab-tracking" class="tab" hidden>
@@ -1380,7 +1376,7 @@
     <span class="hint" style="margin:0">배경색은 오른쪽 위 "배경"에서 고릅니다.</span>
   </section>
   <section class="panel">
-    <div class="bar"><strong>탭 설정</strong> <span class="hint" style="margin:0">— 체크를 끄면 그 탭이 위쪽 메뉴에서 사라지고, ▲▼ 로 순서를 바꿉니다. 이 브라우저에 저장됩니다.</span><span class="grow"></span><button id="btnTabsReset">처음 상태로</button></div>
+    <div class="bar"><strong>탭 설정</strong> <span class="hint" style="margin:0">— 체크를 켜면 위쪽 메뉴에 보이고, 끄면 [더보기]에 들어갑니다. ▲▼ 로 순서를 바꿉니다. 이 기기에만 저장됩니다(휴대폰과 PC를 따로 꾸밀 수 있습니다).</span><span class="grow"></span><button id="btnTabsReset">처음 상태로</button></div>
     <div class="tabsettings" id="tabSettings"></div>
   </section>
   <section class="panel">
