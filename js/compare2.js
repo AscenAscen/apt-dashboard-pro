@@ -84,7 +84,8 @@ const Cmp2 = (() => {
   const cust = { pos: null };                                         // 지도에서 찍은 기준점 (좌표라서 저장하지 않음)
   const refMemo = new Map(), posCache = new Map(), autos = new Map(), areaMemo = new Map();
   const img = { map: null };                                          // 지도 캡처 사진 (저장하지 않음)
-  let kmap = null, shapes = [], arrows = [], selIdx = null, pickRef = false, lastCtx = null;
+  let kmap = null, pickRef = false, lastCtx = null;
+  let mkList = [], autoArr = [], measureObjs = [], measuring = false, mA = null, curRp = null, fitKey = '';
 
   const cid = (c) => `${c.code}|${c.key}#${c.g}`;
   const loadState = () => {
@@ -94,7 +95,7 @@ const Cmp2 = (() => {
   const persist = () => { Store.set(KEY, S); const el = $('c2Saved'); if (el) { el.textContent = '✓ 자동 저장'; } };
   const loadUi = () => {
     const u = Store.get(UKEY, null) || {};
-    ui = { formId: u.formId || 'f_loc', ref: u.ref || 'gangnam', items: Array.isArray(u.items) ? u.items.slice(0, MAX) : [], sketch: u.sketch === 0 ? 0 : 1 };
+    ui = { formId: u.formId || 'f_loc', ref: u.ref || 'gangnam', items: Array.isArray(u.items) ? u.items.slice(0, MAX) : [], sketch: u.sketch === 0 ? 0 : 1, names: u.names ? 1 : 0, arrowOff: Array.isArray(u.arrowOff) ? u.arrowOff : [] };
     if (!S.forms.some(f => f.id === ui.formId)) ui.formId = S.forms[0].id;
     if (ui.ref === 'custom' && !cust.pos) ui.ref = 'gangnam';
   };
@@ -201,9 +202,11 @@ const Cmp2 = (() => {
       <button id="c2SaveSet">💾 저장</button><button id="c2LoadSet">📂 불러오기</button><button id="c2DelSet" class="danger">삭제</button>
     </section>
     <div class="c2-grid">
-      <section class="panel c2-mapbox"><h3>지도 <small id="c2MapHint">마커를 누르면 기준점까지 화살표 · 거리</small></h3>
+      <section class="panel c2-mapbox"><h3>지도 <small id="c2MapHint"></small></h3>
         <div class="c2-mapwrap"><div id="c2Map" class="c2-map"></div><div id="c2MapMsg" class="c2-mapmsg"></div></div>
-        <div class="c2-mapctl"><button id="c2ClrArrow">화살표 지우기</button><label class="inline"><input type="checkbox" id="c2Sketch" ${ui.sketch ? 'checked' : ''}> 사진이 없으면 PPT 에 약도(점·화살표·거리) 넣기</label></div>
+        <div id="c2Legend" class="c2-legend"></div>
+        <div class="c2-mapctl"><button id="c2ArrowAll">화살표 전체 끄기</button><button id="c2Measure" title="누른 뒤 출발할 단지나 지도 위 한 지점, 그다음 도착 지점을 누르면 거리 화살표">📏 거리재기</button><button id="c2ClrArrow">측정 지우기</button><button id="c2Fit">한눈에 보기</button></div>
+        <div class="c2-mapctl"><label class="inline"><input type="checkbox" id="c2Names" ${ui.names ? 'checked' : ''}> 지도에 이름표 표시</label><label class="inline"><input type="checkbox" id="c2Sketch" ${ui.sketch ? 'checked' : ''}> 사진이 없으면 PPT 에 약도(점·화살표·거리) 넣기</label></div>
         <div id="c2Cap"></div></section>
       <section class="panel c2-tbox"><div class="tablewrap"><table id="c2Table" class="cmp c2-table"></table></div>
         <p class="hint">✎ 자동 값을 고치면 📌 이 붙고, 📌 을 누르면 자동 값으로 돌아갑니다. 칸 오른쪽 ✔ 는 PPT 에 노란 체크로 들어갑니다. 거리는 직선거리입니다. 교통 시간은 [🔗 길찾기]에서 카카오맵으로 확인해 직접 적으세요.</p></section>
@@ -286,7 +289,7 @@ const Cmp2 = (() => {
     if (ui.items.some(c => cid(c) === item.id)) return U.toast('이미 넣은 단지입니다.');
     ui.items.push(item); saveUi(); paint(); renderMap();
   }
-  function changeItems() { saveUi(); paint(); renderMap(); }
+  function changeItems() { ui.arrowOff = (ui.arrowOff || []).filter(id => ui.items.some(c => cid(c) === id)); saveUi(); paint(); renderMap(); }
 
   /* ═════════ 자동 초안 ═════════ */
   function makeDraft(x) {
@@ -307,67 +310,126 @@ const Cmp2 = (() => {
   }
 
   /* ═════════ 지도 ═════════ */
-  const clearShapes = () => { shapes.forEach(s => s.remove()); shapes = []; clearArrows(); };
-  const clearArrows = () => { arrows.forEach(s => s.remove()); arrows = []; selIdx = null; markSel(); };
-  const markSel = () => { shapes.forEach(s => { if (s.el) s.el.classList.toggle('sel', s.idx === selIdx); }); const h = $('c2MapHint'); if (h) h.textContent = selIdx == null ? '마커를 누르면 기준점까지 화살표 · 거리' : `${selIdx + 1}번 선택됨 — 다른 단지나 지도의 한 지점을 누르면 거리 화살표 (다시 누르면 해제)`; };
-  function arrow(a, b, color, text) {
-    const LLf = KMap.LL;
-    const pl = new kakao.maps.Polyline({ path: [LLf(a), LLf(b)], strokeWeight: 3, strokeColor: color, strokeOpacity: 0.95, strokeStyle: 'solid', endArrow: true });
-    pl.setMap(kmap);
-    const el = document.createElement('div'); el.className = 'klabel'; el.textContent = text || `${KMap.km(a, b).toFixed(1)}km`;
-    const ov = new kakao.maps.CustomOverlay({ position: LLf({ lat: (a.lat + b.lat) / 2, lng: (a.lng + b.lng) / 2 }), content: el, yAnchor: 0.5, zIndex: 4 });
-    ov.setMap(kmap);
-    return { remove: () => { pl.setMap(null); ov.setMap(null); } };
+  const clearList = (l) => { l.forEach(o => o.remove()); l.length = 0; };
+  const lerp = (a, b, t) => ({ lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t });
+  const offIds = () => ui.arrowOff || [];
+  /** 화면에서 a→b 선이 향하는 각도(도, 오른쪽 = 0). 지도 투영을 먼저 쓰고, 안 되면 메르카토르 계산 */
+  function screenAngle(a, b) {
+    try {
+      const pr = kmap.getProjection(), pa = pr.containerPointFromCoords(KMap.LL(a)), pb = pr.containerPointFromCoords(KMap.LL(b));
+      const dx = pb.x - pa.x, dy = pb.y - pa.y;
+      if (isFinite(dx) && isFinite(dy) && Math.hypot(dx, dy) > 2) return Math.atan2(dy, dx) * 180 / Math.PI;
+    } catch (e) { /* 아래 계산으로 */ }
+    const my = (q) => Math.log(Math.tan(Math.PI / 4 + q.lat * Math.PI / 360));
+    return Math.atan2(-(my(b) - my(a)), (b.lng - a.lng) * Math.PI / 180) * 180 / Math.PI;
+  }
+  /** 굵은 색 선 + 흰 테두리 + 직접 그린 화살촉 + 색 알약 거리 글자. shrink: 선이 도착점 몇 % 앞에서 끝날지 (기준점에서 화살촉이 뭉치지 않게) */
+  function makeArrow(a, b, color, text, opt = {}) {
+    const LLf = KMap.LL, e = lerp(a, b, opt.shrink == null ? 0.93 : opt.shrink), ang = screenAngle(a, e);
+    const mkLine = (weight, col, op, z) => { const pl = new kakao.maps.Polyline({ path: [LLf(a), LLf(e)], strokeWeight: weight, strokeColor: col, strokeOpacity: op, strokeStyle: 'solid', zIndex: z }); pl.setMap(kmap); return pl; };
+    const outline = mkLine(8, '#ffffff', 0.95, 2), line = mkLine(4.5, color, 1, 3);
+    const ov = (pos, el, z) => { const o = new kakao.maps.CustomOverlay({ position: LLf(pos), content: el, xAnchor: 0.5, yAnchor: 0.5, zIndex: z }); o.setMap(kmap); return o; };
+    const headEl = document.createElement('div'); headEl.className = 'c2-head';
+    headEl.innerHTML = `<svg width="26" height="26" viewBox="-13 -13 26 26" style="transform:rotate(${ang}deg)"><path d="M12 0 L-8 -9 L-3 0 L-8 9 Z" fill="${color}" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>`;
+    const head = ov(e, headEl, 5);
+    const pillEl = document.createElement('div'); pillEl.className = 'c2-pill'; pillEl.style.background = color; pillEl.textContent = text;
+    const pill = ov(lerp(a, e, opt.t == null ? 0.5 : opt.t), pillEl, 6);
+    return {
+      remove() { outline.setMap(null); line.setMap(null); head.setMap(null); pill.setMap(null); },
+      dim(on) { try { outline.setOptions({ strokeOpacity: on ? 0.2 : 0.95 }); line.setOptions({ strokeOpacity: on ? 0.25 : 1 }); } catch (err) { /* 옵션 변경 미지원이면 선은 그대로 */ } headEl.style.opacity = pillEl.style.opacity = on ? 0.25 : 1; },
+    };
+  }
+  const highlight = (i) => autoArr.forEach(a => a.dim(i != null && a.i !== i));
+  function hint() {
+    const h = $('c2MapHint'); if (!h) return;
+    h.textContent = pickRef ? '기준점으로 삼을 곳을 지도에서 한 번 누르세요'
+      : measuring ? (mA ? '📏 시작점 지정됨 — 도착할 단지나 지도 위 한 지점을 누르세요' : '📏 거리재기: 출발할 단지나 지도 위 한 지점을 누르세요')
+        : '마커를 누르면 그 단지 화살표가 꺼지고 켜집니다';
+  }
+  function drawLegend() {
+    const el = $('c2Legend'); if (!el) return;
+    const off = offIds();
+    el.innerHTML = ui.items.length ? `<div class="c2-lgh">기준점: <b>${esc(curRef().name)}</b> <small>(직선거리 · 체크를 끄면 그 단지 화살표를 숨김)</small></div>` +
+      ui.items.map((c, i) => { const p = posCache.get(cid(c)), d = p && curRp ? KMap.km(p, curRp) : null;
+        return `<label class="c2-lg" data-i="${i}"><input type="checkbox" data-arrow="${i}" ${off.includes(cid(c)) ? '' : 'checked'}><b style="background:${COLORS[i]}">${i + 1}</b><span class="c2-lgn">${esc(c.name)}</span><span class="c2-lgk">${d == null ? '-' : d.toFixed(1) + 'km'}</span></label>`; }).join('') : '';
+    const btn = $('c2ArrowAll'); if (btn) btn.textContent = ui.items.some(c => !off.includes(cid(c))) ? '화살표 전체 끄기' : '화살표 전체 켜기';
+  }
+  /** 켜 둔 단지마다 기준점까지 화살표 (단지가 늘면 늘어나고, 빼면 줄어듦) */
+  function drawArrows() {
+    clearList(autoArr);
+    if (kmap && curRp) {
+      const off = offIds();
+      ui.items.forEach((c, i) => {
+        const p = posCache.get(cid(c)); if (!p || off.includes(cid(c))) return;
+        const a = makeArrow(p, curRp, COLORS[i], `${KMap.km(p, curRp).toFixed(1)}km`, { t: [0.34, 0.5, 0.66, 0.42][i] }); a.i = i; autoArr.push(a);
+      });
+    }
+    mkList.forEach(m => { if (m.idx != null) m.el.classList.toggle('off', offIds().includes(cid(ui.items[m.idx]))); });
+    drawLegend();
+  }
+  function toggleArrow(i, on) {
+    const id = cid(ui.items[i]), off = new Set(offIds()), nowOn = on == null ? off.has(id) : on;
+    if (nowOn) off.delete(id); else off.add(id);
+    ui.arrowOff = [...off]; saveUi(); drawArrows();
+  }
+  function toggleAll() { const anyOn = ui.items.some(c => !offIds().includes(cid(c))); ui.arrowOff = anyOn ? ui.items.map(cid) : []; saveUi(); drawArrows(); }
+  function clearMeasure() { clearList(measureObjs); mA = null; hint(); }
+  function measurePoint(p) {
+    if (!mA) {
+      mA = p;
+      const d = document.createElement('div'); d.className = 'c2-adot';
+      const o = new kakao.maps.CustomOverlay({ position: KMap.LL(p), content: d, xAnchor: 0.5, yAnchor: 0.5, zIndex: 7 }); o.setMap(kmap);
+      measureObjs.push({ remove: () => o.setMap(null) }); hint(); return;
+    }
+    measureObjs.push(makeArrow(mA, p, '#444444', `${KMap.km(mA, p).toFixed(1)}km`, { shrink: 1, t: 0.5 })); mA = null; hint();
   }
   function onMarker(i) {
     if (pickRef) return;
-    const c = ui.items[i], p = posCache.get(cid(c));
-    if (!p) return;
-    if (selIdx === i) return clearArrows();
-    if (selIdx == null) {
-      selIdx = i; markSel();
-      if (lastRef) arrows.push(arrow(p, lastRef, COLORS[i], `${KMap.km(p, lastRef).toFixed(1)}km`));
-    } else {
-      const q = posCache.get(cid(ui.items[i]));
-      if (q) arrows.push(arrow(posCache.get(cid(ui.items[selIdx])), q, COLORS[selIdx]));
-    }
+    const p = posCache.get(cid(ui.items[i])); if (!p) return;
+    if (measuring) return measurePoint(p);
+    toggleArrow(i);
   }
-  let lastRef = null;
-  async function renderMap() {
+  async function renderMap(force) {
     const my = ++mapSeq, msg = $('c2MapMsg'), box = $('c2Map');
     if (!msg || !box) return;
     const say = (html) => { msg.innerHTML = html; msg.hidden = !html; };
-    clearShapes();
-    if (!ui.items.length) { say('단지를 고르면 지도에 표시됩니다.'); return; }
-    if (!KMap.ready()) { say(KMap.needKeyHtml); return; }
+    clearList(mkList); clearList(autoArr); clearList(measureObjs); mA = null; hint();
+    if (!ui.items.length) { fitKey = ''; drawLegend(); say('단지를 고르면 지도에 표시됩니다.'); return; }
+    if (!KMap.ready()) { drawLegend(); say(KMap.needKeyHtml); return; }
     say('지도를 불러오는 중…');
     let poss, rp;
-    try { await KMap.load(); poss = await Promise.all(ui.items.map(posOf)); rp = await refPos(); } catch (e) { if (my === mapSeq) say(esc(e.message || String(e))); return; }
+    try { await KMap.load(); poss = await Promise.all(ui.items.map(posOf)); rp = await refPos(); } catch (e) { if (my === mapSeq) { drawLegend(); say(esc(e.message || String(e))); } return; }
     if (my !== mapSeq) return;
     const ok = poss.filter(Boolean);
-    if (!ok.length) { say('단지 위치를 찾지 못했습니다.'); return; }
+    if (!ok.length) { drawLegend(); say('단지 위치를 찾지 못했습니다.'); return; }
     say('');
-    lastRef = rp;
+    curRp = rp;
     if (!kmap) {
       kmap = KMap.create(box, rp || ok[0], 7);
       kakao.maps.event.addListener(kmap, 'click', (ev) => {
         const p = { lat: ev.latLng.getLat(), lng: ev.latLng.getLng() };
-        if (pickRef) { pickRef = false; $('c2PickRef').classList.remove('on'); cust.pos = p; ui.ref = 'custom'; saveUi(); drawRefSelect(); paint(); renderMap(); return; }
-        if (selIdx != null) { const a = posCache.get(cid(ui.items[selIdx])); if (a) arrows.push(arrow(a, p, COLORS[selIdx])); }
+        if (pickRef) { pickRef = false; $('c2PickRef').classList.remove('on'); cust.pos = p; ui.ref = 'custom'; saveUi(); drawRefSelect(); hint(); paint(); renderMap(true); return; }
+        if (measuring) measurePoint(p);
       });
     }
     const mk = (pos, html, cls, idx, onClick) => {
       const el = document.createElement('div'); el.className = 'c2-mk ' + (cls || ''); el.innerHTML = html;
       if (onClick) el.onclick = (e) => { e.stopPropagation(); onClick(); };
-      const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(pos), content: el, xAnchor: 0.5, yAnchor: 0.5, zIndex: 6, clickable: true });
+      if (idx != null) { el.onmouseenter = () => highlight(idx); el.onmouseleave = () => highlight(null); }
+      const ov = new kakao.maps.CustomOverlay({ position: KMap.LL(pos), content: el, xAnchor: 0.5, yAnchor: 0.5, zIndex: 8, clickable: true });
       ov.setMap(kmap);
       return { el, idx, remove: () => ov.setMap(null) };
     };
-    if (rp) shapes.push(mk(rp, `<b class="ref">★</b><span>${esc(curRef().name)}</span>`, 'refmk'));
-    ui.items.forEach((c, i) => { const p = poss[i]; if (p) shapes.push(mk(p, `<b style="background:${COLORS[i]}">${i + 1}</b><span>${esc(c.name)}</span>`, '', i, () => onMarker(i))); });
+    if (rp) mkList.push(mk(rp, `<b class="ref">★</b><span>${esc(curRef().name)}</span>`, 'refmk'));
+    ui.items.forEach((c, i) => {
+      const p = poss[i]; if (!p) return;
+      const rev = rp && rp.lng >= p.lng;                               // 이름표는 화살표 반대쪽에
+      mkList.push(mk(p, `<b style="background:${COLORS[i]}">${i + 1}</b>${ui.names ? `<span class="${rev ? 'rev' : ''}">${esc(c.name)}</span>` : ''}`, '', i, () => onMarker(i)));
+    });
     kmap.relayout();
-    KMap.fit(kmap, [...(rp ? [rp] : []), ...ok]);
-    markSel();
+    const key = ui.items.map(cid).join(',') + '|' + ui.ref + (cust.pos && ui.ref === 'custom' ? cust.pos.lat + ',' + cust.pos.lng : '');
+    if (force || key !== fitKey) { KMap.fit(kmap, [...(rp ? [rp] : []), ...ok]); fitKey = key; }   // 단지·기준점이 바뀔 때만 한눈에 맞춤 (직접 움직인 화면은 그대로)
+    drawArrows();
   }
 
   /* ═════════ 지도 사진 (붙여넣기·끌어놓기·파일) ═════════ */
@@ -453,7 +515,7 @@ const Cmp2 = (() => {
     ui.items = (s.items || []).slice(0, MAX).map(c => ({ ...c, id: cid(c) }));
     if (S.forms.some(f => f.id === s.formId)) ui.formId = s.formId;
     ui.ref = REFS.some(r => r.id === s.ref) ? s.ref : 'gangnam';
-    saveUi(); drawForms(); drawRefSelect(); drawEditor(); paint(); renderMap();
+    ui.arrowOff = []; saveUi(); drawForms(); drawRefSelect(); drawEditor(); paint(); renderMap();
   }
   function delSet() {
     const s = S.sets.find(v => v.id === $('c2Sets').value); if (!s || locked() || !confirm(`"${s.name}" 세트를 삭제할까요?`)) return;
@@ -544,22 +606,26 @@ const Cmp2 = (() => {
     const offX = AX + (AW - spanX * s) / 2, offY = AY + (AH - spanY * s) / 2;
     pts.forEach((q, k) => { q.x = offX + (xs[k] - minX) * s; q.y = offY + (ys[k] - minY) * s; });
     slide.addShape(pptx.ShapeType.rect, { x: AX, y: AY, w: AW, h: AH, fill: { color: 'FAFAFA' }, line: { color: 'D0D0D0', width: 0.75, dashType: 'dash' } });
-    const ref = pts.find(q => q.ref);
-    if (ref) pts.filter(q => !q.ref).forEach(q => {
-      const dx = ref.x - q.x, dy = ref.y - q.y, L = Math.hypot(dx, dy) || 1, sx = q.x + dx / L * 0.14, sy = q.y + dy / L * 0.14, ex = ref.x - dx / L * 0.14, ey = ref.y - dy / L * 0.14;
-      const w = Math.abs(ex - sx), h = Math.abs(ey - sy), opt = { x: Math.min(sx, ex), y: Math.min(sy, ey), w, h, line: { color: PCOL[q.i], width: 2, endArrowType: 'triangle' } };
+    const ref = pts.find(q => q.ref), off = ui.arrowOff || [];
+    if (ref) pts.filter(q => !q.ref && !off.includes(cid(ui.items[q.i]))).forEach(q => {
+      const dx = ref.x - q.x, dy = ref.y - q.y, L = Math.hypot(dx, dy) || 1, sx = q.x + dx / L * 0.14, sy = q.y + dy / L * 0.14, ex = ref.x - dx / L * 0.2, ey = ref.y - dy / L * 0.2;
+      const w = Math.abs(ex - sx), h = Math.abs(ey - sy), opt = { x: Math.min(sx, ex), y: Math.min(sy, ey), w, h, line: { color: PCOL[q.i], width: 2.5, endArrowType: 'triangle' } };
       if (ex < sx) opt.flipH = true;
       if (ey < sy) opt.flipV = true;
       slide.addShape(pptx.ShapeType.line, opt);
-      const d = KMap.km(q.p, ref.p), mx = (sx + ex) / 2, my = (sy + ey) / 2;
-      slide.addText(`${d.toFixed(1)}km`, { x: mx - 0.45, y: my - 0.12, w: 0.9, h: 0.24, wrap: false, margin: 0, fontFace: F, fontSize: 10, bold: true, color: PCOL[q.i], align: 'center', valign: 'middle', fill: { color: 'FFFFFF' } });
+      const d = KMap.km(q.p, ref.p), t = [0.34, 0.5, 0.66, 0.42][q.i] || 0.5, mx = sx + (ex - sx) * t, my = sy + (ey - sy) * t;
+      slide.addText(`${d.toFixed(1)}km`, { x: mx - 0.4, y: my - 0.12, w: 0.8, h: 0.24, shape: pptx.ShapeType.roundRect, wrap: false, margin: 0, fontFace: F, fontSize: 10, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle', fill: { color: PCOL[q.i] }, line: { color: 'FFFFFF', width: 1 } });
     });
+    const placed = [];
     pts.forEach(q => {
       if (q.ref) { slide.addShape(pptx.ShapeType.star5, { x: q.x - 0.15, y: q.y - 0.15, w: 0.3, h: 0.3, fill: { color: 'FFC000' }, line: { color: '000000', width: 1 } }); }
       else slide.addShape(pptx.ShapeType.ellipse, { x: q.x - 0.14, y: q.y - 0.14, w: 0.28, h: 0.28, fill: { color: PCOL[q.i] }, line: { color: 'FFFFFF', width: 1 } });
       if (!q.ref) slide.addText(String(q.i + 1), { x: q.x - 0.14, y: q.y - 0.14, w: 0.28, h: 0.28, fontFace: F, fontSize: 9, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle', margin: 0 });
       const right = q.x < AX + AW / 2, tw = 1.7;
-      slide.addText(q.name, { x: right ? q.x + 0.2 : q.x - 0.2 - tw, y: q.y - 0.14, w: tw, h: 0.28, fontFace: F, fontSize: q.ref ? 11 : 10, bold: true, color: q.ref ? '000000' : PCOL[q.i], align: right ? 'left' : 'right', valign: 'middle', margin: 0 });
+      let ly = q.y - 0.14;                                              // 이름표끼리 겹치면 아래로 밀기
+      for (let tries = 0; tries < 6 && placed.some(r => r.right === right && Math.abs(r.y - ly) < 0.27 && Math.abs(r.x - q.x) < tw); tries++) ly += 0.28;
+      placed.push({ right, y: ly, x: q.x });
+      slide.addText(q.name, { x: right ? q.x + 0.2 : q.x - 0.2 - tw, y: ly, w: tw, h: 0.28, fontFace: F, fontSize: q.ref ? 11 : 10, bold: true, color: q.ref ? '000000' : PCOL[q.i], align: right ? 'left' : 'right', valign: 'middle', margin: 0 });
     });
   }
 
@@ -570,6 +636,8 @@ const Cmp2 = (() => {
       if (t.closest('#c2Editor')) return onEditorChange(e);
       if (t.id === 'c2Ref') { ui.ref = t.value; saveUi(); paint(); renderMap(); return; }
       if (t.id === 'c2Sketch') { ui.sketch = t.checked ? 1 : 0; saveUi(); return; }
+      if (t.id === 'c2Names') { ui.names = t.checked ? 1 : 0; saveUi(); renderMap(); return; }
+      if (t.dataset.arrow != null) { toggleArrow(+t.dataset.arrow, t.checked); return; }
       if (t.id === 'c2File') { const f = t.files && t.files[0]; t.value = ''; if (f) putImage(f); return; }
       if (t.dataset.area != null) {
         const i = +t.dataset.area, c = ui.items[i], g = +t.value;
@@ -602,8 +670,11 @@ const Cmp2 = (() => {
       if (t.closest('#c2SaveSet')) return saveSet();
       if (t.closest('#c2LoadSet')) return loadSet();
       if (t.closest('#c2DelSet')) return delSet();
-      if (t.closest('#c2ClrArrow')) return clearArrows();
-      if (t.closest('#c2PickRef')) { if (!kmap) return U.toast('지도가 아직 준비되지 않았습니다. 단지를 먼저 고르세요.'); pickRef = !pickRef; $('c2PickRef').classList.toggle('on', pickRef); U.toast(pickRef ? '지도에서 기준점으로 삼을 곳을 한 번 누르세요.' : '기준점 지정을 취소했습니다.'); return; }
+      if (t.closest('#c2ClrArrow')) return clearMeasure();
+      if (t.closest('#c2ArrowAll')) return toggleAll();
+      if (t.closest('#c2Fit')) return renderMap(true);
+      if (t.closest('#c2Measure')) { if (!kmap) return U.toast('지도가 아직 준비되지 않았습니다. 단지를 먼저 고르세요.'); measuring = !measuring; pickRef = false; $('c2PickRef').classList.remove('on'); mA = null; $('c2Measure').classList.toggle('on', measuring); if (!measuring) clearMeasure(); hint(); return; }
+      if (t.closest('#c2PickRef')) { if (!kmap) return U.toast('지도가 아직 준비되지 않았습니다. 단지를 먼저 고르세요.'); pickRef = !pickRef; measuring = false; mA = null; $('c2Measure').classList.remove('on'); hint(); $('c2PickRef').classList.toggle('on', pickRef); U.toast(pickRef ? '지도에서 기준점으로 삼을 곳을 한 번 누르세요.' : '기준점 지정을 취소했습니다.'); return; }
       const rm = t.closest('[data-rm]'); if (rm) { if (locked()) return; ui.items.splice(+rm.dataset.rm, 1); return changeItems(); }
       const ck = t.closest('[data-ck]'); if (ck) { if (locked()) return; const on = !valOf(ck.dataset.cid, 'ck_' + ck.dataset.ck); setVal(ck.dataset.cid, 'ck_' + ck.dataset.ck, on ? '1' : ''); ck.classList.toggle('on', on); return; }
       const ed = t.closest('[data-edit]');
@@ -624,6 +695,8 @@ const Cmp2 = (() => {
     root.addEventListener('dragover', (e) => { const s = e.target.closest('#c2Slot'); if (s) { e.preventDefault(); s.classList.add('over'); } });
     root.addEventListener('dragleave', (e) => { const s = e.target.closest('#c2Slot'); if (s) s.classList.remove('over'); });
     root.addEventListener('drop', (e) => { const s = e.target.closest('#c2Slot'); if (!s) return; e.preventDefault(); s.classList.remove('over'); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) putImage(f); });
+    root.addEventListener('mouseover', (e) => { const r = e.target.closest('.c2-lg'); if (r) highlight(+r.dataset.i); });
+    root.addEventListener('mouseout', (e) => { if (e.target.closest('.c2-lg')) highlight(null); });
     document.addEventListener('paste', (e) => {                         // Ctrl+V: 이 탭이 보이고 글 입력 중이 아닐 때만 사진으로 받음
       if (root.hidden || !inited) return;
       const a = document.activeElement; if (a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && a.type !== 'checkbox'))) return;
