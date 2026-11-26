@@ -5,8 +5,10 @@
    · 열 때 · 다른 앱 보다가 돌아올 때 · 5분마다 → 받아서 합침 / 고치면 30초 뒤 → 받아서 합친 뒤 올림
    · 합치는 방법: 지난번 동기화 때의 기록(기준)과 비교해서, 바뀐 쪽 값을 씀 → 한쪽에서 지운 단지는 다른 쪽에서도 지워짐
      두 기기가 같은 칸을 고쳤으면 나중에 동기화한 쪽 값이 남음 (처음 연결할 때만 저장소 쪽 값 우선)
-   · 휴대폰 연결: PC 에서 QR 을 띄우고 휴대폰 카메라로 찍으면 저장소·토큰이 자동으로 들어감
-   이 기기에만 저장 (백업 파일에 안 들어감): autosync.cfg (켜기/끄기), autosync.base (지난번 동기화 기준)
+   · 휴대폰 연결 (GitHub 방식): PC 에서 QR 을 띄우고 휴대폰 카메라로 찍으면 저장소·토큰이 자동으로 들어감
+   · Google 방식 (추천): 각 기기에서 Google 로그인 한 번 — QR·토큰 필요 없음 (js/fbsync.js · 설정값 js/fbconfig.js)
+     두 방식은 따로 저장되며, Google 로 로그인해 두면 Google 쪽이 쓰이고 GitHub 설정은 예비로 남음
+   이 기기에만 저장 (백업 파일에 안 들어감): autosync.cfg (켜기/끄기·방식), autosync.base / autosync.base.g (지난번 동기화 기준 · GitHub / Google)
    ───────────────────────────────────────────────────────── */
 const AutoSync = (() => {
   const $ = (id) => document.getElementById(id);
@@ -18,10 +20,15 @@ const AutoSync = (() => {
   const LBL = ['apt.labels.v1', 'apt.labelEdits.v1', 'apt.labelPresets.v1', 'apt.olFix.v1'];   // + 홈 단지 경계에서 손으로 고친 필지                  // 지도 라벨 설정·짧은 이름·숨김·강조 (js/labelkit.js)
   const KEYS = [...TRK, ...TRK_ETC, ...YARD, ...YM, ...LBL];
   const DELAY = 30000, POLL = 10000, REMOTE_EVERY = 5 * 60000, MIN_GAP = 15000;
-  let cfg = { on: 1, last: 0 }, busy = false, again = false, lastTry = 0, err = '', dirtyTimer = null, retryTimer = null, localHash = '', inited = false;
+  let cfg = { on: 1, last: 0 }, needLogin = false, busy = false, again = false, lastTry = 0, err = '', dirtyTimer = null, retryTimer = null, localHash = '', inited = false;
 
   const gh = () => Store.get(GH, { repo: '', token: '', path: 'sync/apt-backup.json' }) || {};
-  const ready = () => { const c = gh(); return !!(c.repo && c.token); };
+  const ready = () => { const c = gh(); return !!(c.repo && c.token); };                       // GitHub 방식 준비됨?
+  const fbOn = () => typeof FbSync !== 'undefined' && FbSync.configured();
+  const mode = () => (cfg.mode === 'google' && fbOn() ? 'google' : ready() ? 'github' : '');    // 지금 쓰는 방식
+  const connected = () => !!mode();
+  const baseKey = () => (mode() === 'google' ? BASE + '.g' : BASE);
+  const gUser = () => (fbOn() ? FbSync.current() : null);
   const saveCfg = () => Store.set(CFG, cfg);
 
   /* ── 글자 ↔ base64 (한글 안전) ── */
@@ -125,18 +132,30 @@ const AutoSync = (() => {
     if (!r.ok) throw new Error(why(r.status));
   }
   const deviceName = () => (/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? '휴대폰' : 'PC');
+  /** 지금 방식의 받기/올리기 (get → {sha, doc}, put(data, sha)) */
+  async function backend() {
+    if (mode() === 'google') {
+      const u = await FbSync.user();
+      if (!u) { const e = new Error('Google 로그인이 필요합니다. 위쪽 ☁ 단추를 눌러 로그인해 주세요.'); e.login = true; throw e; }
+      return { get: () => FbSync.get(u), put: (d, sha) => FbSync.put(u, d, sha, deviceName()) };
+    }
+    const c = gh();
+    return { get: () => getRemote(c), put: (d, sha) => putRemote(c, d, sha) };
+  }
 
   /* ── 동기화 한 번 ── */
   async function sync() {
-    if (!ready() || !cfg.on) return show();
+    if (!connected() || !cfg.on) return show();
     if (busy) { again = true; return; }
     if (editing()) return later(15000);             // 칸에 적는 중이면 잠시 뒤에
     busy = true; lastTry = Date.now(); show('busy');
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
-        const c = gh();
-        const { sha, doc } = await getRemote(c);
-        const base = Store.get(BASE, null), local = readLocal(), remote = doc ? doc.data : null;
+        const B = await backend();
+        let got;
+        try { got = await B.get(); } catch (e) { if (e.transient && attempt < 2) { await new Promise(r => setTimeout(r, 1200)); continue; } throw e; }
+        const { sha, doc } = got;
+        const base = Store.get(baseKey(), null), local = readLocal(), remote = doc ? doc.data : null;
         let merged = remote ? m3(base || undefined, local, remote, !base) : local;
         if (!same(merged, local)) {
           if (editing()) { busy = false; return later(15000); }
@@ -144,14 +163,14 @@ const AutoSync = (() => {
           merged = readLocal();                     // 시세트래킹이 정리(normalize)한 값 그대로
         }
         if (!remote || !same(merged, remote)) {
-          try { await putRemote(c, merged, sha); } catch (e) { if (e.conflict && attempt < 2) continue; throw e; }
+          try { await B.put(merged, sha); } catch (e) { if (e.conflict && attempt < 2) continue; throw e; }
         }
-        Store.set(BASE, merged);
+        Store.set(baseKey(), merged);
         localHash = stable(merged);
-        cfg.last = Date.now(); saveCfg(); err = '';
+        cfg.last = Date.now(); saveCfg(); err = ''; needLogin = false;
         break;
       }
-    } catch (e) { err = e.message || String(e); console.error('자동 동기화', e); }
+    } catch (e) { err = e.message || String(e); needLogin = !!e.login; console.error('자동 동기화', e); }
     finally {
       busy = false; show();
       if (again) { again = false; setTimeout(sync, 500); }
@@ -169,14 +188,15 @@ const AutoSync = (() => {
   function show(state) {
     const b = $('btnAutoSync'); if (!b) return;
     let t, cls = '';
-    if (!ready()) t = '☁ 동기화 설정';
+    if (!connected()) t = '☁ 동기화 설정';
     else if (!cfg.on) t = '☁ 자동 동기화 꺼짐';
     else if (state === 'busy' || busy) t = '⏳ 동기화 중…';
+    else if (needLogin) { t = '☁ Google 로그인 필요'; cls = 'warn'; }
     else if (err) { t = '⚠ 동기화 실패'; cls = 'bad'; }
     else if (dirtyTimer) t = '☁ 고친 내용 곧 올림';
     else t = `☁ 동기화됨 · ${ago(cfg.last) || '아직'}`;
     b.textContent = t; b.className = 'hbtn' + (cls ? ' ' + cls : '');
-    b.title = err ? `실패 이유: ${err} (눌러서 확인)` : '시세트래킹·1등뽑기·앞마당 자동 동기화 (눌러서 설정)';
+    b.title = err ? `실패 이유: ${err} (눌러서 확인)` : `시세트래킹·1등뽑기·앞마당 자동 동기화${mode() === 'google' ? ' · Google' : mode() === 'github' ? ' · GitHub' : ''} (눌러서 설정)`;
     if ($('asModal') && !$('asModal').hidden) renderModal();
   }
 
@@ -188,7 +208,14 @@ const AutoSync = (() => {
     m.innerHTML = `<div class="modalbox" style="width:min(560px,100%);max-height:90vh;overflow:auto">
       <div class="bar"><strong>☁ 자동 동기화 · 시세트래킹 + 1등뽑기 + 앞마당</strong><span class="grow"></span><button id="asClose">닫기</button></div>
       <p id="asState" class="hint" style="margin:6px 0"></p>
+      <div style="margin:8px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+        <div class="bar"><strong>Google 계정으로 동기화</strong><span class="hint" style="margin:0 0 0 6px">추천 · QR·토큰 필요 없음</span></div>
+        <p id="asGState" class="hint" style="margin:6px 0"></p>
+        <div class="bar" style="gap:6px"><button id="asGLogin" class="primary">Google로 로그인</button><button id="asGLogout" hidden>로그아웃</button></div>
+        <p class="hint" style="margin:6px 0 0">PC와 휴대폰에서 같은 Google 계정으로 한 번씩 로그인하면 끝입니다. 한 번 로그인하면 그 기기에서는 계속 유지됩니다.</p>
+      </div>
       <div class="bar"><label class="inline"><input type="checkbox" id="asOn"> 자동 동기화 켜기</label><span class="grow"></span><button id="asNow" class="primary">지금 동기화</button></div>
+      <details id="asOld" style="margin:10px 0"><summary><b>예전 방식 (예비)</b> <span class="hint" style="margin:0">GitHub 저장소 + QR</span></summary>
       <details id="asSetup" style="margin:10px 0"><summary><b>저장소 · 토큰</b> <span class="hint" style="margin:0">(처음 한 번)</span></summary>
         <div class="bar" style="margin-top:8px;flex-wrap:wrap;gap:6px">
           <label>저장소 <input id="asRepo" placeholder="아이디/저장소이름" style="width:200px"></label>
@@ -204,22 +231,37 @@ const AutoSync = (() => {
       </details>
       <div class="bar"><button id="asQr">📱 휴대폰 연결 QR 보기</button><span class="hint" style="margin:0">PC에서 띄우고 휴대폰 카메라로 찍으세요</span></div>
       <div id="asQrBox" hidden style="text-align:center;margin:10px 0"></div>
+      </details>
       <p class="hint" style="margin-top:10px">· 열 때, 다른 앱을 보다가 돌아올 때, 5분마다 받아 오고 / 고치면 30초 뒤 올립니다.<br>
         · 한쪽에서 지운 단지는 다른 기기에서도 지워집니다. 두 기기에서 같은 칸을 고치면 나중에 동기화한 쪽 값이 남습니다.<br>
-        · 토큰은 이 기기에만 저장되고 백업 파일에도 들어가지 않습니다. 기기를 남에게 빌려줄 땐 자동 동기화를 꺼 두세요.</p>
+        · 로그인 정보·토큰은 이 기기에만 저장되고 백업 파일에도 들어가지 않습니다. 기기를 남에게 빌려줄 땐 자동 동기화를 꺼 두세요.</p>
     </div>`;
     document.body.appendChild(m);
     m.addEventListener('click', (e) => { if (e.target === m) m.hidden = true; });
     $('asClose').onclick = () => { m.hidden = true; };
     $('asOn').onchange = () => { cfg.on = $('asOn').checked ? 1 : 0; saveCfg(); show(); if (cfg.on) sync(); };
-    $('asNow').onclick = () => { if (!ready()) { $('asSetup').open = true; return U.toast('먼저 저장소와 토큰을 넣어 주세요.'); } sync(); };
+    $('asNow').onclick = () => { if (!connected()) return U.toast(fbOn() ? '먼저 Google로 로그인해 주세요.' : '먼저 Google 로그인 또는 저장소·토큰을 설정해 주세요.'); sync(); };
+    $('asGLogin').onclick = async () => {
+      if (!fbOn()) return U.toast('Firebase 설정값이 비어 있습니다. js/fbconfig.js 를 먼저 채워 주세요.');
+      const was = cfg.mode; cfg.mode = 'google'; cfg.on = 1; saveCfg();             // 화면 이동 방식으로 로그인해도 돌아와서 이어지게 미리 저장
+      try {
+        const u = await FbSync.signIn();
+        if (u) { err = ''; U.toast('Google 계정에 연결했습니다. 기록을 맞추는 중…'); sync(); }
+      } catch (e) { cfg.mode = was; saveCfg(); err = e.message || String(e); U.toast(err); }
+      show();
+    };
+    $('asGLogout').onclick = async () => {
+      if (!confirm('이 기기에서 Google 로그아웃할까요?\n(기록은 지워지지 않고, 다시 로그인하면 이어집니다)')) return;
+      try { await FbSync.signOut(); } catch (e) { console.error(e); }
+      cfg.mode = ready() ? 'github' : ''; saveCfg(); err = ''; needLogin = false; show();
+    };
     $('asSave').onclick = () => {
       const repo = $('asRepo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/$/, ''), token = $('asToken').value.trim();
       if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) return U.toast('저장소 이름을 "아이디/저장소이름" 모양으로 적어 주세요. (예: AscenAscen/apt-sync)');
       if (!token) return U.toast('토큰을 붙여 넣어 주세요.');
       Store.set(GH, { ...gh(), repo, token, path: 'sync/apt-backup.json' });
       const sr = $('syRepo'), stk = $('syToken'); if (sr) sr.value = repo; if (stk) stk.value = token;     // 시세트래킹 탭의 칸도 같이
-      cfg.on = 1; saveCfg(); U.toast('저장했습니다. 동기화를 시작합니다.'); sync();
+      cfg.on = 1; cfg.mode = 'github'; saveCfg(); U.toast('저장했습니다. 동기화를 시작합니다.'); sync();
     };
     $('asQr').onclick = qr;
     return m;
@@ -229,10 +271,18 @@ const AutoSync = (() => {
     $('asOn').checked = !!cfg.on;
     if (document.activeElement !== $('asRepo')) $('asRepo').value = c.repo || '';
     if (document.activeElement !== $('asToken')) $('asToken').value = c.token || '';
-    $('asState').innerHTML = !ready() ? '아직 연결되지 않았습니다. 아래 <b>저장소 · 토큰</b>을 먼저 넣어 주세요.'
-      : `연결된 저장소: <b>${U.esc(c.repo)}</b> · ${busy ? '동기화 중…' : err ? `<span class="warn">실패: ${U.esc(err)}</span>` : `마지막 동기화 ${ago(cfg.last) || '아직 없음'}`}`;
+    const md = mode(), u = gUser(), st = busy ? '동기화 중…' : err ? `<span class="warn">실패: ${U.esc(err)}</span>` : `마지막 동기화 ${ago(cfg.last) || '아직 없음'}`;
+    $('asState').innerHTML = !md ? '아직 연결되지 않았습니다. 위 <b>Google로 로그인</b>을 눌러 주세요.'
+      : md === 'google' ? `연결: <b>Google${u && u.email ? ' (' + U.esc(u.email) + ')' : ''}</b> · ${st}`
+      : `연결된 저장소: <b>${U.esc(c.repo)}</b> (GitHub 방식) · ${st}`;
+    $('asGState').innerHTML = !fbOn() ? '<span class="warn">아직 Firebase 설정값이 없습니다.</span> js/fbconfig.js 에 설정값을 넣어 주세요. (그전까지는 아래 예전 방식을 쓸 수 있습니다)'
+      : md === 'google' ? (u ? `로그인됨: <b>${U.esc(u.email || u.displayName || '')}</b>` : '로그인이 필요합니다. 아래 단추를 눌러 주세요.')
+      : '아직 로그인하지 않았습니다.';
+    $('asGLogin').hidden = !!(md === 'google' && u); $('asGLogout').hidden = !(md === 'google' && u);
+    $('asGLogin').disabled = !fbOn();
+    $('asOld').open = $('asOld').open || (md === 'github');
   }
-  function openModal() { const m = modal(); renderModal(); if (!ready()) $('asSetup').open = true; m.hidden = false; }
+  function openModal() { const m = modal(); renderModal(); if (!fbOn() && !ready()) { $('asOld').open = true; $('asSetup').open = true; } m.hidden = false; }
 
   /* ── 휴대폰 연결 QR (주소 뒤 #sync=… 에 저장소·토큰을 담음. 주소의 # 뒤는 서버로 가지 않음) ── */
   let qrP = null;
@@ -245,7 +295,7 @@ const AutoSync = (() => {
     }));
   }
   async function qr() {
-    if (!ready()) { $('asSetup').open = true; return U.toast('먼저 저장소와 토큰을 넣어 주세요.'); }
+    if (!ready()) { $('asOld').open = true; $('asSetup').open = true; return U.toast('먼저 저장소와 토큰을 넣어 주세요.'); }
     const box = $('asQrBox');
     if (!box.hidden) { box.hidden = true; box.innerHTML = ''; return; }
     try {
@@ -268,7 +318,7 @@ const AutoSync = (() => {
       if (!o || !o.r || !o.t) throw new Error();
       if (!confirm(`이 기기를 동기화 저장소 ${o.r} 에 연결할까요?\n시세트래킹·1등뽑기·앞마당 기록이 다른 기기와 자동으로 맞춰집니다.\n(이 기기의 기록은 지워지지 않고 합쳐집니다)`)) return;
       Store.set(GH, { ...gh(), repo: o.r, token: o.t, path: 'sync/apt-backup.json' });
-      cfg.on = 1; saveCfg();
+      cfg.on = 1; cfg.mode = 'github'; saveCfg();
       U.toast('동기화를 연결했습니다. 기록을 맞추는 중…');
     } catch (e) { U.toast('QR 연결 정보가 올바르지 않습니다. PC에서 QR을 다시 띄워 주세요.'); }
   }
@@ -288,17 +338,19 @@ const AutoSync = (() => {
     show();
     // 고친 내용 살피기 (10초마다) → 30초 뒤 올림
     setInterval(() => {
-      if (!ready() || !cfg.on || busy || dirtyTimer) return;
+      if (!connected() || !cfg.on || busy || dirtyTimer) return;
       if (stable(readLocal()) !== localHash) { dirtyTimer = setTimeout(() => { dirtyTimer = null; sync(); }, DELAY); show(); }
     }, POLL);
     // 저장소 살피기 (보고 있을 때 5분마다), 상태 글자 새로 고침
-    setInterval(() => { if (document.visibilityState === 'visible' && ready() && cfg.on && Date.now() - lastTry > REMOTE_EVERY) sync(); else show(); }, 60000);
+    setInterval(() => { if (document.visibilityState === 'visible' && connected() && cfg.on && Date.now() - lastTry > REMOTE_EVERY) sync(); else show(); }, 60000);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') syncSoon();
       else if (dirtyTimer) { clearTimeout(dirtyTimer); dirtyTimer = null; sync(); }         // 화면을 떠나기 전에 바로 올림
     });
     window.addEventListener('focus', syncSoon);
-    if (ready() && cfg.on) setTimeout(sync, 1500);
+    if (fbOn()) FbSync.setOnChange(() => { show(); if (connected() && cfg.on && mode() === 'google' && FbSync.current()) syncSoon(); });
+    if (cfg.mode === 'google' && fbOn()) FbSync.load().then(() => show()).catch((e) => { err = e.message || String(e); show(); });   // 로그인 상태 미리 확인
+    if (connected() && cfg.on) setTimeout(sync, 1500);
   }
   return { init, sync, open: openModal, _m3: m3 };
 })();
