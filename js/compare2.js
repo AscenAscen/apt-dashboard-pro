@@ -48,6 +48,7 @@ const Cmp2 = (() => {
   const near = (p) => (p ? `${p.name} ${Loc.meters(p.m)} (도보 약 ${Loc.walk(p.m)}분)` : null);
   const L = (a, f) => (a && a.loc ? f(a.loc) : null);                // 카카오 값이 아직 없으면 null → "불러오는 중"
   const AUTO = {
+    dist2: { name: '기준점까지 거리 (km만, 예: 8.21km)', get: (a, c, x) => (x.km[cid(c)] == null ? null : `${+x.km[cid(c)].toFixed(2)}km`) },
     dist: { name: '기준점까지 직선거리', get: (a, c, x) => (x.km[cid(c)] == null ? null : `${x.km[cid(c)].toFixed(1)}km (직선)`) },
     subway: { name: '가까운 지하철역', get: (a) => L(a, l => (l.subway.length ? l.subway.slice(0, 2).map(s => `${s.name} ${Loc.meters(s.m)} (도보 약 ${Loc.walk(s.m)}분)`).join('\n') : '1.5km 안에 없음')) },
     elem: { name: '가까운 초등학교', get: (a) => L(a, l => near(l.elem) || '2km 안에서 찾지 못함') },
@@ -100,6 +101,13 @@ const Cmp2 = (() => {
       { id: 'k_env', label: '환경', sub: '(있을 것 있고 없을 것 없나)', type: 'rank' },
       { id: 'k_job', label: '직장 / 학군', type: 'rank' },
       { id: 'k_etc', label: '+@ 기타', sub: '급지 및 개발호재', type: 'rank', gray: 1 }] },
+    { id: 'f_front', name: '앞마당 비교평가', layout: 'front', title: '수도권 앞마당 비교평가', rows: [
+      { id: 'fr_price', label: '가격', type: 'text' },
+      { id: 'fr_dist', label: '위치', type: 'auto', src: 'dist2' },
+      { id: 'fr_tr', label: '교통', type: 'text', route: 1 },
+      { id: 'fr_sch', label: '학군', type: 'text' },
+      { id: 'fr_env', label: '환경', type: 'text' },
+      { id: 'fr_think', label: '생각', type: 'long' }] },
   ];
 
   /* ═════════ 상태 ═════════ */
@@ -145,8 +153,9 @@ const Cmp2 = (() => {
   }
 
   /* ═════════ 그림 양식용 보조 (색 순서 · 부호 · 순위) ═════════ */
-  const col = (i) => (form().layout ? COLS_B : COLORS)[i];
-  const pcol = (i) => (form().layout ? PCOL_B : PCOL)[i];
+  const tplForm = () => form().layout === 'judge' || form().layout === 'cases';      // 파랑 먼저 + 이름표 색 칸 스타일
+  const col = (i) => (tplForm() ? COLS_B : COLORS)[i];
+  const pcol = (i) => (tplForm() ? PCOL_B : PCOL)[i];
   const LG = () => S.longs[longKey()] || {};                          // 이 양식 + 이 단지 조합에 적은 글·부호·순위
   function setLong(k, v) {
     const lk = longKey(), o = (S.longs[lk] = S.longs[lk] || {});
@@ -248,7 +257,7 @@ const Cmp2 = (() => {
   };
   const cellText = (row, c, x) => {                                   // 화면·PPT 공통 글자
     const id = cid(c), ov = valOf(id, row.id);
-    if (row.type === 'input' || row.type === 'choice') {
+    if (row.type === 'input' || row.type === 'choice' || row.type === 'text') {
       const k = row.km && x.km[id] != null ? `${x.km[id].toFixed(1)}km` : '';
       return row.km ? (ov && k ? `${ov} / ${k}` : (ov || k)) : (ov || '');
     }
@@ -313,11 +322,12 @@ const Cmp2 = (() => {
   function cellHtml(row, c, x) {
     const id = cid(c), ov = valOf(id, row.id), ck = valOf(id, 'ck_' + row.id);
     const ckb = `<button class="c2-ck${ck ? ' on' : ''}" data-ck="${esc(row.id)}" data-cid="${esc(id)}" title="체크(✔) — PPT 에 노란 체크로 들어갑니다">✔</button>`;
-    if (row.type === 'input' || row.type === 'choice') {
+    if (row.type === 'input' || row.type === 'choice' || row.type === 'text') {
       const url = row.route ? routeUrl(c, x) : null;
       const kt = row.km && x.km[id] != null ? ` <span class="c2-kmtag">/ ${x.km[id].toFixed(1)}km</span>` : '';
       const chips = row.type === 'choice' ? `<div class="c2-opts">${(row.opts && row.opts.length ? row.opts : DEF_OPTS).map(o => `<button class="mini${ov === o ? ' on' : ''}" data-pick="${esc(row.id)}" data-cid="${esc(id)}" data-val="${esc(o)}">${esc(o)}</button>`).join('')}</div>` : '';
-      return `<input class="c2-in" data-v="${esc(row.id)}" data-cid="${esc(id)}" value="${esc(ov || '')}" placeholder="직접 입력">${kt}${row.route ? (url ? ` <a class="btn mini" target="_blank" rel="noopener" href="${url}">🔗 길찾기</a>` : ' <small>(단지 위치를 찾으면 길찾기 버튼이 생깁니다)</small>') : ''}${ckb}${chips}`;
+      const fld = row.type === 'text' ? `<textarea class="c2-in c2-tx" rows="2" data-v="${esc(row.id)}" data-cid="${esc(id)}" placeholder="직접 입력 (Enter 로 줄바꿈)">${esc(ov || '')}</textarea>` : `<input class="c2-in" data-v="${esc(row.id)}" data-cid="${esc(id)}" value="${esc(ov || '')}" placeholder="직접 입력">`;
+      return `${fld}${kt}${row.route ? (url ? ` <a class="btn mini" target="_blank" rel="noopener" href="${url}">🔗 길찾기</a>` : ' <small>(단지 위치를 찾으면 길찾기 버튼이 생깁니다)</small>') : ''}${ckb}${chips}`;
     }
     const src = AUTO[row.src], auto = src ? src.get(x.a[id], c, x) : null, autoTxt = auto == null ? '' : auto;
     if (ov) return `<div class="c2-ov"><input class="c2-in" data-v="${esc(row.id)}" data-cid="${esc(id)}" value="${esc(ov)}"><button class="c2-pin" data-unpin="${esc(row.id)}" data-cid="${esc(id)}" title="📌 직접 고친 값입니다. 누르면 자동 값으로 되돌립니다">📌</button></div><small class="c2-auto">자동: ${esc(autoTxt || '-')}</small>${ckb}`;
@@ -534,7 +544,7 @@ const Cmp2 = (() => {
         if (measuring) measurePoint(p);
       });
     }
-    const tpl = !!form().layout, aList = ui.names && tpl ? await Promise.all(ui.items.map(c => autoOf(c).catch(() => null))) : [];
+    const tpl = tplForm(), aList = ui.names && tpl ? await Promise.all(ui.items.map(c => autoOf(c).catch(() => null))) : [];
     if (my !== mapSeq) return;
     const mk = (pos, html, cls, idx, onClick) => {
       const el = document.createElement('div'); el.className = 'c2-mk ' + (cls || ''); el.innerHTML = html;
@@ -581,7 +591,7 @@ const Cmp2 = (() => {
     ed.hidden = !editing; $('c2EditBtn').classList.toggle('on', editing);
     if (!editing) return;
     const f = form(), lay = f.layout || '';
-    const types = [['auto', '자동 값'], ['input', '직접 입력'], ['choice', '선택 (상·중·하…)']].concat(lay === 'cases' ? [['rank', '순위']] : lay === 'judge' ? [] : [['long', '긴 글']]);
+    const types = [['auto', '자동 값'], ['input', '직접 입력 (한 줄)'], ['text', '직접 입력 (여러 줄)'], ['choice', '선택 (상·중·하…)']].concat(lay === 'cases' ? [['rank', '순위']] : lay === 'judge' ? [] : [['long', '긴 글']]);
     ed.innerHTML = `<h3>양식 편집 <small>줄 이름·종류를 고치면 바로 저장됩니다${lay === 'judge' ? ' · 비교평가 양식: 같은 "묶음 이름"이 이어지면 PPT 에서 한 칸으로 합쳐집니다' : lay === 'cases' ? ' · 투자사례 양식: "순위" 줄이 PPT 오른쪽 박스가 됩니다' : ''}</small></h3>
       <div class="filters"><label>양식 이름 <input id="c2FName" value="${esc(f.name)}"></label>
         <button data-ed="copyform">이 양식 복사</button><button data-ed="delform" class="danger">이 양식 삭제</button><button data-ed="restore" title="지워 버린 기본 양식(비교평가·투자사례)을 다시 추가합니다">기본 양식 다시 추가</button><span class="grow"></span><button data-ed="close" class="primary">닫기</button></div>
@@ -595,8 +605,8 @@ const Cmp2 = (() => {
         ${lay === 'judge' ? `<input class="c2-edgrp" data-edf="group" value="${esc(r.group || '')}" placeholder="묶음 이름(선택)" title="같은 이름이 이어지면 PPT 에서 한 칸으로 합쳐집니다. 비우면 줄 이름이 넓게 들어갑니다.">` : ''}
         ${r.type === 'rank' ? `<input class="c2-edgrp" data-edf="sub" value="${esc(r.sub || '')}" placeholder="작은 글씨(선택)">` : ''}
         ${r.type === 'choice' ? `<input class="c2-edgrp" data-edf="opts" value="${esc((r.opts && r.opts.length ? r.opts : DEF_OPTS).join(', '))}" placeholder="보기를 쉼표로 구분">` : ''}
-        ${r.type === 'input' ? `<label class="inline"><input type="checkbox" data-edf="route" ${r.route ? 'checked' : ''}> 🔗 길찾기 버튼</label><label class="inline"><input type="checkbox" data-edf="km" ${r.km ? 'checked' : ''}> 거리(km) 자동 붙이기</label>` : ''}
-        ${lay === 'cases' && (r.type === 'input' || r.type === 'choice' || r.type === 'auto') ? `<label class="inline"><input type="checkbox" data-edf="callout" ${r.callout ? 'checked' : ''}> 지도 말풍선에 넣기</label>` : ''}
+        ${r.type === 'input' || r.type === 'text' ? `<label class="inline"><input type="checkbox" data-edf="route" ${r.route ? 'checked' : ''}> 🔗 길찾기 버튼</label>` : ''}${r.type === 'input' ? `<label class="inline"><input type="checkbox" data-edf="km" ${r.km ? 'checked' : ''}> 거리(km) 자동 붙이기</label>` : ''}
+        ${lay === 'cases' && (r.type === 'input' || r.type === 'text' || r.type === 'choice' || r.type === 'auto') ? `<label class="inline"><input type="checkbox" data-edf="callout" ${r.callout ? 'checked' : ''}> 지도 말풍선에 넣기</label>` : ''}
         ${lay === 'cases' && r.type === 'rank' ? `<label class="inline"><input type="checkbox" data-edf="gray" ${r.gray ? 'checked' : ''}> 회색 박스</label>` : ''}
         <button class="mini danger" data-ed="delrow" title="이 줄 삭제">✕</button></div>`; }).join('')}</div>
       ${lay === 'judge' ? `<div class="c2-edpanel"><b>판단 질문 (PPT 오른쪽 칸 제목)</b>${(f.panel && f.panel.length ? f.panel : DEF_PANEL).map((p, i) => `<textarea data-edp="${i}" rows="2">${esc(p.h)}</textarea>`).join('')}</div>` : ''}
@@ -634,7 +644,8 @@ const Cmp2 = (() => {
       if (k === 'label') r.label = t.value.trim() || r.label;
       else if (k === 'type') {
         r.type = t.value; if (r.type === 'auto' && !r.src) r.src = 'dist';
-        if (r.type !== 'input') { delete r.route; delete r.km; }
+        if (r.type !== 'input' && r.type !== 'text') delete r.route;
+        if (r.type !== 'input') delete r.km;
         if (r.type === 'choice' && !(r.opts && r.opts.length)) r.opts = DEF_OPTS.slice();
       }
       else if (k === 'src') r.src = t.value;
@@ -816,6 +827,57 @@ const Cmp2 = (() => {
     });
     pfoot(pptx, s, x);
   }
+  /** 앞마당 비교평가: 검은 띠 제목 + 왼쪽 지도 + 오른쪽 [줄 이름][단지…] 도형 격자, ✔ 는 칸 모서리에 크게 */
+  function slideFront(pptx, x) {
+    const f = form(), items = ui.items, n = items.length, lg = LG(), s = pptx.addSlide(); s.background = { color: 'FFFFFF' };
+    s.addShape(pptx.ShapeType.rect, { x: 0, y: 0.1, w: 13.333, h: 0.78, fill: { color: '000000' }, line: { color: '000000', width: 0 } });
+    s.addText(`★ ${lg._title || f.title || f.name} ★`, { x: 0.3, y: 0.1, w: 12.7, h: 0.78, fontFace: PF, fontSize: 34, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
+    const flat = f.rows.filter(r => r.type !== 'rank'), G = 0.06, TX = 5.25, LW = 0.9, VX = TX + LW + G, R = 13.2, vw = (R - VX - G * (n - 1)) / n, Y0 = 1.0, HH = 0.8, YEND = 7.12;
+    const ckT = (r, c) => (valOf(cid(c), 'ck_' + r.id) ? '✔ ' : ''), txt = (r, c) => cellText(r, c, x) || '';
+    const lw = R - VX, avail = YEND - (Y0 + HH + G) - G * Math.max(flat.length - 1, 0);
+    const need = (fs) => flat.map(r => r.type === 'long'
+      ? Math.max(1.3, pLines((lg[r.id] || '').trim(), Math.min(fs, 20), lw) * Math.min(fs, 20) * 1.3 / 72 + 0.22)
+      : Math.max(0.65, Math.max(pLines(r.label, fs + 2, LW), ...items.map(c => pLines(ckT(r, c) + txt(r, c), fs, vw))) * fs * 1.28 / 72 + 0.18));
+    let fs = 22, hs = need(fs);
+    while (hs.reduce((a, b) => a + b, 0) > avail && fs > 9) { fs -= 0.5; hs = need(fs); }
+    const li = flat.findIndex(r => r.type === 'long');
+    let tot = hs.reduce((a, b) => a + b, 0);
+    if (tot < avail) {                                                                              // 남는 높이: 일반 줄은 최대 1.4배까지, 나머지는 긴 글 칸에
+      const fixed = hs.reduce((a, h, i) => a + (i === li ? 0 : h), 0), k = fixed ? Math.min(1.4, (avail - (li >= 0 ? hs[li] : 0)) / fixed) : 1;
+      hs = hs.map((h, i) => (i === li ? h : h * Math.max(1, k)));
+      tot = hs.reduce((a, b) => a + b, 0);
+      if (li >= 0 && tot < avail) hs[li] += avail - tot;
+    }
+    const ys = []; let y = Y0 + HH + G;
+    flat.forEach((r, i) => { ys.push(y); y += hs[i] + G; });
+    const guOf = (c) => String(c.sgg || '').split(/\s+/).filter(Boolean).pop() || '';
+    items.forEach((c, i) => {
+      const nm = `${guOf(c)} ${c.name}`.trim(), sp = specOf(c, x);
+      let hf = 18; while (hf > 9 && (pLines(nm, hf, vw) + pLines(sp, hf - 1, vw)) * hf * 1.2 / 72 > HH - 0.06) hf -= 1;
+      pbox(pptx, s, { x: VX + i * (vw + G), y: Y0, w: vw, h: HH, fill: pcol(i), line: pcol(i), lw: 1, text: [{ text: nm, options: { bold: true, fontSize: hf, breakLine: true } }, { text: sp, options: { bold: true, fontSize: hf - 1 } }], fs: hf, color: 'FFFFFF' });
+    });
+    const checks = [];
+    flat.forEach((r, i) => {
+      pbox(pptx, s, { x: TX, y: ys[i], w: LW, h: hs[i], fill: 'FFFFFF', line: '000000', lw: 3, text: r.label, fs: fs + 2, bold: true, margin: 0.02 });
+      if (r.type === 'long') {
+        pbox(pptx, s, { x: VX, y: ys[i], w: lw, h: hs[i], fill: 'F2F2F2', line: '000000', lw: 3, text: (lg[r.id] || '').trim(), fs: Math.min(fs, 20), bold: true });
+        return;
+      }
+      items.forEach((c, k) => {
+        const cx = VX + k * (vw + G);
+        pbox(pptx, s, { x: cx, y: ys[i], w: vw, h: hs[i], fill: 'FFFFFF', line: '000000', lw: 3, text: txt(r, c), fs, bold: r.type === 'auto', color: '000000', margin: 0.08 });
+        if (valOf(cid(c), 'ck_' + r.id)) checks.push({ x: cx - 0.22, y: ys[i] - 0.22 });
+      });
+    });
+    const ckPts = [[0.04, 0.40], [0.17, 0.30], [0.28, 0.47], [0.57, 0.04], [0.70, 0.13], [0.29, 0.70], [0.27, 0.70]].map((p, i) => (i ? { x: p[0], y: p[1] } : { x: p[0], y: p[1], moveTo: true })).concat([{ close: true }]);
+    checks.forEach(c => s.addShape(pptx.ShapeType.custGeom, { x: c.x, y: c.y, w: 0.75, h: 0.75, fill: { color: 'FFC000' }, line: { color: 'FFFFFF', width: 0.75 }, points: ckPts }));   // 글꼴과 무관한 노란 체크 도형
+    if (flat.length) {                                                                              // 왼쪽: "지도" 이름표 + 지도 칸 (사진 > 약도)
+      pbox(pptx, s, { x: 0.12, y: ys[0], w: TX - 0.22, h: hs[0], fill: 'FFFFFF', line: '000000', lw: 3, text: '지도', fs: fs + 4, bold: true });
+      const my = ys[0] + hs[0] + G, mb = (li >= 0 ? ys[li] - G : YEND);
+      if (mb - my > 1) mapArea(pptx, s, x, 0.12, my, TX - 0.22, mb - my, {});
+    }
+    pfoot(pptx, s, x);
+  }
   /** 비교평가 프로세스 설명 슬라이드 (선택) */
   function slideProc(pptx, x) {
     const f = form(), steps = f.layout === 'judge' && f.panel && f.panel.length ? f.panel : DEF_PANEL, s = pptx.addSlide(); s.background = { color: 'FFFFFF' };
@@ -844,10 +906,11 @@ const Cmp2 = (() => {
       if (ui.proc) slideProc(pptx, x);
       if (f.layout === 'judge') slidesJudge(pptx, x);
       else if (f.layout === 'cases') slideCases(pptx, x);
+      else if (f.layout === 'front') slideFront(pptx, x);
       else {
       const slide = pptx.addSlide(); slide.background = { color: 'FFFFFF' };
       slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0.12, w: 13.333, h: 0.72, fill: { color: BK }, line: { color: BK, width: 0 } });
-      slide.addText(`★ ${f.name} ★`, { x: 0.3, y: 0.12, w: 12.7, h: 0.72, fontFace: F, fontSize: 28, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
+      slide.addText(`★ ${LG()._title || f.title || f.name} ★`, { x: 0.3, y: 0.12, w: 12.7, h: 0.72, fontFace: F, fontSize: 28, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
       // ── 왼쪽: 지도 칸 (사진 > 약도)
       const MX = 0.25, MY = 1.05, MW = 4.7, MH = 6.1;
       slide.addShape(pptx.ShapeType.rect, { x: MX, y: MY, w: MW, h: MH, fill: { color: 'FFFFFF' }, line: { color: BK, width: 1.5 } });
@@ -943,6 +1006,7 @@ const Cmp2 = (() => {
       const right = q.x < AX + AW / 2, tw = tpl ? Math.min(3.6, pWIn(lab, 11) + 0.3) : 1.7;
       let ly = q.y - 0.14;                                              // 이름표끼리 겹치면 아래로 밀기
       for (let tries = 0; tries < 6 && placed.some(r => r.right === right && Math.abs(r.y - ly) < 0.32 && Math.abs(r.x - q.x) < tw); tries++) ly += 0.33;
+      ly = Math.min(ly, AY + AH - 0.32);                                // 지도 칸 밖으로 나가지 않게
       placed.push({ right, y: ly, x: q.x });
       const lx = right ? q.x + 0.2 : q.x - 0.2 - tw;
       if (tpl) slide.addText(lab, { x: lx, y: ly - 0.01, w: tw, h: 0.3, shape: pptx.ShapeType.rect, fill: { color: pcol(q.i) }, line: { color: pcol(q.i), width: 0 }, margin: 0.03, fontFace: F, fontSize: 11, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle' });
@@ -989,7 +1053,7 @@ const Cmp2 = (() => {
       const fb = t.closest('[data-form]');
       if (fb) {
         ui.formId = fb.dataset.form;
-        if (form().layout && !ui.names) { ui.names = 1; const cb = $('c2Names'); if (cb) cb.checked = true; }   // 그림 양식은 지도 이름표(이름·연차·세대수)를 켬
+        if (tplForm() && !ui.names) { ui.names = 1; const cb = $('c2Names'); if (cb) cb.checked = true; }   // 그림 양식은 지도 이름표(이름·연차·세대수)를 켬
         saveUi(); drawForms(); drawEditor(); renderMap(); return paint();
       }
       if (t.closest('[data-newform]')) { if (locked()) return; const nf = { id: newId('f'), name: '새 양식', rows: [{ id: newId('r'), label: '항목 1', type: 'input' }, { id: newId('r'), label: '생각', type: 'long' }] }; S.forms.push(nf); ui.formId = nf.id; persist(); saveUi(); editing = true; drawForms(); drawEditor(); return paint(); }
