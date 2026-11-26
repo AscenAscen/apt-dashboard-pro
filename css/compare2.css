@@ -1,0 +1,68 @@
+/* ─────────────────────────────────────────────────────────
+   compare2.css — [비교] 탭 모양 (js/compare2.js)
+   색은 css/style.css 맨 위 변수(--panel, --line, --accent …)를 따라갑니다.
+   ───────────────────────────────────────────────────────── */
+.c2-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.c2-forms { display: flex; gap: 6px; flex-wrap: wrap; }
+.c2-forms button.on, #c2EditBtn.on, #c2PickRef.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.c2-saved { font-size: 12px; color: var(--sub); }
+.c2-editor h3 { margin: 0 0 8px; font-size: 14px; }
+.c2-editor h3 small { color: var(--sub); font-weight: 500; font-size: 11px; margin-left: 4px; }
+.c2-edrows { display: grid; gap: 6px; margin: 8px 0; }
+.c2-edrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.c2-edlab { min-width: 170px; flex: 1 1 170px; }
+
+.c2-grid { display: grid; gap: 12px; grid-template-columns: minmax(320px, .9fr) minmax(480px, 2.1fr); align-items: start; }
+.c2-grid > .panel { margin: 0; min-width: 0; }
+@media (max-width: 1000px) { .c2-grid { grid-template-columns: 1fr; } }
+.c2-mapbox h3 { margin: 0 0 8px; font-size: 14px; }
+.c2-mapbox h3 small { color: var(--sub); font-weight: 500; font-size: 11px; margin-left: 4px; }
+.c2-mapwrap { position: relative; }
+.c2-map { width: 100%; height: 420px; border-radius: 10px; overflow: hidden; background: var(--panel2); }
+.c2-mapmsg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; color: var(--sub); font-size: 13px; background: var(--panel2); border-radius: 10px; }
+.c2-mapmsg[hidden] { display: none; }
+.c2-mapctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0; font-size: 12px; }
+
+/* 지도 마커 */
+.c2-mk { display: flex; align-items: center; gap: 4px; cursor: pointer; transform: translate(-13px, 0); }
+.c2-mk b { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,.6); color: #fff; font-size: 14px; display: flex; align-items: center; justify-content: center; flex: none; }
+.c2-mk b.ref { background: #ffc000; color: #000; border-radius: 6px; }
+.c2-mk span { background: rgba(255,255,255,.95); color: #111; font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 6px; box-shadow: 0 0 3px rgba(0,0,0,.4); white-space: nowrap; }
+.c2-mk.sel b { outline: 3px solid #ffc000; }
+.c2-mk.refmk { cursor: default; }
+
+/* 지도 사진 칸 */
+.c2-slot { position: relative; border: 1.5px dashed var(--line); border-radius: 10px; min-height: 110px; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none; }
+.c2-slot:focus, .c2-slot.over { border-color: var(--accent); }
+.c2-slot.has { border-style: solid; background: #fff; padding: 4px; }
+.c2-slot img { max-width: 100%; max-height: 240px; display: block; }
+.c2-ph { text-align: center; color: var(--sub); font-size: 12px; line-height: 1.7; padding: 12px; }
+.c2-ph b { display: block; color: var(--text); font-size: 13px; margin-bottom: 4px; }
+.c2-ph kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 11px; background: var(--panel); }
+.c2-x { position: absolute; top: 6px; right: 6px; }
+
+/* 표 */
+.c2-table { width: 100%; }
+.c2-table th, .c2-table td { padding: 8px 10px; border: 1px solid var(--line); vertical-align: middle; }
+.c2-table td.l, .c2-table th.l { text-align: left; white-space: nowrap; width: 1%; }
+.c2-corner { font-weight: 800; }
+.c2-h { text-align: center; min-width: 170px; }
+.c2-hn { font-size: 15px; font-weight: 800; }
+.c2-hs { font-size: 13px; font-weight: 700; margin: 2px 0 4px; }
+.c2-h .evhead { display: flex; gap: 4px; justify-content: center; align-items: center; }
+.c2-h small { opacity: .85; }
+.c2-c { position: relative; text-align: center; padding-right: 30px; }
+.c2-t { white-space: pre-line; }
+.c2-in { width: 100%; min-width: 120px; }
+.c2-ov { display: flex; gap: 4px; align-items: center; }
+.c2-auto { display: block; color: var(--sub); margin-top: 2px; white-space: pre-line; }
+.c2-pin { border: 0; background: transparent; cursor: pointer; font-size: 12px; opacity: .85; }
+.c2-pin.off { opacity: .4; }
+.c2-pin.off:hover, .c2-pin:hover { opacity: 1; }
+.c2-ck { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: transparent; font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
+.c2-ck:hover { color: var(--sub); }
+.c2-ck.on { background: #ffc000; border-color: #ffc000; color: #000; font-weight: 900; }
+.c2-long td { vertical-align: top; }
+.c2-ta { width: 100%; resize: vertical; min-height: 110px; font: inherit; line-height: 1.55; padding: 8px 10px; border-radius: 8px; }
+.c2-tabtn { margin-top: 6px; text-align: right; }
+.c2-empty { padding: 28px; text-align: center; color: var(--sub); }
