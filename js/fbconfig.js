@@ -7,8 +7,8 @@
    · 비워 두면 Google 로그인 동기화 단추가 "설정 필요"로 보이고, 예전 GitHub 방식은 그대로 쓸 수 있습니다.
    ───────────────────────────────────────────────────────── */
 window.FIREBASE_CONFIG = {
-  apiKey: '',
-  authDomain: '',     // 비워 두면 projectId 로 자동 계산 (프로젝트아이디.firebaseapp.com)
-  projectId: '',
-  appId: '',
+  apiKey: 'AIzaSyBXHxMFdJier5BoocDLfgR7cDTBQkNm_Zk',
+  authDomain: 'apt-dashboard-pro.firebaseapp.com',     // 비워 두면 projectId 로 자동 계산 (프로젝트아이디.firebaseapp.com)
+  projectId: 'apt-dashboard-pro',
+  appId: '1:405314521959:web:18be08542d2da5cdccfdc2',
 };
