@@ -66,3 +66,25 @@
 .c2-ta { width: 100%; resize: vertical; min-height: 110px; font: inherit; line-height: 1.55; padding: 8px 10px; border-radius: 8px; }
 .c2-tabtn { margin-top: 6px; text-align: right; }
 .c2-empty { padding: 28px; text-align: center; color: var(--sub); }
+
+/* ── 지도 화살표 · 마커 · 범례 (v2) ── */
+.c2-mk { position: relative; display: block; width: 26px; height: 26px; cursor: pointer; transform: none; }
+.c2-mk b { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 5px rgba(0,0,0,.6); color: #fff; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.c2-mk b.ref { background: #ffc000; color: #000; border-radius: 6px; }
+.c2-mk span { position: absolute; left: 31px; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.95); color: #111; font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 6px; box-shadow: 0 0 3px rgba(0,0,0,.4); white-space: nowrap; }
+.c2-mk span.rev { left: auto; right: 31px; }
+.c2-mk.refmk { cursor: default; }
+.c2-mk.refmk span { left: 50%; top: -22px; transform: translateX(-50%); }
+.c2-mk.off b { opacity: .45; filter: grayscale(.6); }
+.c2-head { pointer-events: none; line-height: 0; filter: drop-shadow(0 0 2px rgba(0,0,0,.45)); }
+.c2-head svg { display: block; overflow: visible; }
+.c2-pill { color: #fff; font-size: 11px; font-weight: 800; padding: 1px 8px; border-radius: 11px; border: 1.5px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5); white-space: nowrap; pointer-events: none; }
+.c2-adot { width: 14px; height: 14px; border-radius: 50%; background: #444; border: 2px solid #fff; box-shadow: 0 0 4px rgba(0,0,0,.6); }
+.c2-legend { display: grid; gap: 4px; margin: 8px 0 2px; font-size: 13px; }
+.c2-lgh { color: var(--sub); font-size: 12px; margin-bottom: 2px; }
+.c2-lg { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 8px; cursor: pointer; }
+.c2-lg:hover { background: var(--panel2); }
+.c2-lg b { width: 20px; height: 20px; border-radius: 50%; color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; flex: none; }
+.c2-lgn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c2-lgk { font-weight: 800; }
+#c2Measure.on { background: var(--accent); color: #fff; border-color: var(--accent); }
