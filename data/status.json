@@ -1,9 +1,9 @@
 {
- "updatedAt": "2026-11-27 04:15",
+ "updatedAt": "2026-11-27 06:11",
  "lastUpdate": "2026-11-27",
  "progress": {
   "sale": {
-   "done": 53631,
+   "done": 54072,
    "total": 64005,
    "priorityDone": 11537,
    "priorityTotal": 11537
@@ -34,7 +34,7 @@
   "minutes": 10,
   "usedToday": {
    "date": "2026-11-27",
-   "sale": 1108,
+   "sale": 1558,
    "rent": 304
   },
   "warnings": []
