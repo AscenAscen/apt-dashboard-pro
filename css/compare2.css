@@ -88,3 +88,38 @@
 .c2-lgn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .c2-lgk { font-weight: 800; }
 #c2Measure.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* ── 그림 양식 (비교평가 · 투자사례) ── */
+.c2-titlebar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.c2-titlebar label { display: flex; align-items: center; gap: 6px; font-size: 12px; flex: 1 1 260px; }
+.c2-titlebar input { flex: 1; min-width: 0; font-weight: 700; }
+.c2-proc { font-size: 12px; }
+.c2-grp { background: #1f2a5c; color: #fff; font-weight: 800; text-align: center; width: 1%; padding: 4px 6px !important; }
+.c2-grp span { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 2px; white-space: nowrap; }
+.c2-table td.c2-nogrp { background: #1f2a5c; color: #fff; }
+.c2-nogrp .rowlab { color: #fff; }
+.c2-sym { width: 1%; text-align: center; padding: 2px 4px !important; }
+.c2-sym button { min-width: 40px; font-size: 22px; font-weight: 900; color: #c00000; background: transparent; border: 1px dashed var(--line); border-radius: 8px; cursor: pointer; line-height: 1.25; }
+.c2-sym button:hover { background: var(--panel2); }
+.c2-table th.c2-symh { background: transparent; border: 0; }
+.c2-kmtag { font-weight: 800; white-space: nowrap; }
+.c2-opts { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.c2-opts .mini.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.c2-sub { display: block; color: var(--sub); font-weight: 500; font-size: 11px; white-space: normal; }
+.c2-rkc { text-align: left; }
+.c2-rank { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.c2-rank.unset { opacity: .6; }
+.c2-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 3px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel2); font-weight: 700; font-size: 13px; }
+.c2-chip b { width: 20px; height: 20px; border-radius: 50%; color: #fff; font-size: 12px; display: flex; align-items: center; justify-content: center; flex: none; }
+.c2-rel { min-width: 34px; font-size: 18px; font-weight: 900; color: #c00000; background: transparent; border: 1px dashed var(--line); border-radius: 8px; cursor: pointer; }
+.c2-panel { margin-top: 12px; display: grid; gap: 10px; }
+.c2-panel h4 { margin: 0; font-size: 14px; }
+.c2-sh { background: #1f2a5c; color: #fff; font-weight: 800; padding: 8px 12px; border-radius: 6px 6px 0 0; line-height: 1.4; }
+.c2-step.g .c2-sh { color: #ffc000; }
+.c2-step .c2-ta { min-height: 70px; border-radius: 0 0 6px 6px; }
+.c2-vd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.c2-vd .red { color: #c00000; }
+.c2-mk span.tpl { color: #fff; border-radius: 3px; padding: 3px 9px; font-size: 13px; box-shadow: 0 0 3px rgba(0,0,0,.5); }
+.c2-edgrp { width: 150px; }
+.c2-edpanel { display: grid; gap: 6px; margin: 8px 0; }
+.c2-edpanel textarea { width: 100%; font: inherit; border-radius: 8px; padding: 6px 8px; }
