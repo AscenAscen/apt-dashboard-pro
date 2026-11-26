@@ -1310,3 +1310,10 @@ label.yd-gs small { color: var(--sub); margin-left: 2px; font-weight: 400; }
   .tabs { padding-bottom: 2px; }
   .tabs button { padding: 5px 11px; min-height: 32px; }
 }
+
+/* ── 탭 설정: 여러 탭을 골라 한꺼번에 옮기기 (js/settings.js) ── */
+.tabrow.sel { background: color-mix(in srgb, var(--accent) 14%, transparent); border-radius: 8px; }
+.tabrow .tabsel { flex: none; width: 20px; height: 20px; margin: 0 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+.tabmvbar { position: sticky; bottom: 10px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+.tabmvbar button { min-height: 36px; padding: 6px 12px; }
+@media (max-width: 760px) { .tabsettings { max-width: none; } .tabrow .mini { min-width: 34px; min-height: 34px; } }

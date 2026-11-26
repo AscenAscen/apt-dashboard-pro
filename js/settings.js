@@ -1,6 +1,7 @@
 /* ─────────────────────────────────────────────────────────
    settings.js — [가이드·설정] 탭의 "탭 설정" 과 "업무지구 설정"
    · 탭을 위쪽 메뉴에 둘지 [더보기]에 넣을지 고르기, 순서 바꾸기 (▲▼ 버튼 — 태블릿에서도 실수가 적습니다). 순서는 전체에서 자유롭게 바뀝니다.
+   · 한꺼번에 옮기기: 줄 맨 앞 ○ 로 여러 탭을 고르고 [맨 위로 / 한 칸 위로 / 한 칸 아래로 / 맨 아래로] — 고른 탭끼리의 순서는 그대로, 위쪽 메뉴·더보기 목록 안에서 각각 움직입니다. 줄마다 ⤒(맨 위로) ⤓(맨 아래로) 단추도 있습니다.
    · [더보기]에 넣은 탭도 누르면 열리고, Ctrl+K 검색으로도 찾습니다. 저장은 기기마다 따로(휴대폰·PC를 다르게 꾸밀 수 있게) 합니다.
    · 업무지구(기준점) 이름과 검색어 바꾸기. 좌표는 저장하지 않고 열 때마다 카카오맵으로 다시 찾습니다.
    저장 위치: apt.tabs.v1, apt.hubs.v1  (백업 파일·코드에 함께 들어갑니다)
@@ -12,6 +13,7 @@ const Settings = (() => {
   let defaults = [];            // [{ id, name }] 화면이 처음 만들어진 순서
   let order = [];               // 지금 순서 [id, …]
   let hidden = new Set();
+  const sel = new Set();        // 한꺼번에 옮기려고 ○ 로 고른 탭 (저장하지 않음)
 
   const nav = () => $('tabs');
   // 처음 상태에서 위쪽 메뉴에 보이는 탭 — 나머지는 [더보기] 안에 들어갑니다 (설정 탭은 항상 위쪽)
@@ -85,13 +87,41 @@ const Settings = (() => {
   function renderTabs() {
     const box = $('tabSettings'); if (!box) return;
     const nm = names(), top = order.filter(id => !hidden.has(id)), more = order.filter(id => hidden.has(id));
-    const row = (id, list) => { const k = list.indexOf(id); return `<div class="tabrow" data-id="${id}">
+    const row = (id, list) => { const k = list.indexOf(id); return `<div class="tabrow${sel.has(id) ? ' sel' : ''}" data-id="${id}">
+      <input type="checkbox" class="tabsel" data-sel ${sel.has(id) ? 'checked' : ''} title="한꺼번에 옮길 탭 고르기" aria-label="${U.esc(nm.get(id) || id)} 옮길 탭으로 고르기">
       <label class="inline"><input type="checkbox" data-vis ${hidden.has(id) ? '' : 'checked'} ${id === 'guide' ? 'disabled title="설정 탭은 항상 위쪽 메뉴에 있습니다"' : ''}> ${U.esc(nm.get(id) || id)}</label>
       <span class="grow"></span>
-      <button class="mini" data-up ${k === 0 ? 'disabled' : ''} title="위로">▲</button>
-      <button class="mini" data-down ${k === list.length - 1 ? 'disabled' : ''} title="아래로">▼</button></div>`; };
+      <button class="mini" data-top ${k === 0 ? 'disabled' : ''} title="맨 위로">⤒</button>
+      <button class="mini" data-up ${k === 0 ? 'disabled' : ''} title="한 칸 위로">▲</button>
+      <button class="mini" data-down ${k === list.length - 1 ? 'disabled' : ''} title="한 칸 아래로">▼</button>
+      <button class="mini" data-bottom ${k === list.length - 1 ? 'disabled' : ''} title="맨 아래로">⤓</button></div>`; };
+    const bar = sel.size ? `<div class="tabmvbar"><b>${sel.size}개 선택</b>
+      <button data-mv="top" class="primary" title="고른 탭을 목록 맨 위로">⤒ 맨 위로</button><button data-mv="up" title="고른 탭을 한 칸 위로">▲ 한 칸</button>
+      <button data-mv="down" title="고른 탭을 한 칸 아래로">▼ 한 칸</button><button data-mv="bottom" title="고른 탭을 목록 맨 아래로">⤓ 맨 아래로</button>
+      <span class="grow"></span><button data-selclr>선택 해제</button></div>` : '<p class="hint" style="margin:8px 0 0">줄 맨 앞 ○ 로 탭을 여러 개 고르면 한꺼번에 위·아래로 옮길 수 있습니다.</p>';
     box.innerHTML = `<div class="tabgrph">위쪽 메뉴 (${top.length}개) — 체크 켜짐</div>${top.map(id => row(id, top)).join('')}` +
-      `<div class="tabgrph">더보기 (${more.length}개) — 체크 꺼짐</div>${more.length ? more.map(id => row(id, more)).join('') : '<p class="hint" style="margin:4px">없음</p>'}`;
+      `<div class="tabgrph">더보기 (${more.length}개) — 체크 꺼짐</div>${more.length ? more.map(id => row(id, more)).join('') : '<p class="hint" style="margin:4px">없음</p>'}` + bar;
+  }
+  /** 고른 탭(ids)을 한꺼번에 옮김. kind: top(맨 위로) · up(한 칸 위로) · down(한 칸 아래로) · bottom(맨 아래로)
+      위쪽 메뉴 목록과 더보기 목록 안에서 각각 움직이고, 고른 탭끼리의 순서는 그대로 둠 */
+  function moveMany(kind, ids) {
+    let changed = false;
+    for (const hid of [false, true]) {
+      const pos = order.map((id, i) => (hidden.has(id) === hid ? i : -1)).filter(i => i >= 0);
+      const sec = pos.map(i => order[i]); if (!sec.some(id => ids.has(id))) continue;
+      const pick = sec.filter(id => ids.has(id)), rest = sec.filter(id => !ids.has(id));
+      let out;
+      if (kind === 'top') out = [...pick, ...rest];
+      else if (kind === 'bottom') out = [...rest, ...pick];
+      else {
+        out = [...sec];
+        if (kind === 'up') { for (let i = 1; i < out.length; i++) if (ids.has(out[i]) && !ids.has(out[i - 1])) [out[i - 1], out[i]] = [out[i], out[i - 1]]; }
+        else { for (let i = out.length - 2; i >= 0; i--) if (ids.has(out[i]) && !ids.has(out[i + 1])) [out[i + 1], out[i]] = [out[i], out[i + 1]]; }
+      }
+      pos.forEach((p, k) => { if (order[p] !== out[k]) { order[p] = out[k]; changed = true; } });
+    }
+    if (changed) { save(); apply(); }
+    renderTabs();
   }
   /** 탭을 더보기(toMore=true)로 보내거나 위쪽 메뉴로 꺼냄 — 옮겨 간 목록의 맨 끝에 놓음 (설정 탭은 항상 위쪽) */
   function move(id, toMore) {
@@ -132,7 +162,12 @@ const Settings = (() => {
     load(); apply(); renderTabs(); initCtx();
     const box = $('tabSettings'); if (!box) return;
     box.onclick = (e) => {
+      const mv = e.target.closest('[data-mv]');                                   // 고른 탭 한꺼번에 옮기기 줄
+      if (mv) return moveMany(mv.dataset.mv, new Set(sel));
+      if (e.target.closest('[data-selclr]')) { sel.clear(); return renderTabs(); }
       const row = e.target.closest('.tabrow'); if (!row) return;
+      const q = e.target.closest('[data-top], [data-bottom]');                   // 줄마다 맨 위로 · 맨 아래로
+      if (q) return moveMany(q.hasAttribute('data-top') ? 'top' : 'bottom', new Set([row.dataset.id]));
       const id = row.dataset.id, up = e.target.matches('[data-up]');
       if (!up && !e.target.matches('[data-down]')) return;
       const sec = order.filter(x => hidden.has(x) === hidden.has(id)), nb = sec[sec.indexOf(id) + (up ? -1 : 1)];   // 같은 목록(위쪽 메뉴 / 더보기) 안의 바로 위·아래 탭과 자리 바꿈
@@ -141,11 +176,12 @@ const Settings = (() => {
       save(); apply(); renderTabs();
     };
     box.onchange = (e) => {
+      if (e.target.matches('[data-sel]')) { const sid = e.target.closest('.tabrow').dataset.id; if (e.target.checked) sel.add(sid); else sel.delete(sid); return renderTabs(); }
       if (!e.target.matches('[data-vis]')) return;
       const id = e.target.closest('.tabrow').dataset.id;
       move(id, !e.target.checked);
     };
-    $('btnTabsReset').onclick = () => { Store.set(TKEY, {}); load(); apply(); renderTabs(); U.toast('메뉴를 처음 상태로 되돌렸습니다.'); };
+    $('btnTabsReset').onclick = () => { Store.set(TKEY, {}); sel.clear(); load(); apply(); renderTabs(); U.toast('메뉴를 처음 상태로 되돌렸습니다.'); };
   }
 
   /* ── 역 관리 (직선거리 기준 역) — 실제 기능은 js/common.js 의 Stations. 단지 비교·비교 평가·입지 분석이 함께 씁니다 ── */
