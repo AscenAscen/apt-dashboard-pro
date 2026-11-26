@@ -35,6 +35,7 @@ const App = (() => {
     if (name === 'land') Land.open();
     if (name === 'yardmap' && typeof YardMap !== 'undefined') YardMap.open();      // 앞마당 지역 판 (js/yardmap.js)
     if (name === 'onepage' && typeof OnePage !== 'undefined') OnePage.open();      // 원페이지 탭 (js/onepage.js)
+    if (name === 'cmp2' && typeof Cmp2 !== 'undefined') Cmp2.open();      // 비교 탭 (js/compare2.js)
     if (name === 'imjang') Imjang.open();
     if (name === 'guide') Guide.open();
     if (name === 'grouping') My.pivot();

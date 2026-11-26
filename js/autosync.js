@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────
-   autosync.js — 자동 동기화 (PC ↔ 휴대폰): 시세트래킹 + 1등뽑기 기록 + 앞마당 지역 판 + 지도 라벨(설정·짧은 이름·숨김·강조)
+   autosync.js — 자동 동기화 (PC ↔ 휴대폰): 시세트래킹 + 1등뽑기 기록 + 앞마당 지역 판 + 지도 라벨(설정·짧은 이름·숨김·강조) + 원페이지 글 + 비교 탭
    · 저장소·토큰은 기존 [올리기/내려받기] 동기화(js/sync.js)와 같은 값을 씀 (나만 보는 비공개 GitHub 저장소)
    · 파일: 그 저장소의 sync/apt-autosync.json  (기존 전체 백업 파일 sync/apt-backup.json 과 따로)
    · 열 때 · 다른 앱 보다가 돌아올 때 · 5분마다 → 받아서 합침 / 고치면 30초 뒤 → 받아서 합친 뒤 올림
@@ -18,7 +18,8 @@ const AutoSync = (() => {
   const YARD = ['apt.yard.v1', 'apt.yardSurveys.v1', 'apt.yardPicks.v1', 'apt.yardOpts.v1'];   // 1등뽑기
   const YM = ['apt.yardmap.v1'];                                                                 // 앞마당 지역 판 (켜짐 상태·급지 색·추가한 지역)
   const LBL = ['apt.labels.v1', 'apt.labelEdits.v1', 'apt.labelPresets.v1', 'apt.olFix.v1'];   // + 홈 단지 경계에서 손으로 고친 필지                  // 지도 라벨 설정·짧은 이름·숨김·강조 (js/labelkit.js)
-  const KEYS = [...TRK, ...TRK_ETC, ...YARD, ...YM, ...LBL];
+  const OPC = ['apt.onepage.v1', 'apt.cmp2.v1'];                                                // 원페이지 글 · 비교 탭(양식·적은 값·저장한 세트). 화면 설정(apt.onepageUi.v1·apt.cmp2Ui.v1)은 이 기기만
+  const KEYS = [...TRK, ...TRK_ETC, ...YARD, ...YM, ...LBL, ...OPC];
   const DELAY = 30000, POLL = 10000, REMOTE_EVERY = 5 * 60000, MIN_GAP = 15000;
   let cfg = { on: 1, last: 0 }, needLogin = false, busy = false, again = false, lastTry = 0, err = '', dirtyTimer = null, retryTimer = null, localHash = '', inited = false;
 
@@ -87,7 +88,7 @@ const AutoSync = (() => {
   function readLocal() { const o = {}; KEYS.forEach(k => { const v = Store.get(k, undefined); if (v !== undefined && v !== null) o[k] = v; }); return o; }
   function editing() {
     const a = document.activeElement;
-    return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !!a.closest('#tab-tracking, #tab-yard, #tab-survey');
+    return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !!a.closest('#tab-tracking, #tab-yard, #tab-survey, #tab-onepage, #tab-cmp2');
   }
   function applyLocal(m) {
     const cur = readLocal(), chg = (keys) => keys.some(k => !same(m[k], cur[k]));
@@ -101,7 +102,13 @@ const AutoSync = (() => {
     if (chg(YARD)) { YARD.forEach(put); if (typeof Yard !== 'undefined' && Yard.reload) Yard.reload(); n++; }
     if (chg(YM)) { YM.forEach(put); if (typeof YardMap !== 'undefined' && YardMap.reload) YardMap.reload(); n++; }
     if (chg(LBL)) { LBL.forEach(put); if (typeof LabelKit !== 'undefined') LabelKit.reload(); n++; }
-    if (n) U.toast('☁ 다른 기기에서 고친 시세트래킹·1등뽑기·앞마당·지도 라벨 기록을 받아 왔습니다.');
+    if (chg(OPC)) {                                 // 원페이지 글 · 비교 탭
+      OPC.forEach(put);
+      if (typeof OnePage !== 'undefined' && OnePage.reload) OnePage.reload();
+      if (typeof Cmp2 !== 'undefined' && Cmp2.reload) Cmp2.reload();
+      n++;
+    }
+    if (n) U.toast('☁ 다른 기기에서 고친 시세트래킹·1등뽑기·앞마당·지도 라벨·원페이지·비교 기록을 받아 왔습니다.');
   }
 
   /* ── GitHub ── */
