@@ -157,7 +157,8 @@
 body.cxm-cap .lk-btn, body.cxm-cap .lk-panel, body.map-capture .lk-btn, body.map-capture .lk-panel { display: none !important; }
 @media (max-width: 760px) {
   .lk-panel { width: auto; left: 10px; }
-  .lk-host[data-lkmap="start"] .lk-legend { left: 8px; right: auto; bottom: 66px; max-width: calc(100% - 70px); }
+  .lk-host[data-lkmap="start"] .lk-legend { left: 8px; right: auto; bottom: var(--st-bar, 56px); max-width: calc(100% - 64px); flex-wrap: nowrap; gap: 0 7px; padding: 3px 7px; font-size: 10px; line-height: 1.25; white-space: nowrap; overflow: hidden; }
+  .lk-host[data-lkmap="start"] .lk-legend i { width: 8px; height: 8px; margin-right: 3px; }
   .lk-host[data-lkmap="start"] .lk-btn { top: 56px; right: 8px; padding: 6px 10px; }
   .lk-host[data-lkmap="start"] .lk-panel { top: 96px; left: 8px; right: 8px; max-height: calc(100% - 180px); }
   .lk-legend { font-size: 11px; }
@@ -182,3 +183,5 @@ body.cxm-cap .lk-btn, body.cxm-cap .lk-panel, body.map-capture .lk-btn, body.map
 .lk.lk-drag { transform: scale(var(--lks, 1)) scale(1.07); filter: drop-shadow(0 8px 14px rgba(15, 23, 42, .38)); }
 .mllabel { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
 .mllabel.lifted { box-shadow: 0 8px 16px rgba(15, 23, 42, .4); outline: 2px solid #2563eb; cursor: grabbing; }
+/* 홈 전체화면일 때는 아래 단추 줄이 없으니 범례를 맨 아래로 */
+body.st-full .lk-host[data-lkmap="start"] .lk-legend { bottom: 8px; }

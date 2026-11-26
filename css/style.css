@@ -1294,3 +1294,19 @@ label.yd-gs small { color: var(--sub); margin-left: 2px; font-weight: 400; }
 #ydTable td.yd-sgg, #ydTable td.yd-dong { white-space: nowrap; color: var(--sub); font-size: 13px; }
 .yd-menu hr.yd-hr { border: 0; border-top: 1px solid var(--line); margin: 2px 0; width: 100%; }
 .yd-rep { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+
+/* ── 휴대폰: 위쪽 줄 접기 (js/compact.js) ──
+   접힌 상태: 제목 + [⚙ 설정] + 탭 한 줄만. [⚙ 설정]을 누르면 잠금·배경·단지 찾기·수집 상태·동기화·데이터 기준이 펼쳐집니다. */
+.topmore { display: none; }
+@media (max-width: 760px) {
+  .top { row-gap: 4px; }
+  .top h1 { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topmore { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--sub); font-size: 12px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .topmore.on { color: var(--text); border-color: var(--accent); }
+  .topmore .topdot { display: none; width: 8px; height: 8px; border-radius: 50%; background: #e5322d; }
+  .topmore[data-dot] .topdot { display: inline-block; }
+  .topmore[data-dot="warn"] .topdot { background: #e0a800; }
+  .top:not(.open) > :not(h1):not(.tabs):not(.topmore) { display: none; }
+  .tabs { padding-bottom: 2px; }
+  .tabs button { padding: 5px 11px; min-height: 32px; }
+}

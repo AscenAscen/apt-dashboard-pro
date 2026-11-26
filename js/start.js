@@ -1005,9 +1005,11 @@ const Start = (() => {
         <div class="hint" id="stOlMsg"></div>
       </div>
       <button type="button" id="stLoc" class="cxmloc" title="내 위치로 이동"><span>◎</span><b>내 위치</b></button>
+      <button type="button" id="stFull" class="cxmloc stfull" title="전체화면 — 위·아래 메뉴를 숨기고 지도만 크게 (다시 누르면 돌아옴)"><span>⛶</span><b>전체화면</b></button>
       <div class="st-msg" id="stMsg" hidden></div>
     </div>`;
     $('stLoc').addEventListener('click', () => myLocation(false));
+    $('stFull').addEventListener('click', () => setFull(!full));
     $('stSide').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-p]'); if (!b) return;
       const k = b.dataset.p;
@@ -1043,6 +1045,20 @@ const Start = (() => {
 
   /** 휴대폰 [레이어] 단추에 켜 둔 레이어 수 표시 */
   function lyBadge() { const el = $('stLyN'); if (el) el.textContent = Object.values(st.layers || {}).filter(Boolean).length || ''; }
+  /* 전체화면: 맨 위 제목·메뉴줄과 아래 단추 줄을 숨기고 지도만 (홈 탭에서만. 다른 탭으로 가면 저절로 꺼짐) */
+  let full = false;
+  function setFull(on) {
+    full = !!on;
+    document.body.classList.toggle('st-full', full);
+    const b = $('stFull');
+    if (b) {
+      b.classList.toggle('on', full);
+      b.querySelector('span').textContent = full ? '✕' : '⛶';
+      b.querySelector('b').textContent = full ? '전체화면 끄기' : '전체화면';
+    }
+    if (full) { if (pop) { pop = ''; renderPop(); } window.scrollTo(0, 0); }
+    requestAnimationFrame(() => { fitHeight(); declutterSoon(); });
+  }
   /* 지도 높이: 화면 아래 끝까지 */
   function fitHeight() {
     const w = $('stWrap'); if (!w || !visible()) return;
@@ -1053,6 +1069,7 @@ const Start = (() => {
 
   async function open() {
     if (!inited) return;
+    document.body.classList.toggle('st-full', full);
     fitHeight();
     if (map) { map.relayout(); redraw(); refreshLayers(); return; }
     if (!KMap.ready()) return msg(KMap.needKeyHtml);
@@ -1084,13 +1101,13 @@ const Start = (() => {
     sideState(); lyBadge();
     document.addEventListener('keydown', (e) => {
       if (!visible()) return;
-      if (e.key === 'Escape') { if (tip) hideTip(); else if (pop) { pop = ''; renderPop(); } else if (OL.manual) { OL.manual = false; olBox(); } }
+      if (e.key === 'Escape') { if (tip) hideTip(); else if (pop) { pop = ''; renderPop(); } else if (OL.manual) { OL.manual = false; olBox(); } else if (full) setFull(false); }
       if (tip && st.tip === 'A' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '')) { e.preventDefault(); stepPc(e.key === 'ArrowLeft' ? -1 : 1); }
     });
     window.addEventListener('resize', () => { if (visible()) { fitHeight(); declutterSoon(); } });
     if (visible()) open();
   }
-  function leave() { hideTip(); }
+  function leave() { hideTip(); document.body.classList.remove('st-full'); }
 
   return { init, open, leave, centerOf, centerCached };
 })();
