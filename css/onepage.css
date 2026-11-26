@@ -1,0 +1,63 @@
+/* ─────────────────────────────────────────────────────────
+   onepage.css — [원페이지] 탭 모양 (js/onepage.js)
+   색은 css/style.css 맨 위 변수(--panel, --line, --accent …)를 그대로 따라가므로 배경 테마를 바꿔도 같이 바뀝니다.
+   ───────────────────────────────────────────────────────── */
+.op-ctl { margin-bottom: 12px; }
+.op-saved { font-size: 12px; color: var(--sub); }
+.op-saved.bad { color: var(--danger); font-weight: 700; }
+
+/* 한 장 배치: 왼쪽 그래프(두 줄) · 가운데 사진/공급 · 오른쪽 표/글 */
+.op-grid { display: grid; gap: 12px; grid-template-columns: minmax(300px, 1.05fr) minmax(280px, .95fr) minmax(460px, 1.9fr); grid-template-areas: "a b1 c1" "a b2 c2"; align-items: start; }
+.op-grid > .panel { margin: 0; min-width: 0; }
+.op-a { grid-area: a; } .op-b1 { grid-area: b1; } .op-b2 { grid-area: b2; } .op-c1 { grid-area: c1; } .op-c2 { grid-area: c2; }
+.op-grid h3 { margin: 0 0 8px; font-size: 14px; letter-spacing: -.2px; }
+.op-grid h3 small { color: var(--sub); font-weight: 500; font-size: 11px; margin-left: 4px; }
+@media (max-width: 1100px) { .op-grid { grid-template-columns: 1fr 1fr; grid-template-areas: "a a" "b1 b2" "c1 c1" "c2 c2"; } }
+@media (max-width: 700px) { .op-grid { grid-template-columns: 1fr; grid-template-areas: "a" "b1" "b2" "c1" "c2"; } }
+
+/* ① 그래프 */
+.op-chartbox { position: relative; height: 340px; }
+.op-lm { margin-bottom: 8px; max-width: 100%; }
+.op-info { margin-top: 10px; display: grid; gap: 6px; font-size: 13px; }
+.op-kv { display: flex; align-items: baseline; gap: 8px; }
+.op-kv span { color: var(--sub); min-width: 28px; }
+.op-kv b { font-size: 17px; letter-spacing: -.3px; }
+.op-kv small { color: var(--sub); font-size: 11px; }
+.op-ch { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); font-size: 13px; }
+.op-ch > span { color: var(--sub); margin-right: 4px; }
+.op-sub { color: var(--sub); font-size: 12px; }
+
+/* ② 아실 사진 칸 */
+.op-slot { position: relative; border: 1.5px dashed var(--line); border-radius: 10px; min-height: 150px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: var(--panel2); outline: none; transition: border-color .15s, background-color .15s; }
+.op-slot.act { border-color: var(--accent); }
+.op-slot.over { border-color: var(--accent); background: var(--sel); }
+.op-slot.has { border-style: solid; background: #fff; padding: 4px; }
+.op-slot img { max-width: 100%; max-height: 260px; display: block; }
+.op-ph { text-align: center; color: var(--sub); font-size: 12px; line-height: 1.7; padding: 14px; }
+.op-ph b { display: block; color: var(--text); font-size: 13px; margin-bottom: 4px; }
+.op-ph kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 11px; background: var(--panel); }
+.op-x { position: absolute; top: 6px; right: 6px; }
+
+/* ③④ 표 */
+.op-t { font-size: 12.5px; }
+.op-t th, .op-t td { padding: 5px 8px; border: 1px solid var(--line); white-space: nowrap; }
+.op-b2, .op-c1, .op-c2 { overflow-x: auto; }
+.op-t td { text-align: center; }
+.op-t td.l { text-align: left; }
+.op-t tr.op-off { opacity: .35; }
+.op-t tr.op-over { opacity: .6; }
+.op-t tr.op-sum td { background: var(--panel2); }
+.op-real { color: var(--c-quote); font-weight: 600; }
+.op-warn { color: #f5a524; cursor: help; }
+.op-memo { width: 100%; min-width: 150px; font-size: 12px; padding: 3px 6px; }
+.op-scan th.op-bl { text-align: center; color: var(--text); font-size: 13px; white-space: nowrap; }
+.op-scan th.op-bl small { display: block; color: var(--sub); font-weight: 500; font-size: 11px; margin: 0; }
+.op-scan td { vertical-align: middle; }
+.op-sc { padding: 1px 0; white-space: nowrap; }
+.op-sc b { color: #f5a524; margin-right: 3px; }
+.op-sc span { color: var(--sub); font-size: 12px; margin-left: 4px; }
+.op-na { color: var(--sub); }
+
+/* ⑤ 글 */
+.op-tx { margin-bottom: 10px; }
+.op-ta { width: 100%; resize: vertical; min-height: 84px; font: inherit; line-height: 1.55; padding: 8px 10px; border-radius: 8px; }
