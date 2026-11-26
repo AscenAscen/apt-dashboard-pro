@@ -19,6 +19,7 @@
 <link rel="stylesheet" href="css/start.css">
 <link rel="stylesheet" href="css/labels.css">
 <link rel="stylesheet" href="css/yardmap.css">
+<link rel="stylesheet" href="css/onepage.css">
 </head>
 <body>
 
@@ -30,6 +31,7 @@
     <button data-tab="yard">1등뽑기</button>
     <button data-tab="tracking">시세트래킹 <span class="badge" id="trackCount">0</span></button>
     <button data-tab="land">랜드마크</button>
+    <button data-tab="onepage">원페이지</button>
     <button data-tab="survey">전수조사</button>
     <button data-tab="cxmap" data-more>단지 지도</button>
     <button data-tab="map" data-more>시세지도</button>
@@ -432,6 +434,7 @@
 <!-- ═══════════════ 시세트래킹 ═══════════════ -->
 <!-- ═══════════════ 앞마당 (지역 박스 판) — 화면은 js/yardmap.js 가 만듭니다 ═══════════════ -->
 <main id="tab-yardmap" class="tab" hidden></main>
+<main id="tab-onepage" class="tab" hidden></main>
 
 <!-- ═══════════════ 1등뽑기 (구 앞마당 · 가격대별 1등 뽑기) — 화면은 js/yard.js 가 만듭니다 ═══════════════ -->
 <main id="tab-yard" class="tab" hidden></main>
@@ -1485,7 +1488,7 @@
    · 지금: 모든 파일을 "동시에" 받기 시작하고, 실행은 목록 순서대로 (async=false)
    · 엑셀 라이브러리(lib/xlsx.full.min.js)는 엑셀 버튼을 누를 때 needXLSX() 로 불러옵니다 */
 (function () {
-  var FILES = ['lib/chart.umd.js', 'js/labelkit.js', 'js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/view3d.js', 'js/satview.js', 'js/count.js', 'js/yard.js', 'js/yardmap.js', 'js/start.js', 'js/fbconfig.js', 'js/fbsync.js', 'js/autosync.js', 'js/compact.js', 'js/app.js'];
+  var FILES = ['lib/chart.umd.js', 'js/labelkit.js', 'js/kakao.js', 'js/kit.js', 'js/common.js', 'js/regfix.js', 'js/home.js', 'js/trades.js', 'js/search.js', 'js/locinfo.js', 'js/compare.js', 'js/infra.js', 'js/colfilter.js', 'js/supply.js', 'js/supplymap.js', 'js/supplycmp.js', 'js/migration.js', 'js/health.js', 'js/cmdk.js', 'js/cxmap.js', 'js/tracking.js', 'js/survey.js', 'js/vault.js', 'js/grouping.js', 'js/trends.js', 'js/invest.js', 'js/chartkit.js', 'js/trkplus.js', 'js/snap.js', 'js/pmarea.js', 'js/monthly.js', 'js/sync.js', 'js/cxview.js', 'js/market.js', 'js/my.js', 'js/land.js', 'js/imjang.js', 'js/guide.js', 'js/maplabel.js', 'js/pricemap.js', 'js/settings.js', 'js/eval.js', 'js/view3d.js', 'js/satview.js', 'js/count.js', 'js/yard.js', 'js/yardmap.js', 'js/start.js', 'js/fbconfig.js', 'js/fbsync.js', 'js/autosync.js', 'js/compact.js', 'js/onepage.js', 'js/app.js'];
   /* 1) 저장소가 준비되는 동안 미리 받아 두기 */
   FILES.forEach(function (f) { var l = document.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = f; document.head.appendChild(l); });
   /* 2) 저장소(Store)가 준비되면 목록 순서대로 실행 */
