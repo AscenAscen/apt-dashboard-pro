@@ -17,7 +17,7 @@ const Settings = (() => {
 
   const nav = () => $('tabs');
   // 처음 상태에서 위쪽 메뉴에 보이는 탭 — 나머지는 [더보기] 안에 들어갑니다 (설정 탭은 항상 위쪽)
-  const DEFAULT_TOP = ['start', 'yardmap', 'yard', 'tracking', 'land', 'onepage', 'cmp2', 'survey', 'guide'];
+  const DEFAULT_TOP = ['start', 'yardmap', 'yard', 'tracking', 'alerts', 'land', 'onepage', 'cmp2', 'survey', 'guide'];
   const nameOf = (btn) => { const t = [...btn.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim(); return t || btn.dataset.tab; };
   const names = () => new Map(defaults.map(d => [d.id, d.name]));
   let moreEl = null, popEl = null, cur = '';
