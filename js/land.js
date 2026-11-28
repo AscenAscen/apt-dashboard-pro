@@ -1,7 +1,7 @@
 /* ─────────────────────────────────────────────────────────
    land.js — [랜드마크] 탭
-   · 지역 대표(랜드마크) 단지를 직접 골라 등급(S/A/B)을 매기고 지도에 표시
-   · 점을 누르면 단지 카드(가격·전고 대비·추세), 지도를 멀리 보면 낮은 등급 이름표는 숨김
+   · 지역 대표(랜드마크) 단지를 직접 골라 등급(S/A/B)을 매김
+   · S(대표) 등급은 "판"(js/landboard.js)에 시군구 칸별 최근 실거래가로 표시, 칸을 누르면 단지 카드(가격·전고 대비·추세)
    · 랜드마크 대비 격차: 내 단지(시세트래킹)가 랜드마크보다 얼마나 싼지
    등급 이름·색은 js/config.js 의 GRADES 에서 바꿉니다. 좌표는 저장하지 않고 열 때마다 다시 찾습니다.
    ───────────────────────────────────────────────────────── */
@@ -10,7 +10,7 @@ const Land = (() => {
   const KEY = 'apt.land.v1', MKEY = 'apt.landMonths.v1';
   let map = Store.get(KEY, {});        // { 단지번호: { grade, name, sido, sgg, dong, jibun, t, quotes: { 연월: { s, sn, r, rn } } } }  ← 시세트래킹과 따로 저장
   let months = Store.get(MKEY, []);    // 시세 기록 표에 있는 달들 (예: 202611)
-  let regions = [], idx = { c: {} }, kmap = null, ctrl = null, seq = 0, inited = false;
+  let regions = [], idx = { c: {} }, inited = false;
   const grade = (k) => CONFIG.GRADES.find(g => g.k === k) || CONFIG.GRADES[CONFIG.GRADES.length - 1];
   const rank = (k) => { const i = CONFIG.GRADES.findIndex(g => g.k === k); return i < 0 ? 99 : i; };
   const save = () => { Store.set(KEY, map); Store.set(MKEY, months); };
@@ -68,15 +68,19 @@ const Land = (() => {
   }
 
   /* ── 화면 ── */
+  /** 실거래 읽기: 지역별로 나눠 6곳씩 동시에 (단지가 많아도 오래 걸리지 않게) */
+  async function loadReal(list) {
+    const by = new Map(); list.forEach(l => { if (!by.has(l.code)) by.set(l.code, []); by.get(l.code).push(l); });
+    const jobs = [...by.values()], total = jobs.length; let done = 0;
+    const msg = document.getElementById('lbMsg');
+    const worker = async () => { while (jobs.length) { const part = jobs.shift(); try { await Real.load(part); } catch (e) { console.warn(e); } done++; if (msg && total > 3) msg.textContent = `실거래를 읽는 중… 지역 ${done}/${total}`; } };
+    await Promise.all(Array.from({ length: 6 }, worker));
+  }
   async function render() {
     const list = all();
     $('ldEmpty').hidden = list.length > 0; $('ldBody').hidden = !list.length;
     if (!list.length) return;
-    await Real.load(list);
-    const sidos = [...new Set(list.map(l => l.sido))], cur = $('ldRegion').value;
-    $('ldRegion').innerHTML = '<option value="">전체</option>' + sidos.map(s => `<option>${U.esc(s)}</option>`).join('');
-    if (sidos.includes(cur)) $('ldRegion').value = cur;
-    $('ldLegend').innerHTML = CONFIG.GRADES.map(g => `<span style="color:${g.color}">●</span> ${U.esc(g.name)}`).join(' &nbsp; ') + ' · 지도를 멀리 보면 낮은 등급 이름은 숨겨집니다';
+    await loadReal(list);
     table(list);
     quoteTable(list);
     const b = $('ldBase').value;
@@ -156,33 +160,8 @@ const Land = (() => {
       c('12개월 실거래 흐름', Kit.spark(x.rl.mon || [], 130, 30), `최근 90일 매매 ${x.rl.n90 ?? 0}건 · <button class="mini" data-open="${U.esc(l.id)}">실거래 그래프</button>`),
     ].join('') + `<div style="grid-column:1/-1">${Loc.summary(l)}</div>`;      // 입지 메모(단지 비교에서 적은 값)도 함께
   }
-  async function draw() {
-    const my = ++seq, msg = $('ldMapMsg'), sido = $('ldRegion').value;
-    const list = all().filter(l => !sido || l.sido === sido);
-    const say = (html) => { msg.innerHTML = html; msg.hidden = false; };
-    if (!KMap.ready()) return say(KMap.needKeyHtml);
-    say(`단지 위치를 찾는 중… (0/${list.length})`);
-    try {
-      await KMap.load();
-      let n = 0;
-      for (const l of list) { l.pos = await KMap.geocode(l); if (my !== seq) return; say(`단지 위치를 찾는 중… (${++n}/${list.length})`); }
-    } catch (e) { return say(U.esc(e.message || String(e))); }
-    const ok = list.filter(l => l.pos);
-    if (!ok.length) return say('단지 위치를 찾지 못했습니다.');
-    msg.hidden = true;
-    if (!kmap) {
-      LabelKit.mount('land', { el: $('ldMap'), ext: () => { const c = $('ldCtl'); c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.classList.add('lk-flash'); setTimeout(() => c.classList.remove('lk-flash'), 1400); } });
-      kmap = KMap.create($('ldMap'), ok[0].pos, 7);
-      // 라벨(겹침 방지·끌어 옮기기·크기·캡처 모드)은 js/maplabel.js — 시세지도와 같은 도구
-      ctrl = MapLabel.create({ key: 'land', map: kmap, panel: $('ldPanel'), ctl: $('ldCtl'), onPick: (it) => { const l = all().find(x => x.id === it.id); if (l) card(l); } });
-    }
-    ctrl.set(ok.map(l => { const p = price(l), x = info(l), col = grade(l.grade).color, v = p ? Kit.eok(p.v, 1) : '-';
-      return { id: l.id, ck: String(l.id).split('#')[0], pos: l.pos, text: `${l.name}${p ? ' ' + v : ''}`, color: col, rank: rank(l.grade),
-        name: l.name, lines: [{ label: '', val: v, col, real: !!p && !p.quoted }], compact: [{ val: v, col }], drop: x.drop, rise: x.rise }; }));
-    kmap.relayout();
-    if (ok.length > 1) KMap.fit(kmap, ok.map(l => l.pos)); else { kmap.setCenter(KMap.LL(ok[0].pos)); kmap.setLevel(5); }
-    if (!$('ldCard').innerHTML) card(ok[0]);
-  }
+  /** 판 그리기 (S 등급만 올라감 — 실제 그리기는 js/landboard.js) */
+  function draw() { return LandBoard.draw(all(), { onPick: (l) => card(l) }); }
 
   async function init() {
     regions = await Data.regions();
@@ -230,7 +209,6 @@ const Land = (() => {
       months = months.filter(x => x !== +m); Object.values(map).forEach(v => { if (v.quotes) delete v.quotes[m]; });
       save(); render();
     };
-    $('ldRegion').onchange = () => { $('ldCard').innerHTML = ''; draw(); };
     $('ldBase').onchange = $('ldVs').onchange = gap;
     $('btnLdExcel').onclick = excel;
     $('ldTable').onchange = (e) => { const id = e.target.closest('tr')?.dataset.id; if (id && e.target.dataset.grade != null) { map[id].grade = e.target.value; save(); render(); } };
