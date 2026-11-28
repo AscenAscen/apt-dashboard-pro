@@ -42,7 +42,8 @@ const OnePage = (() => {
   const nowYm = () => { const t = new Date(); return t.getFullYear() * 100 + t.getMonth() + 1; };
   const load = () => {
     pages = Store.get(KEY, {}) || {};
-    ui = Object.assign({ code: '', ym: nowYm(), mode: 'basic', range: 36, stat: 'avg', rows: 10, supScope: 'city', supMin: 100, noRent: 0 }, Store.get(UKEY, {}) || {});
+    ui = Object.assign({ code: '', ym: nowYm(), mode: 'basic', range: 36, rFrom: 0, rTo: 0, stat: 'avg', rows: 0, rowsAll: 1, supScope: 'city', supMin: 100, noRent: 0 }, Store.get(UKEY, {}) || {});
+    if (!ui.rowsAll) { ui.rows = 0; ui.rowsAll = 1; Store.set(UKEY, ui); }      // 예전에 저장된 '표 단지 수' 제한(8·10·12개)은 한 번 풀어 줌 → 기본 '전체'
   };
   const saveUi = () => Store.set(UKEY, ui);
   const pkey = () => `${ui.code}|${ui.ym}`;
@@ -68,6 +69,14 @@ const OnePage = (() => {
   }
   const addMonths = (ym, k) => { let y = Math.floor(ym / 100), m = ym % 100 + k; while (m > 12) { m -= 12; y++; } while (m < 1) { m += 12; y--; } return y * 100 + m; };
   const monthsEnding = (ym, n) => Array.from({ length: n }, (_, i) => addMonths(ym, -(n - 1 - i)));
+  const monthsBetween = (a, b) => { const out = []; for (let m = a, k = 0; m <= b && k < 300; m = addMonths(m, 1), k++) out.push(m); return out; };
+  /** 그래프에 그릴 달 목록: 목록에서 고른 기간(끝 = 선택한 월) 또는 '직접 지정'(시작월~끝월) */
+  function chartMonths(ym) {
+    if (+ui.range > 0) return monthsEnding(ym, +ui.range);
+    let a = +ui.rFrom || addMonths(ym, -35), b = +ui.rTo || ym;
+    if (a > b) [a, b] = [b, a];
+    return monthsBetween(a, Math.min(b, Math.max(nowYm(), ym)));
+  }
   const ymDot = (ym) => `${Math.floor(ym / 100)}.${String(ym % 100).padStart(2, '0')}`;
   const ymKor = (ym) => `${Math.floor(ym / 100)}년 ${ym % 100}월`;
   const ymStr = (ym) => `${Math.floor(ym / 100)}-${String(ym % 100).padStart(2, '0')}`;            // '2026-11'
@@ -109,12 +118,12 @@ const OnePage = (() => {
   /* ═════════ 자료 만들기 ═════════ */
   /** ① 랜드마크 34평 월별 실거래 그래프 */
   async function buildChart(lm, ym) {
-    const y1 = Math.floor(ym / 100), y0 = Math.min(Math.floor(CONFIG.PEAK_FROM / 10000), y1 - 6), endD = ym * 100 + 31;
+    const months = chartMonths(ym), pos = new Map(months.map((m, i) => [m, i])), endYm = months[months.length - 1], startYm = months[0];
+    const y1 = Math.floor(endYm / 100), y0 = Math.min(Math.floor(CONFIG.PEAK_FROM / 10000), Math.floor(startYm / 100), y1 - 6), endD = endYm * 100 + 31;
     const tr = await Data.complexTrades(lm.code, lm.key, null, y0, y1);
     const sale = tr.sale.filter(t => !t.direct && t.d <= endD && CONFIG.toPyeong(t.area) === PY);
     const rent = tr.rent.filter(t => t.d <= endD && CONFIG.toPyeong(t.area) === PY);
     if (!sale.length && !rent.length) return { empty: true };
-    const months = monthsEnding(ym, +ui.range || 36), pos = new Map(months.map((m, i) => [m, i]));
     const sl = months.map(() => []), rl = months.map(() => []);
     sale.forEach(t => { const i = pos.get(Math.floor(t.d / 100)); if (i != null) sl[i].push(t.price); });
     rent.forEach(t => { const i = pos.get(Math.floor(t.d / 100)); if (i != null) rl[i].push(t.price); });
@@ -130,7 +139,7 @@ const OnePage = (() => {
     const all2020 = sale.filter(t => t.d >= CONFIG.PEAK_FROM), pk = Data.peakTrough(all2020).peak, last = sale[sale.length - 1] || null;
     const cnt = (arr, a, b) => arr.slice(a, b).reduce((s, x) => s + x.length, 0), n = months.length;
     return { months, sv, rv, sn: sl.map(a => a.length), rn: rl.map(a => a.length), cs, cr, peak: pk, last,
-      newHigh: !!(pk && Math.floor(pk.d / 100) === ym), fromPeak: last && pk ? (last.price / pk.price - 1) * 100 : null,
+      newHigh: !!(pk && Math.floor(pk.d / 100) === endYm), fromPeak: last && pk ? (last.price / pk.price - 1) * 100 : null,
       c3: cnt(sl, n - 3, n), p3: cnt(sl, n - 6, n - 3), rc3: cnt(rl, n - 3, n), rp3: cnt(rl, n - 6, n - 3) };
   }
 
@@ -278,9 +287,10 @@ const OnePage = (() => {
         <label>지역 <select id="opRegion" style="min-width:190px"></select></label>
         <label>월 <input type="month" id="opYm"></label>
         <div><span class="hint" style="margin:0">보기</span><div class="presets" id="opMode"><button data-m="basic">기본</button><button data-m="deep">심화 (시세 스캐닝)</button></div></div>
-        <label>그래프 기간 <select id="opRange"><option value="12">1년</option><option value="24">2년</option><option value="36">3년</option><option value="60">5년</option></select></label>
+        <label>그래프 기간 <select id="opRange"><option value="12">1년</option><option value="24">2년</option><option value="36">3년</option><option value="60">5년</option><option value="120">10년</option><option value="0">직접 지정</option></select></label>
+        <label id="opSpan" hidden title="그래프에 그릴 시작월과 끝월을 직접 고릅니다">기간 <span style="display:flex;gap:4px;align-items:center"><input type="month" id="opFrom"> ~ <input type="month" id="opTo"></span></label>
         <label>월 가격 <select id="opStat"><option value="avg">평균</option><option value="med">중앙값</option></select></label>
-        <label>표 단지 수 <select id="opRows"><option value="8">8개</option><option value="10">10개</option><option value="12">12개</option></select></label>
+        <label>표 단지 수 <select id="opRows"><option value="0">전체 (제한 없음)</option><option value="8">8개</option><option value="10">10개</option><option value="12">12개</option><option value="16">16개</option><option value="20">20개</option></select></label>
         <label>공급 범위 <select id="opSupScope"><option value="city">같은 시 전체</option><option value="gu">이 지역만</option></select></label>
         <label>공급 최소 세대 <select id="opSupMin"><option value="0">전부</option><option value="100">100세대 이상</option><option value="300">300세대 이상</option></select></label>
         <label class="row" style="flex-direction:row;align-items:center;padding-bottom:7px;gap:6px"><input type="checkbox" id="opNoRent"> 임대 제외</label>
@@ -292,7 +302,9 @@ const OnePage = (() => {
   }
   function syncCtl() {
     $('opRegion').value = ui.code; $('opYm').value = ymStr(+ui.ym);
-    $('opRange').value = String(ui.range); $('opStat').value = ui.stat; $('opRows').value = String(ui.rows);
+    $('opRange').value = String(ui.range); $('opStat').value = ui.stat;
+    const custom = !(+ui.range > 0), mx = ymStr(Math.max(nowYm(), +ui.ym)); $('opSpan').hidden = !custom;
+    $('opFrom').max = $('opTo').max = mx; $('opFrom').value = ymStr(+ui.rFrom || addMonths(+ui.ym, -35)); $('opTo').value = ymStr(+ui.rTo || +ui.ym); $('opRows').value = String(ui.rows);
     $('opSupScope').value = ui.supScope; $('opSupMin').value = String(ui.supMin); $('opNoRent').checked = !!ui.noRent;
     $('opMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === ui.mode));
   }
@@ -304,13 +316,13 @@ const OnePage = (() => {
     const ex = new Set(m.page.ex || []), rows = m.trk.rows;
     if (!rows.length) return '<p class="hint">이 지역에 담은 시세트래킹 단지가 없습니다. 시세트래킹 탭에서 단지를 담으면 여기에 나옵니다.</p>';
     const shown = rows.filter(r => !ex.has(r.id));
-    const lim = shown.slice(0, +ui.rows || 10);
+    const lim = +ui.rows > 0 ? shown.slice(0, +ui.rows) : shown;                // 표 단지 수 '전체' = 제한 없음
     return `<div class="tablewrap"><table class="op-t"><thead><tr><th class="c"></th><th class="l">단지</th><th>연식</th><th>세대수</th><th>평형</th><th>전용</th><th>계/복</th><th>방</th><th>화</th><th>매매</th><th>전월대비</th><th>전세</th><th>전월대비</th><th>매-전</th><th>전세가율</th></tr></thead><tbody>` +
       rows.map(r => { const off = ex.has(r.id), inList = lim.includes(r);
         return `<tr class="${off ? 'op-off' : inList ? '' : 'op-over'}" data-id="${esc(r.id)}"><td class="c"><input type="checkbox" data-ex ${off ? '' : 'checked'} title="원페이지·PPT 표에 넣기"></td>` +
           `<td class="l">${esc(r.name)}${r.askGap != null && Math.abs(r.askGap) >= GAPLIM ? ` <span class="op-warn" title="호가가 최근 실거래와 ${pct1(r.askGap)} 벌어짐">⚠</span>` : ''}</td><td>${r.by || '-'}</td><td>${r.hh ? r.hh.toLocaleString() : '-'}</td><td>${r.py}</td><td>${r.g}</td>` +
           `<td>${esc(r.struct) || '-'}</td><td>${esc(r.rooms) || '-'}</td><td>${esc(r.baths) || '-'}</td><td>${cellMoney(r.s, r.sReal)}</td><td>${cellDiff(r.ds)}</td><td>${cellMoney(r.r, r.rReal)}</td><td>${cellDiff(r.dr)}</td><td>${cellMoney(r.gap, false)}</td><td>${r.ratio == null ? '-' : Math.round(r.ratio) + '%'}</td></tr>`; }).join('') +
-      `</tbody></table></div><p class="hint" style="margin:6px 0 0"><span class="op-real">파랑</span> = 호가가 없어 최근 실거래로 채운 값 · 맨 앞 ✓ 를 끄면 표에서 뺍니다 · 위에서 ${lim.length}개만 PPT 에 들어갑니다 (옅은 줄 = 개수 초과).</p>`;
+      `</tbody></table></div><p class="hint" style="margin:6px 0 0"><span class="op-real">파랑</span> = 호가가 없어 최근 실거래로 채운 값 · 맨 앞 ✓ 를 끄면 표에서 뺍니다 · ${+ui.rows > 0 && shown.length > lim.length ? `위에서 ${lim.length}개만 PPT 에 들어갑니다 (옅은 줄 = 개수 초과).` : `체크한 ${lim.length}개가 모두 PPT 한 장에 들어갑니다 (많으면 글자가 작아집니다).`}${lim.length > 30 ? ' <b style="color:var(--danger)">⚠ 30개가 넘으면 PPT 글자가 너무 작아져 읽기 어렵습니다 — 일부를 빼 주세요.</b>' : ''}</p>`;
   }
   function scanTable(m) {
     const s = m.scan;
@@ -327,7 +339,7 @@ const OnePage = (() => {
     return `<div class="tablewrap"><table class="op-t"><thead><tr><th class="l">위치</th><th class="l">단지명</th><th>입주</th><th>세대수</th><th class="l">메모 (전세 시작가 등)</th></tr></thead><tbody>` +
       sp.rows.map(r => `<tr data-sid="${esc(r.id)}"><td class="l">${esc(r.loc)}</td><td class="l">${esc(r.name)}</td><td>${r.ym.slice(0, 4)}년 ${+r.ym.slice(5)}월</td><td>${r.hh.toLocaleString()}</td><td class="l"><input class="op-memo" data-memo value="${esc(r.memo)}" placeholder="예: 25평 전세 4.9억부터"></td></tr>`).join('') +
       `<tr class="op-sum"><td class="l" colspan="3"><b>${esc(sp.scopeName)} 합계</b></td><td><b>${sp.total.toLocaleString()}</b></td><td></td></tr></tbody></table></div>` +
-      `<p class="hint" style="margin:6px 0 0">입주 ${ymDot(addMonths(m.ym, -12))} ~ ${ymDot(addMonths(m.ym, 36))} · 향후 6개월 ${sp.n6}단지 ${sp.hh6.toLocaleString()}세대${sp.need ? ` · 12개월 ${sp.hh12.toLocaleString()}세대 = 적정 수요(연 ${Math.round(sp.need).toLocaleString()})의 ${Math.round(sp.hh12 / sp.need * 100)}%` : ''}. PPT 에는 가까운 5개만 들어갑니다.</p>`;
+      `<p class="hint" style="margin:6px 0 0">입주 ${ymDot(addMonths(m.ym, -12))} ~ ${ymDot(addMonths(m.ym, 36))} · 향후 6개월 ${sp.n6}단지 ${sp.hh6.toLocaleString()}세대${sp.need ? ` · 12개월 ${sp.hh12.toLocaleString()}세대 = 적정 수요(연 ${Math.round(sp.need).toLocaleString()})의 ${Math.round(sp.hh12 / sp.need * 100)}%` : ''}. PPT 에는 위 표가 모두 들어갑니다 (많으면 글자가 작아지고 사진 칸이 조금 줄어듭니다).</p>`;
   }
   function chartInfo(m) {
     const c = m.chart;
@@ -348,7 +360,7 @@ const OnePage = (() => {
     const t = m.page.t || {}, d = m.draft;
     $('opBody').innerHTML = `
     <div class="op-grid">
-      <section class="panel op-a"><h3>① 랜드마크 가격 변화 <small>${m.lm ? esc(m.lm.name) : ''} · 34평(전용 84형) · 실거래</small></h3>${lmSel}
+      <section class="panel op-a"><h3>① 랜드마크 가격 변화 <small>${m.lm ? esc(m.lm.name) : ''} · 34평(전용 84형) · 실거래${m.chart && m.chart.months ? ` · ${ymDot(m.chart.months[0])}~${ymDot(m.chart.months[m.chart.months.length - 1])}` : ''}</small></h3>${lmSel}
         <div class="op-chartbox"><canvas id="opChart"></canvas></div>${chartInfo(m)}</section>
       <section class="panel op-b1"><h3>② 매매/전세 물량 <small>아실 캡처 · 저장되지 않고 PPT 에만 들어갑니다</small></h3>
         ${imgSlot('a', '매매 물량 (아실)')}${imgSlot('b', '전세 물량 (아실)')}<input type="file" id="opFile" accept="image/*" hidden></section>
@@ -374,8 +386,8 @@ const OnePage = (() => {
       ctx.strokeStyle = o.edge; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x0, A.top); ctx.lineTo(x0, A.bottom); ctx.moveTo(x1, A.top); ctx.lineTo(x1, A.bottom); ctx.stroke(); ctx.restore(); } };
     chart = new Chart(cv, { type: 'line', plugins: [band],
       data: { labels: c.months.map(ymDot), datasets: [
-        { label: '매매', data: v(c.sv), borderColor: col.sale, backgroundColor: col.sale, spanGaps: true, pointRadius: 2, borderWidth: 2, tension: .2 },
-        { label: '전세', data: v(c.rv), borderColor: col.rent, backgroundColor: col.rent, spanGaps: true, pointRadius: 2, borderWidth: 2, tension: .2 }] },
+        { label: '매매', data: v(c.sv), borderColor: col.sale, backgroundColor: col.sale, spanGaps: true, pointRadius: n > 60 ? 0 : 2, borderWidth: 2, tension: .2 },
+        { label: '전세', data: v(c.rv), borderColor: col.rent, backgroundColor: col.rent, spanGaps: true, pointRadius: n > 60 ? 0 : 2, borderWidth: 2, tension: .2 }] },
       options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
         plugins: { opBand: n > 7 ? { from: n - 7, to: n - 1, color: 'rgba(120,150,255,.12)', edge: 'rgba(150,170,255,.55)' } : {}, legend: { position: 'bottom', labels: { color: col.text, usePointStyle: true, boxWidth: 8 } },
           tooltip: { callbacks: { label: (it) => { const a = it.datasetIndex ? c.rn : c.sn; return `${it.dataset.label} ${it.parsed.y == null ? '-' : it.parsed.y.toFixed(2) + '억'} (${a[it.dataIndex]}건)`; } } } },
@@ -423,6 +435,14 @@ const OnePage = (() => {
       const regName = m.reg ? (m.reg[2] || '') : '', sido = m.reg ? sidoShort(m.reg[1]) : '', title = `${sido} ${regName}`.trim();
       const box = (x, y, w, h) => slide.addShape(pptx.ShapeType.rect, { x, y, w, h, fill: { color: 'FFFFFF' }, line: { color: BK, width: 1 } });
       const head = (t, x, y, w, sub) => slide.addText([{ text: t, options: { bold: true, fontSize: 11, color: BK } }, ...(sub ? [{ text: '  ' + sub, options: { fontSize: 8, color: GR } }] : [])], { x: x + 0.05, y: y + 0.02, w: w - 0.1, h: 0.3, fontFace: F, valign: 'middle', margin: 0.03 });
+      /** 표가 칸 높이(availH, 인치)에 들어가도록 글자 크기·줄 높이를 줄임. nameW = 단지명 칸 너비, maxLen = 가장 긴 이름 글자 수 (줄바꿈으로 줄이 늘어나지 않게) */
+      const warns = [];
+      const fitTable = (nRows, availH, fsMax, fsMin, rowMax, nameW, maxLen) => {
+        const mgOf = (fs) => (fs < 6 ? 0.005 : 0.015), need = (fs) => fs * 1.35 / 72 + 2 * mgOf(fs) + 0.015;      // 한글 글꼴은 줄 간격이 글자 크기의 약 1.35배
+        let fs = fsMax; while (fs > fsMin && nRows * need(fs) > availH) fs -= 0.25;
+        if (nameW && maxLen) { const fw = (nameW - 2 * mgOf(fs)) * 72 / (maxLen * 0.92); if (fw < fs) fs = Math.max(Math.min(fs, Math.max(fw, 5.5)), fsMin); }   // 이름이 길어 줄바꿈될 때만 더 줄임 (5.5pt 아래로는 내리지 않음)
+        return { fs: Math.round(fs * 4) / 4, mg: mgOf(fs), rowH: Math.min(rowMax, availH / nRows), fits: nRows * need(fs) <= availH + 0.001 };
+      };
       // 머리글
       slide.addShape(pptx.ShapeType.rect, { x: 0.25, y: 0.14, w: 0.06, h: 0.42, fill: { color: BK }, line: { color: BK, width: 0 } });
       slide.addText('원페이지', { x: 0.4, y: 0.1, w: 3, h: 0.5, fontFace: F, fontSize: 22, bold: true, color: BK, valign: 'middle' });
@@ -432,15 +452,15 @@ const OnePage = (() => {
 
       // ① 랜드마크 그래프
       const AX = 0.2, AY = 1.35, AW = 3.7, AH = 5.95;
-      box(AX, AY, AW, AH); head('랜드마크 가격 변화', AX, AY, AW, m.lm ? `${m.lm.name} · 34평 · 실거래` : '');
-      const c = m.chart;
+      box(AX, AY, AW, AH); const c = m.chart;
+      head('랜드마크 가격 변화', AX, AY, AW, m.lm ? `${m.lm.name} · 34평${c && c.months ? ` · ${ymDot(c.months[0])}~${ymDot(c.months[c.months.length - 1])}` : ' · 실거래'}` : '');
       if (c && !c.empty) {
         const fill = (a) => { const o = [...a], idx = o.map((v, i) => (v != null ? i : -1)).filter(i => i >= 0); for (let i = idx[0] + 1; i < idx[idx.length - 1]; i++) if (o[i] == null) { const p = idx.filter(j => j < i).pop(), q = idx.find(j => j > i); o[i] = o[p] + (o[q] - o[p]) * (i - p) / (q - p); } return o; };
         const sv = fill(c.sv), rv = fill(c.rv), first = Math.min(...[sv, rv].map(a => a.findIndex(x => x != null)).filter(i => i >= 0)), last = Math.max(...[sv, rv].map(a => { let j = -1; a.forEach((x, i) => { if (x != null) j = i; }); return j; }));
         const sl = (a) => a.slice(first, last + 1).map(x => (x == null ? null : +(x / 10000).toFixed(2)));
         slide.addChart(pptx.charts.LINE, [{ name: '매매', labels: c.months.slice(first, last + 1).map(ymDot), values: sl(sv) }, { name: '전세', labels: c.months.slice(first, last + 1).map(ymDot), values: sl(rv) }],
           { x: AX + 0.05, y: AY + 0.36, w: AW - 0.1, h: 3.7, chartColors: [SALE, RENT], lineSize: 2, lineDataSymbolSize: 4, showLegend: true, legendPos: 'b', legendFontSize: 9, legendFontFace: F,
-            catAxisLabelFontSize: 8, catAxisLabelFontFace: F, valAxisLabelFontSize: 8, valAxisLabelFormatCode: '0.0', catAxisLabelRotate: 270, valGridLine: { color: 'D9D9D9', size: 0.5 }, catGridLine: { style: 'none' }, displayBlanksAs: 'span' });
+            catAxisLabelFontSize: 8, catAxisLabelFontFace: F, catAxisLabelFrequency: last - first + 1 > 18 ? Math.ceil((last - first + 1) / 12) : 1, valAxisLabelFontSize: 8, valAxisLabelFormatCode: '0.0', catAxisLabelRotate: 270, valGridLine: { color: 'D9D9D9', size: 0.5 }, catGridLine: { style: 'none' }, displayBlanksAs: 'span' });
         const s = c.cs, r = c.cr, runs = [];
         const ln = (t, o = {}) => runs.push({ text: t, options: { fontSize: 10, fontFace: F, breakLine: true, color: BK, ...o } });
         if (s) ln(`${ymDot(c.months[s.e])} 매매 ${ui.stat === 'med' ? '중앙값' : '평균'} ${eok(s.v)} (${c.sn[s.e]}건)`, { bold: true });
@@ -454,25 +474,36 @@ const OnePage = (() => {
         slide.addText(runs, { x: AX + 0.1, y: AY + 4.1, w: AW - 0.2, h: 1.8, fontFace: F, valign: 'top', margin: 0.03 });
       } else slide.addText(m.lm ? '34평형(전용 84㎡형) 실거래가 없어 그래프를 그리지 못했습니다.' : '이 지역에 등록한 랜드마크가 없습니다.', { x: AX + 0.1, y: AY + 1.5, w: AW - 0.2, h: 1, fontFace: F, fontSize: 11, color: GR, align: 'center' });
 
+      // ③ 공급물량 크기 먼저 정하기 — 행이 많으면 ② 사진 칸을 줄여(최소 2.5인치) 표 칸을 키움
+      const BX = 4.0, BW = 3.2, COLH = AH, sp = m.supply, spOk = !!(sp && !sp.none && sp.rows.length);
+      const supRows = spOk ? sp.rows : [], supN = supRows.length + 2, supName = Math.max(0, ...supRows.map(r => r.name.length));
+      let H2 = 3.7, supFit = null;
+      if (spOk) {
+        const tryH = (h, fsMin) => fitTable(supN, (COLH - 0.1 - h) - 0.42, 8, fsMin, 0.24, 1.2, supName);
+        for (; H2 >= 2.5; H2 = Math.round((H2 - 0.1) * 10) / 10) { supFit = tryH(H2, 6); if (supFit.fits) break; }   // 6pt 이상으로 들어갈 때까지 사진 칸을 조금씩 줄임
+        if (H2 < 2.5) { H2 = 2.5; supFit = tryH(2.5, 4); }                                                          // 그래도 안 되면 사진 칸 최소(2.5인치)에서 글자를 4pt 까지 줄임
+      }
+      const SY = AY + H2 + 0.1, SH = COLH - H2 - 0.1;
+
       // ② 아실 사진
-      const BX = 4.0, BW = 3.2;
-      box(BX, AY, BW, 3.7); head('매매/전세 물량', BX, AY, BW, '아실');
+      box(BX, AY, BW, H2); head('매매/전세 물량', BX, AY, BW, '아실');
+      const slotH = (H2 - 0.52) / 2;
       [['a', '매매 물량'], ['b', '전세 물량']].forEach(([k, nm], i) => {
-        const y = AY + 0.4 + i * 1.64, w = BW - 0.2, h = 1.58, im = imgs[k];
+        const y = AY + 0.4 + i * (slotH + 0.06), w = BW - 0.2, h = slotH, im = imgs[k];
         if (im) { const r = Math.min(w / im.w, h / im.h), iw = im.w * r, ih = im.h * r; slide.addImage({ data: im.data, x: BX + 0.1 + (w - iw) / 2, y: y + (h - ih) / 2, w: iw, h: ih }); }
         else { slide.addShape(pptx.ShapeType.rect, { x: BX + 0.1, y, w, h, fill: { color: 'F7F7F7' }, line: { color: 'A6A6A6', width: 0.75, dashType: 'dash' } });
           slide.addText(`${nm} (아실) 그래프를\n여기에 붙여넣기`, { x: BX + 0.1, y, w, h, fontFace: F, fontSize: 10, color: '7F7F7F', align: 'center', valign: 'middle' }); }
       });
 
-      // ③ 공급물량
-      const SY = 5.15, SH = 2.15; box(BX, SY, BW, SH); head('공급물량', BX, SY, BW, m.supply && !m.supply.none ? `${m.supply.scopeName} 입주` : '');
-      const sp = m.supply;
-      if (sp && !sp.none && sp.rows.length) {
+      // ③ 공급물량 (표 전체)
+      box(BX, SY, BW, SH); head('공급물량', BX, SY, BW, spOk ? `${sp.scopeName} 입주 · ${sp.rows.length}단지` : '');
+      if (spOk) {
         const hd = (t) => ({ text: t, options: { bold: true, fill: { color: 'D9D9D9' }, align: 'center' } });
-        const cur = ymStr(m.ym), upcoming = sp.rows.filter(r => r.ym >= cur), pick = (upcoming.length ? upcoming : sp.rows).slice(0, 5);
-        const trs = [[hd('위치'), hd('단지명'), hd('입주'), hd('세대수')], ...pick.map(r => [{ text: r.loc, options: { align: 'left' } }, { text: r.name, options: { align: 'left' } }, { text: `${r.ym.slice(0, 4)}.${r.ym.slice(5)}` }, { text: r.hh.toLocaleString() }]),
+        const trs = [[hd('위치'), hd('단지명'), hd('입주'), hd('세대수')], ...supRows.map(r => [{ text: r.loc, options: { align: 'left' } }, { text: r.name, options: { align: 'left' } }, { text: `${r.ym.slice(0, 4)}.${r.ym.slice(5)}` }, { text: r.hh.toLocaleString() }]),
           [{ text: `${sp.scopeName} 합계 (${sp.rows.length}단지)`, options: { colspan: 3, bold: true, align: 'left' } }, { text: sp.total.toLocaleString(), options: { bold: true } }]];
-        slide.addTable(trs, { x: BX + 0.08, y: SY + 0.36, w: BW - 0.16, colW: [0.62, 1.2, 0.55, 0.63], fontFace: F, fontSize: 8, color: BK, align: 'center', valign: 'middle', border: { type: 'solid', pt: 0.5, color: BK }, rowH: 0.24, margin: 0.02 });
+        slide.addTable(trs, { x: BX + 0.08, y: SY + 0.36, w: BW - 0.16, colW: [0.62, 1.2, 0.55, 0.63], fontFace: F, fontSize: supFit.fs, color: BK, align: 'center', valign: 'middle', border: { type: 'solid', pt: 0.5, color: BK }, rowH: supFit.rowH, margin: supFit.mg });
+        if (supFit.fs < 6) warns.push(`공급물량 ${sp.rows.length}단지라 글자가 ${supFit.fs}pt 로 작아졌습니다`);
+        if (!supFit.fits) warns.push('공급물량이 많아 칸을 넘칠 수 있습니다 — 단지를 줄여 주세요 (공급 최소 세대·임대 제외)');
       } else slide.addText(sp && sp.none ? '공급지도 탭에 입주물량 엑셀을 올리면 채워집니다.' : '입주 예정 단지가 없습니다.', { x: BX + 0.1, y: SY + 0.5, w: BW - 0.2, h: 1, fontFace: F, fontSize: 9, color: GR, align: 'center' });
 
       // ④ 표
@@ -487,14 +518,17 @@ const OnePage = (() => {
         slide.addTable(trs, { x: CX + 0.08, y: AY + 0.36, w: CW - 0.16, colW: [1.15, ...s.cols.map(() => cw)], fontFace: F, fontSize: 7.5, color: BK, valign: 'middle', border: { type: 'solid', pt: 0.5, color: BK }, rowH: 0.3, margin: 0.02 });
       } else if (ui.mode !== 'deep' && m.trk.rows.length) {
         head('시세트래킹 단지', CX, AY, CW, '호가(검정) · 실거래로 채운 값(파랑) · 만원');
-        const ex = new Set(m.page.ex || []), list = m.trk.rows.filter(r => !ex.has(r.id)).slice(0, +ui.rows || 10);
+        const ex = new Set(m.page.ex || []), shownAll = m.trk.rows.filter(r => !ex.has(r.id)), list = +ui.rows > 0 ? shownAll.slice(0, +ui.rows) : shownAll;
         const hd = (t) => ({ text: t, options: { bold: true, fill: { color: 'D9D9D9' }, align: 'center' } });
         const mny = (v, real) => ({ text: v == null ? '-' : man(v), options: { color: real ? BLUE : BK } });
         const df = (v) => ({ text: v == null ? '-' : v === 0 ? '0' : (v > 0 ? '' : '-') + man(Math.abs(v)), options: { color: v == null || v === 0 ? BK : v > 0 ? 'C00000' : '1F4E9E' } });
         const trs = [['단지', '연식', '세대', '평형', '계/복', '방/화', '매매', '전월', '전세', '전월', '매-전', '전세가율'].map(hd),
           ...list.map(r => [{ text: r.name, options: { align: 'left' } }, { text: r.by || '-' }, { text: r.hh ? r.hh.toLocaleString() : '-' }, { text: String(r.py) }, { text: r.struct || '-' }, { text: `${r.rooms || '-'}/${r.baths || '-'}` },
             mny(r.s, r.sReal), df(r.ds), mny(r.r, r.rReal), df(r.dr), mny(r.gap, false), { text: r.ratio == null ? '-' : Math.round(r.ratio) + '%' }])];
-        slide.addTable(trs, { x: CX + 0.08, y: AY + 0.36, w: CW - 0.16, colW: [1.1, 0.38, 0.42, 0.34, 0.4, 0.36, 0.5, 0.4, 0.5, 0.4, 0.46, 0.4], fontFace: F, fontSize: 7, color: BK, align: 'center', valign: 'middle', border: { type: 'solid', pt: 0.5, color: BK }, rowH: 0.27, margin: 0.015 });
+        const tf = fitTable(list.length + 1, 3.7 - 0.36 - 0.06, 7, 4.5, 0.27, 1.1, Math.max(0, ...list.map(r => r.name.length)));      // 단지가 많으면 글자·줄 높이를 줄여 한 장에 담음
+        slide.addTable(trs, { x: CX + 0.08, y: AY + 0.36, w: CW - 0.16, colW: [1.1, 0.38, 0.42, 0.34, 0.4, 0.36, 0.5, 0.4, 0.5, 0.4, 0.46, 0.4], fontFace: F, fontSize: tf.fs, color: BK, align: 'center', valign: 'middle', border: { type: 'solid', pt: 0.5, color: BK }, rowH: tf.rowH, margin: tf.mg });
+        if (tf.fs < 6) warns.push(`시세트래킹 ${list.length}단지라 글자가 ${tf.fs}pt 로 작아졌습니다`);
+        if (!tf.fits) warns.push(`시세트래킹 ${list.length}단지는 한 장에 다 들어가지 않을 수 있습니다 — 일부를 빼 주세요`);
       } else { head(ui.mode === 'deep' ? '시세 스캐닝' : '시세트래킹 단지', CX, AY, CW); slide.addText('표로 만들 단지가 없습니다. (시세트래킹 탭에 단지를 담거나 1등뽑기에 호가를 적어 주세요)', { x: CX + 0.1, y: AY + 1.4, w: CW - 0.2, h: 1, fontFace: F, fontSize: 10, color: GR, align: 'center' }); }
 
       // ⑤ 글
@@ -507,7 +541,7 @@ const OnePage = (() => {
 
       const fname = `원페이지_${(title || '지역').replace(/[\\/:*?"<>|\s]+/g, '')}_${ymStr(m.ym)}.pptx`;
       await pptx.writeFile({ fileName: fname });
-      U.toast(`${fname} 을(를) 내려받았습니다.${imgs.a || imgs.b ? '' : ' (아실 사진 칸은 비어 있습니다 — PPT 에서 붙여넣으세요)'}`);
+      U.toast(`${fname} 을(를) 내려받았습니다.${imgs.a || imgs.b ? '' : ' (아실 사진 칸은 비어 있습니다 — PPT 에서 붙여넣으세요)'}${warns.length ? ' ⚠ ' + warns.join(' · ') : ''}`);
     } catch (e) { console.error(e); U.toast('PPT 를 만들지 못했습니다: ' + (e.message || e)); }
     finally { btn.disabled = false; btn.textContent = '📊 PPT 다운로드'; }
   }
@@ -527,7 +561,16 @@ const OnePage = (() => {
       const t = e.target;
       if (t.id === 'opRegion') { setUi({ code: t.value }, true); return refresh(); }
       if (t.id === 'opYm') { const ym = ymFromStr(t.value); if (!ym) return; setUi({ ym }); return refresh(); }
-      if (t.id === 'opRange') { setUi({ range: +t.value }); return refresh(); }
+      if (t.id === 'opRange') {
+        const v = +t.value, ch = { range: v };
+        if (!v && !(+ui.rFrom && +ui.rTo)) { ch.rFrom = addMonths(+ui.ym, -35); ch.rTo = +ui.ym; }       // 처음 '직접 지정'을 고르면 3년 구간으로 시작
+        setUi(ch); syncCtl(); return refresh();
+      }
+      if (t.id === 'opFrom' || t.id === 'opTo') {
+        let a = ymFromStr($('opFrom').value), b = ymFromStr($('opTo').value); if (!a || !b) return;
+        if (a > b) { [a, b] = [b, a]; U.toast('시작월이 끝월보다 늦어 두 값을 바꿨습니다.'); }
+        setUi({ range: 0, rFrom: a, rTo: b }); syncCtl(); return refresh();
+      }
       if (t.id === 'opStat') { setUi({ stat: t.value }); return refresh(); }
       if (t.id === 'opRows') { setUi({ rows: +t.value }); return refresh(); }
       if (t.id === 'opSupScope') { setUi({ supScope: t.value }); return refresh(); }
