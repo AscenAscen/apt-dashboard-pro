@@ -1,0 +1,46 @@
+name: 등록 단지 텔레그램 알림
+
+# 실거래 자동 수집이 끝날 때마다 → 등록한 단지에 새 거래가 있는지 보고 텔레그램으로 알려 줍니다.
+# 직접 확인하려면 Actions 화면에서 [Run workflow] 를 누르세요.
+on:
+  workflow_run:
+    workflows: ["실거래가 자동 수집 · 사이트 배포"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apt-alerts          # 동시에 두 번 돌면 같은 거래를 두 번 알릴 수 있어서 줄 서서 하나씩
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    name: 새 실거래 확인 · 텔레그램 보내기
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion != 'cancelled' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main                    # 수집이 방금 저장한 최신 자료
+          sparse-checkout: |
+            scripts
+            data/sale
+            data/rent
+          sparse-checkout-cone-mode: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 필요한 도구 설치
+        run: pip install -q google-auth requests
+
+      - name: 새 실거래 확인하고 텔레그램으로 보내기
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python scripts/alerts.py
