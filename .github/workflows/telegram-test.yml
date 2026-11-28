@@ -1,0 +1,23 @@
+name: 텔레그램 연결 테스트
+
+# 손으로 "Run workflow" 버튼을 눌렀을 때만 실행됩니다.
+on:
+  workflow_dispatch:
+
+jobs:
+  send-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 텔레그램으로 테스트 메시지 보내기
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "Secrets 값이 비어 있습니다. 이름과 값을 다시 확인하세요."
+            exit 1
+          fi
+          curl --fail-with-body -sS \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=✅ 단지 아틀라스 연결 성공! 이제 알림을 받을 수 있어요."
